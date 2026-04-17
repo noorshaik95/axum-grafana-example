@@ -38,9 +38,9 @@ scrape_configs:
           service: 'content-management-service'
 
   - job_name: 'onboarding-service'
-    metrics_path: /metrics
+    metrics_path: /health
     static_configs:
-      - targets: ['onboarding-service:9090']
+      - targets: ['onboarding-service:9081']
         labels:
           service: 'onboarding-service'
 
@@ -49,8 +49,11 @@ scrape_configs:
       - targets: ['tenant-service:9090']
 
   - job_name: 'metrics-service'
+    metrics_path: /health
     static_configs:
-      - targets: ['metrics-service:9090']
+      - targets: ['metrics-service:8087']
+        labels:
+          service: 'metrics-service'
 
   - job_name: 'video-conferencing-service'
     static_configs:

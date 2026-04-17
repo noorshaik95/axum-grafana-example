@@ -1,14 +1,14 @@
-'use client';
+'use client'
 
-import * as React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, TrendingUp, Users, Award } from 'lucide-react';
-import { mockStudentPerformance } from '@/lib/mock-data';
+import * as React from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { AlertTriangle, TrendingUp, Users, Award } from 'lucide-react'
+import { mockStudentPerformance } from '@/lib/mock-data'
 
 export function StudentPerformanceWidget() {
-  const { overall, gradeDistribution, atRiskStudents } = mockStudentPerformance;
+  const { overall, gradeDistribution, atRiskStudents } = mockStudentPerformance
 
   return (
     <Card>
@@ -36,9 +36,7 @@ export function StudentPerformanceWidget() {
               </div>
               <div className="text-3xl font-bold text-gray-900 dark:text-white">
                 {overall.activeStudents}
-                <span className="text-sm font-normal text-gray-500">
-                  /{overall.totalStudents}
-                </span>
+                <span className="text-sm font-normal text-gray-500">/{overall.totalStudents}</span>
               </div>
             </div>
           </div>
@@ -133,5 +131,5 @@ export function StudentPerformanceWidget() {
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }

@@ -1,13 +1,13 @@
-'use client';
+'use client'
 
-import * as React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ArrowRight, Users, TrendingUp, FileText } from 'lucide-react';
-import { mockCourses } from '@/lib/mock-data';
-import { cn } from '@/lib/utils';
+import * as React from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ArrowRight, Users, TrendingUp, FileText } from 'lucide-react'
+import { mockCourses } from '@/lib/mock-data'
+import { cn } from '@/lib/utils'
 
 const gradientClasses: Record<string, string> = {
   'blue-cyan': 'from-blue-500 to-cyan-500',
@@ -17,7 +17,7 @@ const gradientClasses: Record<string, string> = {
   'amber-yellow': 'from-amber-500 to-yellow-500',
   'violet-indigo': 'from-violet-500 to-indigo-500',
   'indigo-purple': 'from-indigo-500 to-purple-500',
-};
+}
 
 export function CourseOverviewWidget() {
   return (
@@ -46,9 +46,7 @@ export function CourseOverviewWidget() {
                     </div>
                     <Badge variant="outline">{course.section}</Badge>
                   </div>
-                  <h4 className="font-semibold text-gray-900 dark:text-white">
-                    {course.name}
-                  </h4>
+                  <h4 className="font-semibold text-gray-900 dark:text-white">{course.name}</h4>
                 </div>
               </div>
 
@@ -84,9 +82,7 @@ export function CourseOverviewWidget() {
 
               <div className="mb-3">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Course Progress
-                  </span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Course Progress</span>
                   <span className="text-sm font-semibold text-gray-900 dark:text-white">
                     {course.progress}%
                   </span>
@@ -103,5 +99,5 @@ export function CourseOverviewWidget() {
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }

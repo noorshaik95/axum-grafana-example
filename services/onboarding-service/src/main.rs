@@ -1,3 +1,4 @@
+mod health;
 mod kafka;
 mod state;
 mod workflow;
@@ -19,6 +20,16 @@ async fn main() -> anyhow::Result<()> {
     })?;
 
     info!("Starting onboarding service");
+
+    // Spawn health server on a separate port (Restate HttpServer owns 9080 and
+    // does not expose /health, so Prometheus and Docker HEALTHCHECK use 9081).
+    let health_addr = std::env::var("HEALTH_ADDR")
+        .unwrap_or_else(|_| "0.0.0.0:9081".to_string());
+    tokio::spawn(async move {
+        if let Err(e) = health::start_health_server(&health_addr).await {
+            tracing::error!("Health server error: {}", e);
+        }
+    });
 
     let endpoint = Endpoint::builder()
         .bind(OnboardingWorkflowImpl.serve())

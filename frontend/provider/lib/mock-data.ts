@@ -12,7 +12,7 @@ export const mockInstructor = {
   officeLocation: 'CS Building, Room 305',
   officeHours: 'Tuesday & Thursday, 2:00 PM - 4:00 PM',
   createdAt: '2020-01-15T00:00:00Z',
-};
+}
 
 export const mockCourses = [
   {
@@ -20,7 +20,8 @@ export const mockCourses = [
     code: 'CS 101',
     name: 'Introduction to Computer Science',
     section: 'A',
-    description: 'Fundamental concepts of computer science including algorithms, data structures, and programming.',
+    description:
+      'Fundamental concepts of computer science including algorithms, data structures, and programming.',
     semester: 'Fall',
     year: 2024,
     credits: 4,
@@ -76,7 +77,7 @@ export const mockCourses = [
       { day: 'Wednesday', time: '2:00 PM - 4:00 PM', location: 'Lab 402' },
     ],
   },
-];
+]
 
 export const mockGradingQueue = [
   {
@@ -139,7 +140,7 @@ export const mockGradingQueue = [
     points: 75,
     priority: 'low' as const,
   },
-];
+]
 
 export const mockUpcomingClasses = [
   {
@@ -193,7 +194,7 @@ export const mockUpcomingClasses = [
     type: 'lab' as const,
     prepNotes: 'Setup TensorFlow environment',
   },
-];
+]
 
 export const mockRecentActivity = [
   {
@@ -246,7 +247,7 @@ export const mockRecentActivity = [
     item: 'Quiz 3: Big O Notation',
     timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
   },
-];
+]
 
 export const mockStudentPerformance = {
   overall: {
@@ -294,7 +295,7 @@ export const mockStudentPerformance = {
       riskLevel: 'medium' as const,
     },
   ],
-};
+}
 
 export const mockAnnouncements = [
   {
@@ -302,7 +303,8 @@ export const mockAnnouncements = [
     courseId: '1',
     courseName: 'CS 101',
     title: 'Midterm Exam Schedule',
-    message: 'The midterm exam will be held on November 22nd in the Main Hall. Please arrive 15 minutes early.',
+    message:
+      'The midterm exam will be held on November 22nd in the Main Hall. Please arrive 15 minutes early.',
     priority: 'high' as const,
     createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     isPinned: true,
@@ -312,7 +314,8 @@ export const mockAnnouncements = [
     courseId: '2',
     courseName: 'CS 301',
     title: 'Guest Lecture Next Week',
-    message: 'Dr. Johnson from Google will be giving a guest lecture on scalable algorithms next Tuesday.',
+    message:
+      'Dr. Johnson from Google will be giving a guest lecture on scalable algorithms next Tuesday.',
     priority: 'medium' as const,
     createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
     isPinned: false,
@@ -327,7 +330,7 @@ export const mockAnnouncements = [
     createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
     isPinned: false,
   },
-];
+]
 
 export const mockCalendarEvents = [
   {
@@ -374,7 +377,7 @@ export const mockCalendarEvents = [
     location: 'Main Hall',
     color: 'orange',
   },
-];
+]
 
 export const mockStudentQuestions = [
   {
@@ -410,13 +413,14 @@ export const mockStudentQuestions = [
     studentAvatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Carol',
     courseId: '2',
     courseName: 'CS 301',
-    question: 'I\'m having trouble understanding dynamic programming. Can we discuss this in office hours?',
+    question:
+      "I'm having trouble understanding dynamic programming. Can we discuss this in office hours?",
     topic: 'Dynamic Programming',
     createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
     status: 'pending' as const,
     isUrgent: true,
   },
-];
+]
 
 export const mockStudents = [
   {
@@ -489,7 +493,7 @@ export const mockStudents = [
     lastActive: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
     status: 'at-risk' as const,
   },
-];
+]
 
 export const mockStats = {
   totalCourses: 3,
@@ -498,4 +502,4 @@ export const mockStats = {
   nextClass: mockUpcomingClasses[0],
   averageGrade: 82.4,
   activeRate: 93,
-};
+}

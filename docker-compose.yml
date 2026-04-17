@@ -681,6 +681,7 @@ services:
       RUST_LOG: "info,onboarding_service=debug"
     ports:
       - "8084:9080"   # Restate handler endpoint
+      - "8085:9081"   # Health check endpoint
     networks:
       - slate-network
     depends_on:
@@ -892,9 +893,9 @@ services:
       dockerfile: services/metrics-service/Dockerfile
     environment:
       SERVER_HOST: "0.0.0.0"
-      SERVER_PORT: "8084"
+      SERVER_PORT: "8087"
       GRPC_HOST: "0.0.0.0"
-      GRPC_PORT: "50054"
+      GRPC_PORT: "50057"
       DB_HOST: "postgres"
       DB_PORT: "5432"
       DB_USER: "postgres"
@@ -907,9 +908,8 @@ services:
       LOG_LEVEL: "info"
       ENVIRONMENT: "development"
     ports:
-      - "50059:50054"   # gRPC
-      - "8089:8084"     # HTTP
-      - "9101:9090"     # Metrics
+      - "50059:50057"   # gRPC
+      - "8089:8087"     # HTTP
     depends_on:
       postgres:
         condition: service_healthy

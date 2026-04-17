@@ -1,26 +1,26 @@
-'use client';
+'use client'
 
-import * as React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { FileText, Clock, AlertCircle } from 'lucide-react';
-import { mockGradingQueue } from '@/lib/mock-data';
-import { formatRelativeTime } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import * as React from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { FileText, Clock, AlertCircle } from 'lucide-react'
+import { mockGradingQueue } from '@/lib/mock-data'
+import { formatRelativeTime } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 const priorityColors = {
   low: 'default' as const,
   medium: 'warning' as const,
   high: 'destructive' as const,
-};
+}
 
 const typeIcons = {
   essay: FileText,
   quiz: FileText,
   project: FileText,
   assignment: FileText,
-};
+}
 
 export function GradingQueueWidget() {
   return (
@@ -41,8 +41,8 @@ export function GradingQueueWidget() {
             </div>
           ) : (
             mockGradingQueue.map((item) => {
-              const Icon = typeIcons[item.assignmentType];
-              const isOverdue = new Date(item.dueDate) < new Date();
+              const Icon = typeIcons[item.assignmentType]
+              const isOverdue = new Date(item.dueDate) < new Date()
 
               return (
                 <div
@@ -98,11 +98,11 @@ export function GradingQueueWidget() {
                     </div>
                   </div>
                 </div>
-              );
+              )
             })
           )}
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }

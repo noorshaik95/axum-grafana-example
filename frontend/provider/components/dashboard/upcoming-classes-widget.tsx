@@ -1,25 +1,25 @@
-'use client';
+'use client'
 
-import * as React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, BookOpen, FlaskConical, Users } from 'lucide-react';
-import { mockUpcomingClasses } from '@/lib/mock-data';
-import { formatDateTime } from '@/lib/utils';
+import * as React from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Calendar, Clock, MapPin, BookOpen, FlaskConical, Users } from 'lucide-react'
+import { mockUpcomingClasses } from '@/lib/mock-data'
+import { formatDateTime } from '@/lib/utils'
 
 const typeIcons = {
   lecture: BookOpen,
   lab: FlaskConical,
   'office-hours': Users,
   exam: BookOpen,
-};
+}
 
 const typeColors = {
   lecture: 'default' as const,
   lab: 'info' as const,
   'office-hours': 'success' as const,
   exam: 'destructive' as const,
-};
+}
 
 export function UpcomingClassesWidget() {
   return (
@@ -31,11 +31,11 @@ export function UpcomingClassesWidget() {
       <CardContent>
         <div className="space-y-3">
           {mockUpcomingClasses.map((classItem) => {
-            const Icon = typeIcons[classItem.type];
-            const now = new Date();
-            const classDate = new Date(classItem.date);
-            const isToday = classDate.toDateString() === now.toDateString();
-            const isSoon = classDate.getTime() - now.getTime() < 3 * 60 * 60 * 1000; // Less than 3 hours
+            const Icon = typeIcons[classItem.type]
+            const now = new Date()
+            const classDate = new Date(classItem.date)
+            const isToday = classDate.toDateString() === now.toDateString()
+            const isSoon = classDate.getTime() - now.getTime() < 3 * 60 * 60 * 1000 // Less than 3 hours
 
             return (
               <div
@@ -92,10 +92,10 @@ export function UpcomingClassesWidget() {
                   </div>
                 </div>
               </div>
-            );
+            )
           })}
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }

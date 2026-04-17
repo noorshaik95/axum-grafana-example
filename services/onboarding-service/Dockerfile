@@ -40,9 +40,9 @@ COPY --from=builder /app/onboarding-service /usr/local/bin/app
 # Copy migrations for reference
 COPY services/onboarding-service/migrations/ /app/migrations/
 
-EXPOSE 9080
+EXPOSE 9080 9081
 
 HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -sf http://localhost:9080/health || exit 1
+    CMD curl -sf http://localhost:9081/health || exit 1
 
 CMD ["app"]
