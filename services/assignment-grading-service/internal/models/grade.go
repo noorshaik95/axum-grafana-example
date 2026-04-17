@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -13,19 +14,43 @@ const (
 
 // Grade represents a grade for a submission
 type Grade struct {
-	ID            string     `json:"id"`
-	SubmissionID  string     `json:"submission_id"`
-	StudentID     string     `json:"student_id"`
-	AssignmentID  string     `json:"assignment_id"`
-	Score         float64    `json:"score"`
-	AdjustedScore float64    `json:"adjusted_score"` // After late penalty
-	Feedback      string     `json:"feedback"`
-	Status        string     `json:"status"`
-	GradedAt      *time.Time `json:"graded_at,omitempty"`
-	PublishedAt   *time.Time `json:"published_at,omitempty"`
-	GradedBy      string     `json:"graded_by"` // Instructor ID
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID                    string                 `json:"id"`
+	TenantID              string                 `json:"tenant_id"`
+	SubmissionID          string                 `json:"submission_id"`
+	StudentID             string                 `json:"student_id"`
+	AssignmentID          string                 `json:"assignment_id"`
+	CourseID              string                 `json:"course_id"`
+	Score                 float64                `json:"score"`
+	MaxScore              float64                `json:"max_score"`
+	AdjustedScore         float64                `json:"adjusted_score"`
+	Percentage            float64                `json:"percentage"`
+	LetterGrade           string                 `json:"letter_grade,omitempty"`
+	RubricScores          map[string]interface{} `json:"rubric_scores,omitempty"`
+	Feedback              string                 `json:"feedback"`
+	Status                string                 `json:"status"`
+	GradedAt              *time.Time             `json:"graded_at,omitempty"`
+	PublishedAt           *time.Time             `json:"published_at,omitempty"`
+	GradedBy              string                 `json:"graded_by"`
+	OverrideJustification string                 `json:"override_justification,omitempty"`
+	Percentile            float64                `json:"percentile"`
+	CreatedAt             time.Time              `json:"created_at"`
+	UpdatedAt             time.Time              `json:"updated_at"`
+}
+
+// RubricScoresJSON returns rubric scores as JSON bytes
+func (g *Grade) RubricScoresJSON() ([]byte, error) {
+	if g.RubricScores == nil {
+		return nil, nil
+	}
+	return json.Marshal(g.RubricScores)
+}
+
+// SetRubricScoresFromJSON parses rubric scores from JSON
+func (g *Grade) SetRubricScoresFromJSON(data []byte) error {
+	if data == nil {
+		return nil
+	}
+	return json.Unmarshal(data, &g.RubricScores)
 }
 
 // Validate checks if the grade has valid data

@@ -50,7 +50,7 @@ func TestSubmission_Validate(t *testing.T) {
 			errorMsg:    "student_id is required",
 		},
 		{
-			name: "missing file_path",
+			name: "missing file_path and file_urls",
 			submission: Submission{
 				AssignmentID: "ASSIGN-001",
 				StudentID:    "STUDENT-001",
@@ -58,7 +58,18 @@ func TestSubmission_Validate(t *testing.T) {
 				Status:       StatusSubmitted,
 			},
 			expectError: true,
-			errorMsg:    "file_path is required",
+			errorMsg:    "file_path or file_urls is required",
+		},
+		{
+			name: "valid with file_urls instead of file_path",
+			submission: Submission{
+				AssignmentID: "ASSIGN-001",
+				StudentID:    "STUDENT-001",
+				FileURLs:     []string{"s3://bucket/file.pdf"},
+				SubmittedAt:  now,
+				Status:       StatusSubmitted,
+			},
+			expectError: false,
 		},
 		{
 			name: "zero submitted_at",
@@ -215,6 +226,7 @@ func TestIsValidStatus(t *testing.T) {
 		{StatusSubmitted, true},
 		{StatusGraded, true},
 		{StatusReturned, true},
+		{StatusLate, true},
 		{"invalid", false},
 		{"", false},
 		{"SUBMITTED", false}, // Case sensitive

@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"fmt"
 
+	"slate/services/assignment-grading-service/internal/grading"
 	"slate/services/assignment-grading-service/internal/models"
 	"slate/services/assignment-grading-service/internal/repository"
 )
@@ -14,6 +15,8 @@ type gradebookService struct {
 	assignmentRepo repository.AssignmentRepository
 	submissionRepo repository.SubmissionRepository
 	gradeRepo      repository.GradeRepository
+	ruleRepo       repository.GradingRuleRepository
+	estimator      *grading.Estimator
 }
 
 // NewGradebookService creates a new gradebook service
@@ -29,39 +32,49 @@ func NewGradebookService(
 	}
 }
 
+// NewGradebookServiceFull creates a gradebook service with grading rules support
+func NewGradebookServiceFull(
+	assignmentRepo repository.AssignmentRepository,
+	submissionRepo repository.SubmissionRepository,
+	gradeRepo repository.GradeRepository,
+	ruleRepo repository.GradingRuleRepository,
+) GradebookService {
+	return &gradebookService{
+		assignmentRepo: assignmentRepo,
+		submissionRepo: submissionRepo,
+		gradeRepo:      gradeRepo,
+		ruleRepo:       ruleRepo,
+		estimator:      grading.NewEstimator(gradeRepo, ruleRepo, assignmentRepo),
+	}
+}
+
 // GetStudentGradebook gets the gradebook for a single student
 func (s *gradebookService) GetStudentGradebook(ctx context.Context, studentID, courseID string) (*StudentGradebook, error) {
-	// Get all assignments for the course
 	assignments, _, err := s.assignmentRepo.ListByCourse(ctx, courseID, 1, 1000)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list assignments: %w", err)
 	}
 
-	// Get all grades for the student
 	grades, err := s.gradeRepo.ListByStudent(ctx, studentID, courseID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list grades: %w", err)
 	}
 
-	// Create grade map for quick lookup
 	gradeMap := make(map[string]*models.Grade)
 	for _, grade := range grades {
 		gradeMap[grade.AssignmentID] = grade
 	}
 
-	// Get all submissions for the student
 	submissions, err := s.submissionRepo.ListByStudent(ctx, studentID, courseID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list submissions: %w", err)
 	}
 
-	// Create submission map for quick lookup
 	submissionMap := make(map[string]*models.Submission)
 	for _, submission := range submissions {
 		submissionMap[submission.AssignmentID] = submission
 	}
 
-	// Build gradebook entries
 	entries := make([]GradebookEntry, 0, len(assignments))
 	var totalPoints, earnedPoints float64
 
@@ -73,13 +86,11 @@ func (s *gradebookService) GetStudentGradebook(ctx context.Context, studentID, c
 			DueDate:         assignment.DueDate,
 		}
 
-		// Add submission info if exists
 		if submission, ok := submissionMap[assignment.ID]; ok {
 			entry.SubmittedAt = &submission.SubmittedAt
 			entry.IsLate = submission.IsLate
 		}
 
-		// Add grade info if exists
 		if grade, ok := gradeMap[assignment.ID]; ok {
 			entry.Score = grade.Score
 			entry.AdjustedScore = grade.AdjustedScore
@@ -93,13 +104,11 @@ func (s *gradebookService) GetStudentGradebook(ctx context.Context, studentID, c
 		entries = append(entries, entry)
 	}
 
-	// Calculate percentage
 	percentage := 0.0
 	if totalPoints > 0 {
 		percentage = (earnedPoints / totalPoints) * 100
 	}
 
-	// Calculate letter grade
 	letterGrade := calculateLetterGrade(percentage)
 
 	return &StudentGradebook{
@@ -115,31 +124,26 @@ func (s *gradebookService) GetStudentGradebook(ctx context.Context, studentID, c
 
 // GetCourseGradebook gets the gradebook for an entire course
 func (s *gradebookService) GetCourseGradebook(ctx context.Context, courseID string) (*CourseGradebook, error) {
-	// Get all assignments for the course
 	assignments, _, err := s.assignmentRepo.ListByCourse(ctx, courseID, 1, 1000)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list assignments: %w", err)
 	}
 
-	// Get all grades for the course
 	grades, err := s.gradeRepo.ListByCourse(ctx, courseID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list grades: %w", err)
 	}
 
-	// Group grades by student
 	studentGrades := make(map[string][]*models.Grade)
 	for _, grade := range grades {
 		studentGrades[grade.StudentID] = append(studentGrades[grade.StudentID], grade)
 	}
 
-	// Calculate total possible points
 	var totalPoints float64
 	for _, assignment := range assignments {
 		totalPoints += assignment.MaxPoints
 	}
 
-	// Build student summaries
 	students := make([]StudentSummary, 0, len(studentGrades))
 	for studentID, studentGradeList := range studentGrades {
 		var earnedPoints float64
@@ -149,7 +153,6 @@ func (s *gradebookService) GetCourseGradebook(ctx context.Context, courseID stri
 			earnedPoints += grade.AdjustedScore
 		}
 
-		// Build entries for this student
 		var entries []GradebookEntry
 		for _, assignment := range assignments {
 			entry := GradebookEntry{
@@ -197,7 +200,6 @@ func (s *gradebookService) GetGradeStatistics(ctx context.Context, assignmentID 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get statistics: %w", err)
 	}
-
 	return stats, nil
 }
 
@@ -207,23 +209,19 @@ func (s *gradebookService) ExportGrades(ctx context.Context, courseID, format st
 		return nil, fmt.Errorf("unsupported format: %s", format)
 	}
 
-	// Get course gradebook
 	gradebook, err := s.GetCourseGradebook(ctx, courseID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get gradebook: %w", err)
 	}
 
-	// Create CSV
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
 
-	// Write header
 	header := []string{"Student ID", "Total Points", "Earned Points", "Percentage", "Letter Grade"}
 	if err := writer.Write(header); err != nil {
 		return nil, fmt.Errorf("failed to write CSV header: %w", err)
 	}
 
-	// Write data
 	for _, student := range gradebook.Students {
 		row := []string{
 			student.StudentID,
@@ -245,18 +243,34 @@ func (s *gradebookService) ExportGrades(ctx context.Context, courseID, format st
 	return buf.Bytes(), nil
 }
 
+// GetStudentGradesByTenant returns all grades for a student in a tenant
+func (s *gradebookService) GetStudentGradesByTenant(ctx context.Context, tenantID, studentID string) ([]*models.Grade, error) {
+	grades, err := s.gradeRepo.ListByStudentTenant(ctx, tenantID, studentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get student grades: %w", err)
+	}
+	return grades, nil
+}
+
+// GetGradeDistribution returns the grade distribution for a course
+func (s *gradebookService) GetGradeDistribution(ctx context.Context, courseID string) ([]grading.GradeDistribution, error) {
+	grades, err := s.gradeRepo.ListByCourse(ctx, courseID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get course grades: %w", err)
+	}
+
+	return grading.ComputeDistribution(grades, nil), nil
+}
+
+// EstimateFinalGrade computes a weighted grade estimate for a student
+func (s *gradebookService) EstimateFinalGrade(ctx context.Context, studentID, courseID, tenantID string) (*grading.GradeEstimate, error) {
+	if s.estimator == nil {
+		return nil, fmt.Errorf("grade estimation not available: grading rules not configured")
+	}
+	return s.estimator.EstimateFinalGrade(ctx, studentID, courseID, tenantID)
+}
+
 // calculateLetterGrade converts a percentage to a letter grade
 func calculateLetterGrade(percentage float64) string {
-	switch {
-	case percentage >= 90:
-		return "A"
-	case percentage >= 80:
-		return "B"
-	case percentage >= 70:
-		return "C"
-	case percentage >= 60:
-		return "D"
-	default:
-		return "F"
-	}
+	return grading.LetterGrade(percentage, nil)
 }

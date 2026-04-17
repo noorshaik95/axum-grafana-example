@@ -13,6 +13,7 @@ import (
 
 	"slate/services/assignment-grading-service/internal/config"
 	grpchandler "slate/services/assignment-grading-service/internal/grpc"
+	"slate/services/assignment-grading-service/internal/handlers"
 	"slate/services/assignment-grading-service/internal/health"
 	"slate/services/assignment-grading-service/internal/repository"
 	"slate/services/assignment-grading-service/internal/service"
@@ -75,9 +76,6 @@ func main() {
 		}()
 	}
 
-	// Note: The tracer name is already set in tracingCfg.ServiceName above
-	// Individual handlers will use the common-go tracing package for function-level spans
-
 	// Connect to database
 	db, err := database.NewPostgresDB(cfg.Database.DSN())
 	if err != nil {
@@ -110,6 +108,7 @@ func main() {
 	registry := prometheus.NewRegistry()
 	metricsCollector := metrics.NewMetrics(registry)
 	log.Info().Msg("Prometheus metrics initialized")
+	_ = metricsCollector
 
 	// Start metrics HTTP server
 	metricsAddr := fmt.Sprintf(":%d", cfg.Observability.MetricsPort)
@@ -147,52 +146,91 @@ func main() {
 	assignmentRepo := repository.NewAssignmentRepository(db.DB)
 	submissionRepo := repository.NewSubmissionRepository(db.DB)
 	gradeRepo := repository.NewGradeRepository(db.DB)
+	gradingRuleRepo := repository.NewGradingRuleRepository(db.DB)
 
 	// Initialize services
 	assignmentService := service.NewAssignmentService(assignmentRepo, kafkaProducer)
 	submissionService := service.NewSubmissionService(assignmentRepo, submissionRepo, fileStorage, kafkaProducer)
-	gradingService := service.NewGradingService(assignmentRepo, submissionRepo, gradeRepo, kafkaProducer)
-	gradebookService := service.NewGradebookService(assignmentRepo, submissionRepo, gradeRepo)
+	gradingService := service.NewGradingServiceWithDB(assignmentRepo, submissionRepo, gradeRepo, kafkaProducer, db.DB)
+	gradebookService := service.NewGradebookServiceFull(assignmentRepo, submissionRepo, gradeRepo, gradingRuleRepo)
+	gradingRuleService := service.NewGradingRuleService(gradingRuleRepo)
 
 	log.Info().Msg("Services initialized")
 
-	// Initialize gRPC handlers with service dependencies
+	// Initialize Kafka consumer
+	if cfg.Kafka.Enabled {
+		consumer := kafka.NewConsumer(kafka.ConsumerConfig{
+			Brokers: cfg.Kafka.Brokers,
+			GroupID: "assignment-grading-service",
+			Topics:  []string{"course-events", "user-events"},
+			Enabled: true,
+		})
+
+		// Handle course.deleted: soft-delete all assignments for the course
+		consumer.RegisterHandler("course.deleted", func(ctx context.Context, event kafka.Event) error {
+			courseID, ok := event.Data["course_id"].(string)
+			if !ok {
+				return fmt.Errorf("missing course_id in event data")
+			}
+			log.Info().Str("course_id", courseID).Msg("Handling course.deleted event")
+			return assignmentRepo.SoftDeleteByCourse(ctx, courseID)
+		})
+
+		// Handle user.enrolled: create empty grade records
+		consumer.RegisterHandler("user.enrolled", func(ctx context.Context, event kafka.Event) error {
+			studentID, _ := event.Data["student_id"].(string)
+			courseID, _ := event.Data["course_id"].(string)
+			tenantID, _ := event.Data["tenant_id"].(string)
+			if studentID == "" || courseID == "" {
+				return fmt.Errorf("missing student_id or course_id in event data")
+			}
+			log.Info().Str("student_id", studentID).Str("course_id", courseID).Msg("Handling user.enrolled event")
+
+			assignments, _, err := assignmentRepo.ListByCourse(ctx, courseID, 1, 1000)
+			if err != nil {
+				return fmt.Errorf("failed to list assignments: %w", err)
+			}
+			for _, a := range assignments {
+				if err := gradeRepo.CreateEmpty(ctx, tenantID, a.ID, studentID, courseID); err != nil {
+					log.Error().Err(err).Str("assignment_id", a.ID).Msg("Failed to create empty grade")
+				}
+			}
+			return nil
+		})
+
+		consumerCtx, consumerCancel := context.WithCancel(context.Background())
+		consumer.Start(consumerCtx)
+		defer func() {
+			consumerCancel()
+			consumer.Close()
+		}()
+		log.Info().Msg("Kafka consumer started")
+	}
+
+	// Initialize gRPC handlers
 	assignmentHandler := grpchandler.NewAssignmentServiceServer(assignmentService)
 	submissionHandler := grpchandler.NewSubmissionServiceServer(submissionService)
 	gradingHandler := grpchandler.NewGradingServiceServer(gradingService)
 	gradebookHandler := grpchandler.NewGradebookServiceServer(gradebookService)
-	_ = metricsCollector
 
 	log.Info().Msg("gRPC handlers initialized")
 
-	// Initialize gRPC server with OpenTelemetry interceptors
+	// Initialize gRPC server
 	grpcServer := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.ChainUnaryInterceptor(
-			tracing.TracingUnaryInterceptor(),    // Extract trace context from metadata
-			tracing.LoggingUnaryInterceptor(log), // Debug logging
+			tracing.TracingUnaryInterceptor(),
+			tracing.LoggingUnaryInterceptor(log),
 		),
 	)
 
-	// Register all gRPC services
 	pb.RegisterAssignmentServiceServer(grpcServer, assignmentHandler)
-	log.Info().Msg("gRPC AssignmentService registered")
-
 	pb.RegisterSubmissionServiceServer(grpcServer, submissionHandler)
-	log.Info().Msg("gRPC SubmissionService registered")
-
 	pb.RegisterGradingServiceServer(grpcServer, gradingHandler)
-	log.Info().Msg("gRPC GradingService registered")
-
 	pb.RegisterGradebookServiceServer(grpcServer, gradebookHandler)
-	log.Info().Msg("gRPC GradebookService registered")
 
-	// Register health check service
 	healthChecker := health.NewHealthChecker(db.DB)
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthChecker)
-	log.Info().Msg("gRPC health check service registered")
-
-	// Enable reflection for debugging
 	reflection.Register(grpcServer)
 
 	// Start gRPC server
@@ -204,30 +242,49 @@ func main() {
 
 	log.Info().Str("address", cfg.GRPC.Address()).Msg("gRPC server listening")
 
-	// Handle graceful shutdown
 	go func() {
-		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
-		<-sigint
-
-		log.Info().Msg("Shutting down servers")
-
-		// Shutdown metrics server
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := metricsServer.Shutdown(shutdownCtx); err != nil {
-			log.Error().Err(err).Msg("Failed to shutdown metrics server")
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Error().Err(err).Msg("gRPC server failed")
 		}
-
-		// Shutdown gRPC server
-		grpcServer.GracefulStop()
 	}()
 
-	// Start serving
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Error().Err(err).Msg("Failed to serve")
-		os.Exit(1)
+	// Start REST API server
+	restRouter := handlers.NewRouter(assignmentService, submissionService, gradingService, gradebookService, gradingRuleService)
+	restAddr := cfg.Server.Address()
+	restServer := &http.Server{
+		Addr:              restAddr,
+		Handler:           restRouter.Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
 	}
+
+	go func() {
+		log.Info().Str("address", restAddr).Msg("Starting REST API server")
+		if serverErr := restServer.ListenAndServe(); serverErr != nil && serverErr != http.ErrServerClosed {
+			log.Error().Err(serverErr).Msg("REST server failed")
+		}
+	}()
+
+	// Handle graceful shutdown
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
+	<-sigint
+
+	log.Info().Msg("Shutting down servers")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := restServer.Shutdown(shutdownCtx); err != nil {
+		log.Error().Err(err).Msg("Failed to shutdown REST server")
+	}
+
+	if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+		log.Error().Err(err).Msg("Failed to shutdown metrics server")
+	}
+
+	grpcServer.GracefulStop()
 
 	log.Info().Msg("Server stopped")
 }

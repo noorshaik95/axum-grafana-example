@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
+	"slate/services/assignment-grading-service/internal/grading"
 	"slate/services/assignment-grading-service/internal/models"
 	"slate/services/assignment-grading-service/internal/repository"
 	"slate/services/assignment-grading-service/pkg/kafka"
@@ -15,6 +17,8 @@ type gradingService struct {
 	gradeRepo      repository.GradeRepository
 	producer       kafka.EventPublisher
 	latePolicyCalc *LatePolicyCalculator
+	engine         *grading.Engine
+	db             *sql.DB
 }
 
 // NewGradingService creates a new grading service
@@ -30,44 +34,83 @@ func NewGradingService(
 		gradeRepo:      gradeRepo,
 		producer:       producer,
 		latePolicyCalc: NewLatePolicyCalculator(),
+		engine:         grading.NewEngine(gradeRepo, producer),
 	}
 }
 
-// CreateGrade creates a new grade for a submission
+// NewGradingServiceWithDB creates a grading service with DB access for auto-grading
+func NewGradingServiceWithDB(
+	assignmentRepo repository.AssignmentRepository,
+	submissionRepo repository.SubmissionRepository,
+	gradeRepo repository.GradeRepository,
+	producer kafka.EventPublisher,
+	db *sql.DB,
+) GradingService {
+	return &gradingService{
+		assignmentRepo: assignmentRepo,
+		submissionRepo: submissionRepo,
+		gradeRepo:      gradeRepo,
+		producer:       producer,
+		latePolicyCalc: NewLatePolicyCalculator(),
+		engine:         grading.NewEngine(gradeRepo, producer),
+		db:             db,
+	}
+}
+
+// CreateGrade creates a new grade for a submission (simple version)
 func (s *gradingService) CreateGrade(ctx context.Context, submissionID string, score float64, feedback, gradedBy string) (*models.Grade, error) {
-	// Get submission
+	return s.CreateGradeFull(ctx, submissionID, score, feedback, gradedBy, nil, "", "")
+}
+
+// CreateGradeFull creates a grade with all fields
+func (s *gradingService) CreateGradeFull(ctx context.Context, submissionID string, score float64, feedback, gradedBy string, rubricScores map[string]interface{}, courseID, tenantID string) (*models.Grade, error) {
 	submission, err := s.submissionRepo.GetByID(ctx, submissionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get submission: %w", err)
 	}
 
-	// Get assignment to validate score and apply late penalty
 	assignment, err := s.assignmentRepo.GetByID(ctx, submission.AssignmentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get assignment: %w", err)
 	}
 
-	// Validate score
 	if score < 0 || score > assignment.MaxPoints {
 		return nil, fmt.Errorf("score must be between 0 and %f", assignment.MaxPoints)
 	}
 
-	// Apply late penalty
 	adjustedScore := s.latePolicyCalc.ApplyPenalty(score, submission.DaysLate, assignment.LatePolicy)
 
-	// Create grade model
-	grade := &models.Grade{
-		SubmissionID:  submissionID,
-		StudentID:     submission.StudentID,
-		AssignmentID:  assignment.ID,
-		Score:         score,
-		AdjustedScore: adjustedScore,
-		Feedback:      feedback,
-		Status:        models.GradeStatusDraft,
-		GradedBy:      gradedBy,
+	percentage := 0.0
+	if assignment.MaxPoints > 0 {
+		percentage = (adjustedScore / assignment.MaxPoints) * 100
 	}
 
-	// Validate
+	letterGrade := grading.LetterGrade(percentage, nil)
+
+	if courseID == "" {
+		courseID = assignment.CourseID
+	}
+	if tenantID == "" {
+		tenantID = assignment.TenantID
+	}
+
+	grade := &models.Grade{
+		TenantID:     tenantID,
+		SubmissionID: submissionID,
+		StudentID:    submission.StudentID,
+		AssignmentID: assignment.ID,
+		CourseID:     courseID,
+		Score:        score,
+		MaxScore:     assignment.MaxPoints,
+		AdjustedScore: adjustedScore,
+		Percentage:   percentage,
+		LetterGrade:  letterGrade,
+		RubricScores: rubricScores,
+		Feedback:     feedback,
+		Status:       models.GradeStatusDraft,
+		GradedBy:     gradedBy,
+	}
+
 	if err := grade.Validate(); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
@@ -76,15 +119,19 @@ func (s *gradingService) CreateGrade(ctx context.Context, submissionID string, s
 		return nil, fmt.Errorf("score validation failed: %w", err)
 	}
 
-	// Create in repository
 	if err := s.gradeRepo.Create(ctx, grade); err != nil {
 		return nil, fmt.Errorf("failed to create grade: %w", err)
 	}
 
-	// Update submission status
 	submission.Status = models.StatusGraded
 	if err := s.submissionRepo.Update(ctx, submission); err != nil {
 		fmt.Printf("Failed to update submission status: %v\n", err)
+	}
+
+	// Emit submission.graded event
+	event := kafka.NewSubmissionGradedEvent(grade.ID, grade.AssignmentID, grade.StudentID, grade.Score, grade.TenantID)
+	if err := s.producer.PublishEvent(ctx, event); err != nil {
+		fmt.Printf("Failed to publish submission.graded event: %v\n", err)
 	}
 
 	return grade, nil
@@ -92,18 +139,15 @@ func (s *gradingService) CreateGrade(ctx context.Context, submissionID string, s
 
 // UpdateGrade updates an existing grade (only draft grades can be updated)
 func (s *gradingService) UpdateGrade(ctx context.Context, id string, score float64, feedback string) (*models.Grade, error) {
-	// Get existing grade
 	grade, err := s.gradeRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get grade: %w", err)
 	}
 
-	// Only draft grades can be updated
 	if !grade.IsDraft() {
 		return nil, fmt.Errorf("only draft grades can be updated")
 	}
 
-	// Get submission and assignment to validate and apply late penalty
 	submission, err := s.submissionRepo.GetByID(ctx, grade.SubmissionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get submission: %w", err)
@@ -114,20 +158,24 @@ func (s *gradingService) UpdateGrade(ctx context.Context, id string, score float
 		return nil, fmt.Errorf("failed to get assignment: %w", err)
 	}
 
-	// Validate score
 	if score < 0 || score > assignment.MaxPoints {
 		return nil, fmt.Errorf("score must be between 0 and %f", assignment.MaxPoints)
 	}
 
-	// Apply late penalty
 	adjustedScore := s.latePolicyCalc.ApplyPenalty(score, submission.DaysLate, assignment.LatePolicy)
 
-	// Update fields
+	percentage := 0.0
+	if assignment.MaxPoints > 0 {
+		percentage = (adjustedScore / assignment.MaxPoints) * 100
+	}
+
 	grade.Score = score
 	grade.AdjustedScore = adjustedScore
 	grade.Feedback = feedback
+	grade.Percentage = percentage
+	grade.LetterGrade = grading.LetterGrade(percentage, nil)
+	grade.MaxScore = assignment.MaxPoints
 
-	// Update in repository
 	if err := s.gradeRepo.Update(ctx, grade); err != nil {
 		return nil, fmt.Errorf("failed to update grade: %w", err)
 	}
@@ -137,23 +185,19 @@ func (s *gradingService) UpdateGrade(ctx context.Context, id string, score float
 
 // PublishGrade publishes a grade (makes it visible to student)
 func (s *gradingService) PublishGrade(ctx context.Context, id string) (*models.Grade, error) {
-	// Get grade
 	grade, err := s.gradeRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get grade: %w", err)
 	}
 
-	// Publish grade
 	if publishErr := grade.Publish(); publishErr != nil {
 		return nil, fmt.Errorf("failed to publish grade: %w", publishErr)
 	}
 
-	// Update in repository
 	if updateErr := s.gradeRepo.Update(ctx, grade); updateErr != nil {
 		return nil, fmt.Errorf("failed to update grade: %w", updateErr)
 	}
 
-	// Update submission status
 	submission, err := s.submissionRepo.GetByID(ctx, grade.SubmissionID)
 	if err == nil {
 		submission.Status = models.StatusReturned
@@ -162,7 +206,6 @@ func (s *gradingService) PublishGrade(ctx context.Context, id string) (*models.G
 		}
 	}
 
-	// Publish event
 	event := kafka.NewGradePublishedEvent(grade.ID, grade.AssignmentID, grade.StudentID, grade.Score, grade.AdjustedScore)
 	if err := s.producer.PublishEvent(ctx, event); err != nil {
 		fmt.Printf("Failed to publish grade.published event: %v\n", err)
@@ -177,6 +220,10 @@ func (s *gradingService) GetGrade(ctx context.Context, id string) (*models.Grade
 	if err != nil {
 		return nil, fmt.Errorf("failed to get grade: %w", err)
 	}
-
 	return grade, nil
+}
+
+// AutoGrade triggers percentile-based auto-grading for an assignment
+func (s *gradingService) AutoGrade(ctx context.Context, assignmentID string) error {
+	return s.engine.AutoGrade(ctx, s.db, assignmentID)
 }

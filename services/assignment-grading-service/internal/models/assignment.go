@@ -1,9 +1,17 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 )
+
+// RubricCriterion defines a single rubric criterion
+type RubricCriterion struct {
+	Criterion   string  `json:"criterion"`
+	MaxPoints   float64 `json:"max_points"`
+	Description string  `json:"description"`
+}
 
 // LatePolicy defines the late submission policy for an assignment
 type LatePolicy struct {
@@ -13,15 +21,38 @@ type LatePolicy struct {
 
 // Assignment represents a course assignment
 type Assignment struct {
-	ID          string     `json:"id"`
-	CourseID    string     `json:"course_id"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	MaxPoints   float64    `json:"max_points"`
-	DueDate     time.Time  `json:"due_date"`
-	LatePolicy  LatePolicy `json:"late_policy"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID               string            `json:"id"`
+	TenantID         string            `json:"tenant_id"`
+	CourseID         string            `json:"course_id"`
+	InstructorID     string            `json:"instructor_id"`
+	Title            string            `json:"title"`
+	Description      string            `json:"description"`
+	MaxPoints        float64           `json:"max_points"`
+	Rubric           []RubricCriterion `json:"rubric,omitempty"`
+	AssignmentType   string            `json:"assignment_type,omitempty"`
+	DueDate          time.Time         `json:"due_date"`
+	MaxFileSizeMB    int               `json:"max_file_size_mb"`
+	AllowedFileTypes []string          `json:"allowed_file_types,omitempty"`
+	IsDeleted        bool              `json:"is_deleted"`
+	LatePolicy       LatePolicy        `json:"late_policy"`
+	CreatedAt        time.Time         `json:"created_at"`
+	UpdatedAt        time.Time         `json:"updated_at"`
+}
+
+// RubricJSON returns the rubric as a JSON byte slice for database storage
+func (a *Assignment) RubricJSON() ([]byte, error) {
+	if a.Rubric == nil {
+		return nil, nil
+	}
+	return json.Marshal(a.Rubric)
+}
+
+// SetRubricFromJSON parses rubric JSON from database
+func (a *Assignment) SetRubricFromJSON(data []byte) error {
+	if data == nil {
+		return nil
+	}
+	return json.Unmarshal(data, &a.Rubric)
 }
 
 // Validate checks if the assignment has valid data
@@ -44,6 +75,13 @@ func (a *Assignment) Validate() error {
 
 	if a.DueDate.IsZero() {
 		return errors.New("due_date is required")
+	}
+
+	if a.AssignmentType != "" {
+		validTypes := map[string]bool{"exam": true, "homework": true, "quiz": true, "project": true}
+		if !validTypes[a.AssignmentType] {
+			return errors.New("assignment_type must be one of: exam, homework, quiz, project")
+		}
 	}
 
 	return a.LatePolicy.Validate()

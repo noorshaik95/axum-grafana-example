@@ -10,14 +10,17 @@ const (
 	StatusSubmitted = "submitted"
 	StatusGraded    = "graded"
 	StatusReturned  = "returned"
+	StatusLate      = "late"
 )
 
 // Submission represents a student's assignment submission
 type Submission struct {
 	ID           string    `json:"id"`
+	TenantID     string    `json:"tenant_id"`
 	AssignmentID string    `json:"assignment_id"`
 	StudentID    string    `json:"student_id"`
 	FilePath     string    `json:"file_path"`
+	FileURLs     []string  `json:"file_urls,omitempty"`
 	SubmittedAt  time.Time `json:"submitted_at"`
 	Status       string    `json:"status"`
 	IsLate       bool      `json:"is_late"`
@@ -36,8 +39,8 @@ func (s *Submission) Validate() error {
 		return errors.New("student_id is required")
 	}
 
-	if s.FilePath == "" {
-		return errors.New("file_path is required")
+	if s.FilePath == "" && len(s.FileURLs) == 0 {
+		return errors.New("file_path or file_urls is required")
 	}
 
 	if s.SubmittedAt.IsZero() {
@@ -58,7 +61,7 @@ func (s *Submission) Validate() error {
 // isValidStatus checks if the status is valid
 func isValidStatus(status string) bool {
 	switch status {
-	case StatusSubmitted, StatusGraded, StatusReturned:
+	case StatusSubmitted, StatusGraded, StatusReturned, StatusLate:
 		return true
 	default:
 		return false
