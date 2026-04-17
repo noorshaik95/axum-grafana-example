@@ -656,7 +656,7 @@ services:
     networks:
       - slate-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9080/restate/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:9070/health"]
       interval: 10s
       timeout: 5s
       retries: 5

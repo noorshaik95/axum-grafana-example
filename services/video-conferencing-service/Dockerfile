@@ -47,10 +47,10 @@ USER appuser
 # gRPC: 50052
 # WebSocket/HTTP: 8082
 # Metrics: 9092
-EXPOSE 50052 8082 9092
+EXPOSE 50055 8086 9092
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8082/health || exit 1
+    CMD curl -f http://localhost:8086/health || exit 1
 
 CMD ["/app/video-conferencing-service"]
