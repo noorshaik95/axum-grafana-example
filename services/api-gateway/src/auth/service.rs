@@ -10,7 +10,7 @@ use crate::config::AuthConfig;
 use super::auth::auth_service_client::AuthServiceClient;
 use super::auth::{ValidateTokenRequest, ValidateTokenResponse};
 use super::constants::{
-    DEFAULT_CACHE_TTL, ERR_CACHE_CLEAR, ERR_CACHE_READ, ERR_CACHE_WRITE, ERR_CONNECTION_FAILED,
+    DEFAULT_CACHE_TTL, ERR_CACHE_CLEAR, ERR_CACHE_READ, ERR_CACHE_WRITE,
     ERR_INSUFFICIENT_PERMISSIONS_PREFIX, ERR_INVALID_ENDPOINT, ERR_INVALID_TOKEN, ERR_NO_CLAIMS,
     FALLBACK_CACHE_TTL,
 };
@@ -46,10 +46,7 @@ impl AuthService {
             .connect_timeout(Duration::from_secs(10))
             .tcp_keepalive(Some(Duration::from_secs(60)));
 
-        let channel = endpoint
-            .connect()
-            .await
-            .map_err(|e| AuthError::ConnectionError(format!("{}: {}", ERR_CONNECTION_FAILED, e)))?;
+        let channel = endpoint.connect_lazy();
 
         info!("Authorization service client initialized successfully");
 
