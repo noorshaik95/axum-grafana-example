@@ -1,266 +1,275 @@
 'use client';
 
-import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { AnimatedProgress } from '@/components/common/animated-progress';
-import { GradientType } from '@/components/common/gradient-card';
+import Link from 'next/link';
 import {
-  BookOpen, Clock, Users, FileText, MessageSquare,
-  BarChart3, Play, CheckCircle2, Circle
+  BookOpen,
+  Users,
+  FileText,
+  Loader2,
+  AlertCircle,
+  ChevronRight,
+  CheckCircle2,
+  Circle,
+  ClipboardList,
 } from 'lucide-react';
-import { mockCourses, mockModules } from '@/lib/mock-data';
-
-// Map course colors to gradient types
-const colorToGradient: Record<string, GradientType> = {
-  blue: 'blue-cyan',
-  purple: 'purple-pink',
-  green: 'emerald-teal',
-  red: 'orange-red',
-  amber: 'amber-yellow',
-  violet: 'violet-indigo',
-  indigo: 'indigo-purple',
-};
-
-const gradientBadgeClasses: Record<GradientType, string> = {
-  'blue-cyan': 'gradient-blue-cyan',
-  'purple-pink': 'gradient-purple-pink',
-  'emerald-teal': 'gradient-emerald-teal',
-  'orange-red': 'gradient-orange-red',
-  'amber-yellow': 'gradient-amber-yellow',
-  'violet-indigo': 'gradient-violet-indigo',
-  'indigo-purple': 'gradient-indigo-purple',
-};
+import {
+  useCourse,
+  useProfile,
+  useMyEnrollments,
+  useEnrollInCourse,
+} from '../../../../shared/lib/api/hooks';
+import { useCourseModules } from '@/lib/api/hooks';
 
 export default function CourseDetailPage() {
   const params = useParams();
   const courseId = params.id as string;
-  const [activeTab, setActiveTab] = useState<'content' | 'assignments' | 'discussions' | 'grades'>('content');
 
-  const course = mockCourses.find(c => c.id === courseId);
-  const courseModules = mockModules.filter(m => m.courseId === courseId);
+  const { data: course, isLoading, isError } = useCourse(courseId);
+  const { data: profile } = useProfile();
+  const studentId = profile?.id ?? '';
+  const { data: enrollments } = useMyEnrollments(studentId);
+  const enrollMutation = useEnrollInCourse();
+  const { data: modules, isLoading: modulesLoading } = useCourseModules(courseId);
 
-  if (!course) {
+  const enrollmentList = Array.isArray(enrollments) ? enrollments : [];
+  const isEnrolled = enrollmentList.some((e) => e.courseId === courseId);
+  const moduleList = Array.isArray(modules) ? modules : [];
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 p-6">
-        <div className="max-w-7xl mx-auto">
-          <Card className="p-12 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Course not found</h2>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">The course you&apos;re looking for doesn&apos;t exist.</p>
-            </div>
-          </Card>
-        </div>
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-text-muted)]" />
       </div>
     );
   }
 
-  const gradient = colorToGradient[course.color] || 'blue-cyan';
-
-  const tabs = [
-    { id: 'content' as const, label: 'Content', icon: BookOpen },
-    { id: 'assignments' as const, label: 'Assignments', icon: FileText },
-    { id: 'discussions' as const, label: 'Discussions', icon: MessageSquare },
-    { id: 'grades' as const, label: 'Grades', icon: BarChart3 },
-  ];
+  if (isError || !course) {
+    return (
+      <div className="flex flex-col items-center py-20 text-center">
+        <AlertCircle className="h-12 w-12 text-[var(--color-error)] mb-3" />
+        <h2 className="text-lg font-semibold text-[var(--color-text)]">Course not found</h2>
+        <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+          The course you&apos;re looking for doesn&apos;t exist or could not be loaded.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Course Header */}
-        <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className={`inline-block px-4 py-1.5 rounded-lg text-white font-semibold text-sm ${gradientBadgeClasses[gradient]}`}>
-                    {course.code}
-                  </div>
-                  <Badge variant="outline" className="border-gray-300 dark:border-gray-600">
-                    {course.semester} {course.year}
-                  </Badge>
-                </div>
-                <CardTitle className="text-3xl text-gray-900 dark:text-white">{course.name}</CardTitle>
-                <CardDescription className="text-base text-gray-600 dark:text-gray-400">
-                  {course.description}
-                </CardDescription>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <div className="text-right">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Instructor</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{course.instructor}</p>
-                </div>
-              </div>
+    <div className="space-y-6">
+      {/* Course header */}
+      <div className="rounded-xl border border-[var(--color-border)] bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-md bg-indigo-600 px-3 py-1 text-sm font-semibold text-white">
+                {course.metadata?.courseCode ?? course.metadata?.department ?? 'COURSE'}
+              </span>
+              <span className="rounded-full border border-[var(--color-border)] px-2.5 py-0.5 text-xs text-[var(--color-text-muted)]">
+                {course.term}
+              </span>
+              {course.isPublished && (
+                <span className="rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-xs text-green-700">
+                  Published
+                </span>
+              )}
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Progress */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Course Progress</span>
-                <span className="text-2xl font-bold text-gray-900 dark:text-white">{course.progress}%</span>
-              </div>
-              <AnimatedProgress
-                value={course.progress}
-                gradient={gradient}
-                size="lg"
-                animated={true}
-              />
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                <span className="text-sm text-gray-700 dark:text-gray-300">{course.enrollmentCount} Students</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                <span className="text-sm text-gray-700 dark:text-gray-300">{course.credits} Credits</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                <span className="text-sm text-gray-700 dark:text-gray-300">{courseModules.length} Modules</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tabs */}
-        <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-2xl">
-          <nav className="-mb-px flex space-x-8 px-6">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`
-                    flex items-center gap-2 border-b-2 py-4 px-1 text-sm font-medium transition-colors
-                    ${activeTab === tab.id
-                      ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
-                      : 'border-transparent text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-900 dark:hover:text-gray-200'
-                    }
-                  `}
-                >
-                  <Icon className="h-4 w-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
+            <h1 className="text-xl font-bold text-[var(--color-text)]">{course.title}</h1>
+            {course.description && (
+              <p className="text-sm text-[var(--color-text-muted)]">{course.description}</p>
+            )}
+          </div>
+          <div className="shrink-0">
+            {isEnrolled ? (
+              <span className="inline-flex items-center rounded-lg bg-green-50 px-4 py-2 text-sm font-medium text-green-700">
+                Enrolled
+              </span>
+            ) : (
+              <button
+                onClick={() => enrollMutation.mutate(courseId)}
+                disabled={enrollMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {enrollMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Enroll in Course
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Tab Content */}
-        {activeTab === 'content' && (
-          <div className="space-y-4">
-            {courseModules.map((module) => (
-              <Card key={module.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-gray-900 dark:text-white">
-                        Module {module.order}: {module.title}
-                      </CardTitle>
-                      <CardDescription className="text-gray-600 dark:text-gray-400">
-                        {module.description}
-                      </CardDescription>
-                    </div>
-                    <Badge 
-                      variant={module.isPublished ? 'default' : 'secondary'}
-                      className={module.isPublished ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' : ''}
-                    >
-                      {module.isPublished ? 'Published' : 'Draft'}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {module.items.map((item) => {
-                    const Icon = item.type === 'lecture' ? Play :
-                                 item.type === 'assignment' ? FileText :
-                                 item.type === 'quiz' ? MessageSquare : FileText;
-                    const StatusIcon = item.isCompleted ? CheckCircle2 : Circle;
+        {/* Stats */}
+        <div className="mt-5 grid grid-cols-2 gap-4 border-t border-[var(--color-border)] pt-4 sm:grid-cols-3">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-[var(--color-text-muted)]" />
+            <span className="text-sm text-[var(--color-text-muted)]">
+              {course.metadata?.maxStudents ?? '--'} Max Students
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-[var(--color-text-muted)]" />
+            <span className="text-sm text-[var(--color-text-muted)]">
+              {course.metadata?.credits ?? '--'} Credits
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-[var(--color-text-muted)]" />
+            <span className="text-sm text-[var(--color-text-muted)]">
+              {course.metadata?.department ?? '--'}
+            </span>
+          </div>
+        </div>
+      </div>
 
-                    return (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between p-3 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-300 cursor-pointer hover-lift"
-                      >
-                        <div className="flex items-center gap-3">
-                          <StatusIcon
-                            className={`h-5 w-5 ${item.isCompleted ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-600'}`}
-                          />
-                          <Icon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                          <div>
-                            <p className="font-medium text-gray-900 dark:text-white">{item.title}</p>
-                            <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                              {'duration' in item && item.duration && <span>{item.duration} min</span>}
-                              {'points' in item && item.points && <span>{item.points} points</span>}
-                              {'dueDate' in item && item.dueDate && (
-                                <span className="text-orange-600 dark:text-orange-400 font-medium">
-                                  Due {new Date(item.dueDate).toLocaleDateString()}
-                                </span>
-                              )}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Course Modules */}
+        <div className="lg:col-span-2 rounded-xl border border-[var(--color-border)] bg-white shadow-sm">
+          <div className="flex items-center justify-between p-5 border-b border-[var(--color-border)]">
+            <h2 className="text-base font-semibold text-[var(--color-text)]">Course Modules</h2>
+            <span className="text-xs text-[var(--color-text-muted)]">
+              {moduleList.length} modules
+            </span>
+          </div>
+          {modulesLoading ? (
+            <div className="p-5 space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-16 rounded-lg bg-gray-100 animate-pulse" />
+              ))}
+            </div>
+          ) : moduleList.length > 0 ? (
+            <div className="divide-y divide-[var(--color-border)]">
+              {moduleList.map((mod) => {
+                const totalLessons = mod.lessons?.length ?? 0;
+                const completedLessons = mod.lessons?.filter((l) => l.completed).length ?? 0;
+                const allComplete = totalLessons > 0 && completedLessons === totalLessons;
+                return (
+                  <Link
+                    key={mod.id}
+                    href={`/courses/${courseId}/modules/${mod.id}`}
+                    className="flex items-center gap-4 p-4 hover:bg-[var(--color-bg-muted)] transition-colors"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50">
+                      {allComplete ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <span className="text-sm font-semibold text-indigo-600">
+                          {mod.displayOrder}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[var(--color-text)] truncate">
+                        {mod.name}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs text-[var(--color-text-muted)]">
+                          {totalLessons} lesson{totalLessons !== 1 ? 's' : ''}
+                        </span>
+                        {totalLessons > 0 && (
+                          <>
+                            <span className="text-xs text-[var(--color-text-muted)]">
+                              {completedLessons}/{totalLessons} complete
+                            </span>
+                            <div className="h-1.5 w-16 rounded-full bg-gray-100">
+                              <div
+                                className="h-1.5 rounded-full bg-indigo-600 transition-all"
+                                style={{
+                                  width: `${(completedLessons / totalLessons) * 100}%`,
+                                }}
+                              />
                             </div>
-                          </div>
-                        </div>
-                        {!item.isCompleted && item.type === 'lecture' && (
-                          <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                            Start
-                          </Button>
+                          </>
                         )}
                       </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            ))}
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-[var(--color-text-muted)]" />
+                  </Link>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-8 text-center">
+              <BookOpen className="mx-auto h-8 w-8 text-[var(--color-text-muted)]" />
+              <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+                No modules available yet.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-4">
+          {/* Assignments link */}
+          <Link
+            href={`/courses/${courseId}/assignments`}
+            className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-white p-4 shadow-sm hover:bg-[var(--color-bg-muted)] transition-colors"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+              <ClipboardList className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-[var(--color-text)]">Assignments</p>
+              <p className="text-xs text-[var(--color-text-muted)]">View and submit assignments</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-[var(--color-text-muted)]" />
+          </Link>
+
+          {/* Syllabus */}
+          {course.syllabus && (
+            <div className="rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-[var(--color-text)] mb-3">Syllabus</h3>
+              <a
+                href={course.syllabus}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700"
+              >
+                <FileText className="h-4 w-4" />
+                View Syllabus
+              </a>
+            </div>
+          )}
+
+          {/* Course Info */}
+          <div className="rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-[var(--color-text)] mb-3">
+              Course Information
+            </h3>
+            <dl className="space-y-2">
+              <div>
+                <dt className="text-xs text-[var(--color-text-muted)]">Term</dt>
+                <dd className="text-sm text-[var(--color-text)]">{course.term}</dd>
+              </div>
+              {course.metadata?.department && (
+                <div>
+                  <dt className="text-xs text-[var(--color-text-muted)]">Department</dt>
+                  <dd className="text-sm text-[var(--color-text)]">{course.metadata.department}</dd>
+                </div>
+              )}
+              {course.metadata?.credits && (
+                <div>
+                  <dt className="text-xs text-[var(--color-text-muted)]">Credits</dt>
+                  <dd className="text-sm text-[var(--color-text)]">{course.metadata.credits}</dd>
+                </div>
+              )}
+              {course.metadata?.tags && course.metadata.tags.length > 0 && (
+                <div>
+                  <dt className="text-xs text-[var(--color-text-muted)]">Tags</dt>
+                  <dd className="mt-1 flex flex-wrap gap-1">
+                    {course.metadata.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </dd>
+                </div>
+              )}
+            </dl>
           </div>
-        )}
-
-        {activeTab === 'assignments' && (
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-gray-900 dark:text-white">Assignments</CardTitle>
-              <CardDescription className="text-gray-600 dark:text-gray-400">
-                View and submit course assignments
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600 dark:text-gray-400">Assignment list will appear here</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {activeTab === 'discussions' && (
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-gray-900 dark:text-white">Discussions</CardTitle>
-              <CardDescription className="text-gray-600 dark:text-gray-400">
-                Participate in course discussions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600 dark:text-gray-400">Discussion threads will appear here</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {activeTab === 'grades' && (
-          <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-gray-900 dark:text-white">Grades</CardTitle>
-              <CardDescription className="text-gray-600 dark:text-gray-400">
-                View your grades for this course
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-600 dark:text-gray-400">Grade breakdown will appear here</p>
-            </CardContent>
-          </Card>
-        )}
+        </div>
       </div>
     </div>
   );

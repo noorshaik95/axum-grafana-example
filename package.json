@@ -1,0 +1,33 @@
+{
+  "name": "slate",
+  "private": true,
+  "workspaces": [
+    "frontend/*"
+  ],
+  "scripts": {
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "frontend/student/**/*.{ts,tsx}": [
+      "bash -c 'npx tsc --noEmit -p frontend/student/tsconfig.json'"
+    ],
+    "frontend/admin/**/*.{ts,tsx}": [
+      "bash -c 'npx tsc --noEmit -p frontend/admin/tsconfig.json'"
+    ],
+    "frontend/provider/**/*.{ts,tsx}": [
+      "bash -c 'npx tsc --noEmit -p frontend/provider/tsconfig.json'"
+    ],
+    "frontend/shared/**/*.{ts,tsx}": [
+      "bash -c 'npx tsc --noEmit -p frontend/shared/tsconfig.json'"
+    ],
+    "**/*.{js,ts,tsx,json,md}": [
+      "prettier --check"
+    ]
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "prettier": "^3.4.2",
+    "typescript": "^5.9.3"
+  }
+}

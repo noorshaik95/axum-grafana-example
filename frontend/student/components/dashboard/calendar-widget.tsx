@@ -37,10 +37,10 @@ const todayEvents = [
 
 const formatTodayDate = () => {
   const today = new Date();
-  const options: Intl.DateTimeFormatOptions = { 
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric' 
+  const options: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
   };
   return today.toLocaleDateString('en-US', options);
 };
@@ -51,17 +51,10 @@ export function CalendarWidget() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Today&apos;s Schedule</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {formatTodayDate()}
-          </p>
+          <h2 className="text-2xl font-bold text-foreground">Today&apos;s Schedule</h2>
+          <p className="text-sm text-muted-foreground mt-1">{formatTodayDate()}</p>
         </div>
-        <Button
-          asChild
-          variant="ghost"
-          size="icon"
-          className="hover:bg-gray-100 dark:hover:bg-gray-800"
-        >
+        <Button asChild variant="ghost" size="icon" className="hover:bg-muted">
           <Link href="/calendar" aria-label="View full calendar">
             <CalendarIcon className="h-5 w-5" />
           </Link>
@@ -71,14 +64,10 @@ export function CalendarWidget() {
       {/* Today's Events */}
       <div className="space-y-4">
         {todayEvents.length === 0 ? (
-          <p className="text-sm text-gray-600 dark:text-gray-400">No events scheduled</p>
+          <p className="text-sm text-muted-foreground">No events scheduled</p>
         ) : (
           todayEvents.map((event) => (
-            <ScheduleEvent
-              key={event.id}
-              event={event}
-              variant="detailed"
-            />
+            <ScheduleEvent key={event.id} event={event} variant="detailed" />
           ))
         )}
       </div>

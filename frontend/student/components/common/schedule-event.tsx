@@ -16,24 +16,25 @@ interface ScheduleEventProps {
   className?: string;
 }
 
+// Slate Glass theme - using slate colors with blue accent for interactive elements
 const eventTypeStyles = {
   class: {
-    background: 'bg-blue-50 dark:bg-blue-900/20',
-    border: 'border-blue-200 dark:border-blue-800',
-    badge: 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300',
-    text: 'text-blue-900 dark:text-blue-100',
+    background: 'bg-slate-50 dark:bg-slate-800/50',
+    border: 'border-slate-200 dark:border-slate-700',
+    badge: 'bg-blue-500 text-white',
+    text: 'text-foreground',
   },
   deadline: {
-    background: 'bg-red-50 dark:bg-red-900/20',
-    border: 'border-red-200 dark:border-red-800',
-    badge: 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300',
-    text: 'text-red-900 dark:text-red-100',
+    background: 'bg-slate-50 dark:bg-slate-800/50',
+    border: 'border-slate-200 dark:border-slate-700',
+    badge: 'bg-slate-600 dark:bg-slate-500 text-white',
+    text: 'text-foreground',
   },
   event: {
-    background: 'bg-purple-50 dark:bg-purple-900/20',
-    border: 'border-purple-200 dark:border-purple-800',
-    badge: 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300',
-    text: 'text-purple-900 dark:text-purple-100',
+    background: 'bg-slate-50 dark:bg-slate-800/50',
+    border: 'border-slate-200 dark:border-slate-700',
+    badge: 'bg-slate-500 text-white',
+    text: 'text-foreground',
   },
 };
 
@@ -66,9 +67,7 @@ export const ScheduleEvent = React.forwardRef<HTMLDivElement, ScheduleEventProps
       <div
         ref={ref}
         className={cn(
-          'rounded-xl border p-4 transition-all duration-300',
-          styles.background,
-          styles.border,
+          'rounded-xl p-4 transition-all duration-300 border border-slate-200 dark:border-slate-700',
           variant === 'detailed' && 'hover:shadow-md',
           className
         )}
@@ -76,20 +75,14 @@ export const ScheduleEvent = React.forwardRef<HTMLDivElement, ScheduleEventProps
         <div className="flex items-start gap-4">
           {/* Time Display */}
           <div className="flex flex-col items-center min-w-[80px]">
-            <span className={cn('text-3xl font-bold', styles.text)}>
-              {timeFormatted.main}
-            </span>
-            <span className={cn('text-sm font-medium', styles.text)}>
-              {timeFormatted.period}
-            </span>
+            <span className={cn('text-3xl font-bold', styles.text)}>{timeFormatted.main}</span>
+            <span className={cn('text-sm font-medium', styles.text)}>{timeFormatted.period}</span>
           </div>
 
           {/* Event Details */}
           <div className="flex-1">
             <div className="flex items-start justify-between gap-2 mb-2">
-              <h4 className={cn('font-semibold text-lg', styles.text)}>
-                {event.title}
-              </h4>
+              <h4 className={cn('font-semibold text-lg', styles.text)}>{event.title}</h4>
               <span
                 className={cn(
                   'px-2.5 py-1 rounded-md text-xs font-medium capitalize whitespace-nowrap',
@@ -103,19 +96,19 @@ export const ScheduleEvent = React.forwardRef<HTMLDivElement, ScheduleEventProps
             {variant === 'detailed' && (
               <div className="space-y-1.5">
                 {event.location && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <MapPin className="w-4 h-4" />
                     <span>{event.location}</span>
                   </div>
                 )}
                 {event.course && (
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="w-4 h-4" />
                     <span>{event.course}</span>
                   </div>
                 )}
                 {event.endTime && (
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="text-sm text-muted-foreground">
                     Until {formatTime(event.endTime).main} {formatTime(event.endTime).period}
                   </div>
                 )}

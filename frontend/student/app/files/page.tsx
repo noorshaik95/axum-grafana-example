@@ -7,9 +7,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import {
-  File, Folder, Upload, Download, Share2, Trash2, Search, Grid3x3, List,
-  FileText, FileCode, Image as ImageIcon, Film, Archive, MoreVertical,
-  Plus, HardDrive, ChevronRight
+  File,
+  Folder,
+  Upload,
+  Download,
+  Share2,
+  Trash2,
+  Search,
+  Grid3x3,
+  List,
+  FileText,
+  FileCode,
+  Image as ImageIcon,
+  Film,
+  Archive,
+  MoreVertical,
+  Plus,
+  HardDrive,
+  ChevronRight,
 } from 'lucide-react';
 import { mockFiles, mockFolders } from '@/lib/mock-data-extended';
 import { formatFileSize, formatRelativeTime } from '@/lib/utils';
@@ -26,7 +41,7 @@ export default function FilesPage() {
   const storagePercentage = (usedStorage / totalStorage) * 100;
 
   // Filter files by folder and search
-  const filteredFiles = mockFiles.filter(file => {
+  const filteredFiles = mockFiles.filter((file) => {
     const matchesFolder = selectedFolder ? file.folderId === selectedFolder : true;
     const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFolder && matchesSearch;
@@ -147,25 +162,37 @@ export default function FilesPage() {
             <div className="space-y-1">
               <p className="text-muted-foreground">Documents</p>
               <p className="font-semibold">
-                {formatFileSize(mockFiles.filter(f => f.type === 'document' || f.type === 'pdf').reduce((sum, f) => sum + f.size, 0))}
+                {formatFileSize(
+                  mockFiles
+                    .filter((f) => f.type === 'document' || f.type === 'pdf')
+                    .reduce((sum, f) => sum + f.size, 0)
+                )}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-muted-foreground">Images</p>
               <p className="font-semibold">
-                {formatFileSize(mockFiles.filter(f => f.type === 'image').reduce((sum, f) => sum + f.size, 0))}
+                {formatFileSize(
+                  mockFiles.filter((f) => f.type === 'image').reduce((sum, f) => sum + f.size, 0)
+                )}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-muted-foreground">Videos</p>
               <p className="font-semibold">
-                {formatFileSize(mockFiles.filter(f => f.type === 'video').reduce((sum, f) => sum + f.size, 0))}
+                {formatFileSize(
+                  mockFiles.filter((f) => f.type === 'video').reduce((sum, f) => sum + f.size, 0)
+                )}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-muted-foreground">Other</p>
               <p className="font-semibold">
-                {formatFileSize(mockFiles.filter(f => f.type === 'code' || f.type === 'archive').reduce((sum, f) => sum + f.size, 0))}
+                {formatFileSize(
+                  mockFiles
+                    .filter((f) => f.type === 'code' || f.type === 'archive')
+                    .reduce((sum, f) => sum + f.size, 0)
+                )}
               </p>
             </div>
           </div>
@@ -182,16 +209,14 @@ export default function FilesPage() {
             <button
               onClick={() => setSelectedFolder(null)}
               className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                selectedFolder === null
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-accent'
+                selectedFolder === null ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
               }`}
             >
               <Folder className="h-4 w-4" />
               <span>All Files</span>
             </button>
             {mockFolders.map((folder) => {
-              const fileCount = mockFiles.filter(f => f.folderId === folder.id).length;
+              const fileCount = mockFiles.filter((f) => f.folderId === folder.id).length;
               return (
                 <button
                   key={folder.id}
@@ -261,7 +286,7 @@ export default function FilesPage() {
               </button>
               <ChevronRight className="h-4 w-4" />
               <span className="text-foreground font-medium">
-                {mockFolders.find(f => f.id === selectedFolder)?.name}
+                {mockFolders.find((f) => f.id === selectedFolder)?.name}
               </span>
             </div>
           )}
@@ -269,9 +294,7 @@ export default function FilesPage() {
           {/* Upload Area */}
           <div
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              dragActive
-                ? 'border-primary bg-primary/5'
-                : 'border-border hover:border-primary/50'
+              dragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
             }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
@@ -282,9 +305,7 @@ export default function FilesPage() {
             <p className="text-lg font-medium mb-2">
               {dragActive ? 'Drop files here' : 'Drag and drop files here'}
             </p>
-            <p className="text-sm text-muted-foreground mb-4">
-              or click the upload button above
-            </p>
+            <p className="text-sm text-muted-foreground mb-4">or click the upload button above</p>
             <p className="text-xs text-muted-foreground">
               Supports: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, images, videos, and more
             </p>
@@ -299,7 +320,7 @@ export default function FilesPage() {
                     filteredFiles.map((file) => {
                       const Icon = getFileIcon(file.type);
                       const iconColor = getFileColor(file.type);
-                      const folder = mockFolders.find(f => f.id === file.folderId);
+                      const folder = mockFolders.find((f) => f.id === file.folderId);
 
                       return (
                         <div

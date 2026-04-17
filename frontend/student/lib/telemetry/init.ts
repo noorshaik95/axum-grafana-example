@@ -5,7 +5,10 @@ import { DocumentLoadInstrumentation } from '@opentelemetry/instrumentation-docu
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { Resource } from '@opentelemetry/resources';
-import { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
+import {
+  SEMRESATTRS_SERVICE_NAME,
+  SEMRESATTRS_SERVICE_VERSION,
+} from '@opentelemetry/semantic-conventions';
 
 let isInitialized = false;
 
@@ -53,6 +56,7 @@ export function getTracer() {
     return null;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { trace } = require('@opentelemetry/api');
   return trace.getTracer(
     process.env.NEXT_PUBLIC_OTEL_SERVICE_NAME || 'student-portal-web',

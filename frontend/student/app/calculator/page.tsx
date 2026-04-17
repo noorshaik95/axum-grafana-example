@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Calculator, Plus, Trash2, RotateCcw, TrendingUp, TrendingDown, Minus, Save } from 'lucide-react';
-import { mockGradeCategories, mockCourses } from '@/lib/mock-data-extended';
+import { Calculator, Plus, Trash2, RotateCcw, TrendingUp, TrendingDown } from 'lucide-react';
+import { mockGradeCategories } from '@/lib/mock-data-extended';
 
 interface GradeEntry {
   id: string;
@@ -18,8 +18,7 @@ interface GradeEntry {
 }
 
 export default function CalculatorPage() {
-  const [selectedCourse, setSelectedCourse] = useState(mockCourses[0].id);
-  const [categories, setCategories] = useState(mockGradeCategories);
+  const [categories] = useState(mockGradeCategories);
   const [grades, setGrades] = useState<GradeEntry[]>([
     { id: '1', name: 'Quiz 1', score: 85, maxScore: 100, categoryId: 'cat-1' },
     { id: '2', name: 'Assignment 1', score: 90, maxScore: 100, categoryId: 'cat-2' },
@@ -34,7 +33,7 @@ export default function CalculatorPage() {
   });
 
   const calculateCategoryAverage = (categoryId: string) => {
-    const categoryGrades = grades.filter(g => g.categoryId === categoryId);
+    const categoryGrades = grades.filter((g) => g.categoryId === categoryId);
     if (categoryGrades.length === 0) return 0;
 
     const totalEarned = categoryGrades.reduce((sum, g) => sum + g.score, 0);
@@ -47,9 +46,9 @@ export default function CalculatorPage() {
     let weightedSum = 0;
     let totalWeight = 0;
 
-    categories.forEach(category => {
+    categories.forEach((category) => {
       const avg = calculateCategoryAverage(category.id);
-      const categoryGrades = grades.filter(g => g.categoryId === category.id);
+      const categoryGrades = grades.filter((g) => g.categoryId === category.id);
 
       if (categoryGrades.length > 0) {
         weightedSum += avg * (category.weight / 100);
@@ -61,23 +60,26 @@ export default function CalculatorPage() {
   };
 
   const calculateProjectedGrade = (categoryId: string, targetScore: number) => {
-    const category = categories.find(c => c.id === categoryId);
+    const category = categories.find((c) => c.id === categoryId);
     if (!category) return calculateOverallGrade();
 
     // Simulate adding a perfect score to this category
-    const tempGrades = [...grades, {
-      id: 'temp',
-      name: 'Projected',
-      score: targetScore,
-      maxScore: 100,
-      categoryId,
-    }];
+    const tempGrades = [
+      ...grades,
+      {
+        id: 'temp',
+        name: 'Projected',
+        score: targetScore,
+        maxScore: 100,
+        categoryId,
+      },
+    ];
 
     let weightedSum = 0;
     let totalWeight = 0;
 
-    categories.forEach(cat => {
-      const categoryGradesList = tempGrades.filter(g => g.categoryId === cat.id);
+    categories.forEach((cat) => {
+      const categoryGradesList = tempGrades.filter((g) => g.categoryId === cat.id);
       if (categoryGradesList.length === 0) return;
 
       const totalEarned = categoryGradesList.reduce((sum, g) => sum + g.score, 0);
@@ -128,7 +130,7 @@ export default function CalculatorPage() {
   };
 
   const removeGrade = (id: string) => {
-    setGrades(grades.filter(g => g.id !== id));
+    setGrades(grades.filter((g) => g.id !== id));
   };
 
   const resetCalculator = () => {
@@ -144,7 +146,9 @@ export default function CalculatorPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Grade Calculator</h1>
-          <p className="text-muted-foreground">Calculate your grades and explore what-if scenarios</p>
+          <p className="text-muted-foreground">
+            Calculate your grades and explore what-if scenarios
+          </p>
         </div>
         <Button variant="outline" onClick={resetCalculator}>
           <RotateCcw className="mr-2 h-4 w-4" />
@@ -209,7 +213,7 @@ export default function CalculatorPage() {
           <CardContent className="space-y-4">
             {categories.map((category) => {
               const avg = calculateCategoryAverage(category.id);
-              const categoryGrades = grades.filter(g => g.categoryId === category.id);
+              const categoryGrades = grades.filter((g) => g.categoryId === category.id);
 
               return (
                 <div key={category.id} className="space-y-2">
@@ -265,8 +269,7 @@ export default function CalculatorPage() {
                         </span>
                         {difference > 0 && (
                           <Badge variant="outline" className="text-green-600 text-xs">
-                            <TrendingUp className="h-3 w-3 mr-1" />
-                            +{difference.toFixed(1)}
+                            <TrendingUp className="h-3 w-3 mr-1" />+{difference.toFixed(1)}
                           </Badge>
                         )}
                       </div>
@@ -352,13 +355,15 @@ export default function CalculatorPage() {
       <Card>
         <CardHeader>
           <CardTitle>Entered Grades</CardTitle>
-          <CardDescription>{grades.length} grade{grades.length !== 1 ? 's' : ''} entered</CardDescription>
+          <CardDescription>
+            {grades.length} grade{grades.length !== 1 ? 's' : ''} entered
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {grades.length > 0 ? (
             <div className="space-y-2">
               {grades.map((grade) => {
-                const category = categories.find(c => c.id === grade.categoryId);
+                const category = categories.find((c) => c.id === grade.categoryId);
                 const percentage = (grade.score / grade.maxScore) * 100;
 
                 return (
@@ -386,11 +391,7 @@ export default function CalculatorPage() {
                           {getGradeLetter(percentage)}
                         </p>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeGrade(grade.id)}
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => removeGrade(grade.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>

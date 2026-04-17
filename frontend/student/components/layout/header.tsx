@@ -30,12 +30,7 @@ export function Header({ className }: HeaderProps) {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Notifications"
-            className="relative"
-          >
+          <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
             <Bell className="h-5 w-5" />
             <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-600" />
           </Button>

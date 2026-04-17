@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Clock, ArrowRight, FileText } from 'lucide-react';
-import { formatRelativeTime } from '@/lib/utils';
+import { formatRelativeTime, getDueDateStatus } from '@/lib/utils';
 
 const upcomingAssignments = [
   {
@@ -43,11 +43,17 @@ const upcomingAssignments = [
 ];
 
 export function UpcomingAssignmentsWidget() {
+  // Semantic colors: red for urgent (<=1 day), yellow for warning (<=3 days), slate for normal
   const getDueDateColor = (dueDate: string) => {
-    const days = Math.floor((new Date(dueDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
-    if (days <= 1) return 'text-red-600 dark:text-red-400';
-    if (days <= 3) return 'text-orange-600 dark:text-orange-400';
-    return 'text-muted-foreground';
+    const status = getDueDateStatus(dueDate);
+    switch (status) {
+      case 'error':
+        return 'text-red-500 font-semibold';
+      case 'warning':
+        return 'text-yellow-500 font-medium';
+      default:
+        return 'text-muted-foreground';
+    }
   };
 
   return (
@@ -77,9 +83,9 @@ export function UpcomingAssignmentsWidget() {
             <Link
               key={assignment.id}
               href={`/assignments/${assignment.id}`}
-              className="block rounded-lg border p-3 transition-colors hover:bg-accent focus-ring"
+              className="block rounded-xl glass-card p-3 transition-colors hover:bg-white/10 focus-ring"
             >
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start justify-between gap-2 p-2">
                 <div className="flex-1 space-y-1">
                   <h4 className="text-sm font-medium leading-none">{assignment.title}</h4>
                   <p className="text-xs text-muted-foreground">{assignment.course}</p>
@@ -91,7 +97,10 @@ export function UpcomingAssignmentsWidget() {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <Badge variant={assignment.status === 'pending' ? 'secondary' : 'default'} className="text-xs">
+                  <Badge
+                    variant={assignment.status === 'pending' ? 'secondary' : 'default'}
+                    className="text-xs"
+                  >
                     {assignment.points} pts
                   </Badge>
                   {assignment.status === 'in-progress' && (

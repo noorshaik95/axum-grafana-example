@@ -1,118 +1,95 @@
-import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://api.slate.local';
 
-interface ApiError {
-  message: string;
-  code: string;
-  details?: Record<string, any>;
+function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('student_token') || localStorage.getItem('slate_token');
 }
 
-interface ApiResponse<T> {
-  data: T;
-  message?: string;
-  success: boolean;
+function getTenantId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('tenant_id');
 }
 
-class ApiClient {
-  private client: AxiosInstance;
-
-  constructor() {
-    this.client = axios.create({
-      baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
-      timeout: 30000,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    this.setupInterceptors();
-  }
-
-  private setupInterceptors() {
-    // Request interceptor
-    this.client.interceptors.request.use(
-      (config: InternalAxiosRequestConfig) => {
-        // Add auth token if available
-        if (typeof window !== 'undefined') {
-          const token = localStorage.getItem('auth_token');
-          if (token && config.headers) {
-            config.headers.Authorization = `Bearer ${token}`;
-          }
-        }
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
-      }
-    );
-
-    // Response interceptor
-    this.client.interceptors.response.use(
-      (response) => {
-        return response;
-      },
-      async (error: AxiosError<ApiError>) => {
-        if (error.response?.status === 401) {
-          // Handle unauthorized access
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('auth_token');
-            window.location.href = '/login';
-          }
-        }
-
-        const apiError: ApiError = {
-          message: error.response?.data?.message || error.message || 'An error occurred',
-          code: error.response?.data?.code || 'UNKNOWN_ERROR',
-          details: error.response?.data?.details,
-        };
-
-        return Promise.reject(apiError);
-      }
-    );
-  }
-
-  async get<T>(url: string, config?: any): Promise<ApiResponse<T>> {
-    const response = await this.client.get<ApiResponse<T>>(url, config);
-    return response.data;
-  }
-
-  async post<T>(url: string, data?: any, config?: any): Promise<ApiResponse<T>> {
-    const response = await this.client.post<ApiResponse<T>>(url, data, config);
-    return response.data;
-  }
-
-  async put<T>(url: string, data?: any, config?: any): Promise<ApiResponse<T>> {
-    const response = await this.client.put<ApiResponse<T>>(url, data, config);
-    return response.data;
-  }
-
-  async patch<T>(url: string, data?: any, config?: any): Promise<ApiResponse<T>> {
-    const response = await this.client.patch<ApiResponse<T>>(url, data, config);
-    return response.data;
-  }
-
-  async delete<T>(url: string, config?: any): Promise<ApiResponse<T>> {
-    const response = await this.client.delete<ApiResponse<T>>(url, config);
-    return response.data;
-  }
-
-  async uploadFile<T>(url: string, file: File, onProgress?: (progress: number) => void): Promise<ApiResponse<T>> {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await this.client.post<ApiResponse<T>>(url, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      onUploadProgress: (progressEvent) => {
-        if (onProgress && progressEvent.total) {
-          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          onProgress(progress);
-        }
-      },
-    });
-
-    return response.data;
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public statusText: string,
+    public body: Record<string, unknown> | null
+  ) {
+    super(`${status} ${statusText}`);
+    this.name = 'ApiError';
   }
 }
 
-export const apiClient = new ApiClient();
+export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const tenantId = getTenantId();
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  if (tenantId) {
+    headers['X-Tenant-ID'] = tenantId;
+  }
+
+  // Don't set Content-Type for FormData (browser sets multipart boundary)
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    let body: Record<string, unknown> | null = null;
+    try {
+      body = await response.json();
+    } catch {
+      // not JSON
+    }
+    throw new ApiError(response.status, response.statusText, body);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return response.json();
+}
+
+export function get<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'GET' });
+}
+
+export function post<T>(path: string, data?: unknown): Promise<T> {
+  if (data instanceof FormData) {
+    return request<T>(path, { method: 'POST', body: data });
+  }
+  return request<T>(path, {
+    method: 'POST',
+    body: data ? JSON.stringify(data) : undefined,
+  });
+}
+
+export function put<T>(path: string, data?: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PUT',
+    body: data ? JSON.stringify(data) : undefined,
+  });
+}
+
+export function patch<T>(path: string, data?: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PATCH',
+    body: data ? JSON.stringify(data) : undefined,
+  });
+}
+
+export function del<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'DELETE' });
+}

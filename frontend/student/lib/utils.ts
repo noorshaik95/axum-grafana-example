@@ -115,12 +115,11 @@ export function calculatePercentage(value: number, total: number): number {
   return Math.round((value / total) * 100);
 }
 
+// Semantic grade colors: blue for excellent, yellow for warning, red for failing
 export function getGradeColor(grade: number): string {
-  if (grade >= 90) return 'text-green-600 dark:text-green-400';
-  if (grade >= 80) return 'text-blue-600 dark:text-blue-400';
-  if (grade >= 70) return 'text-yellow-600 dark:text-yellow-400';
-  if (grade >= 60) return 'text-orange-600 dark:text-orange-400';
-  return 'text-red-600 dark:text-red-400';
+  if (grade >= 80) return 'text-blue-500'; // A/B - Excellent
+  if (grade >= 60) return 'text-yellow-500'; // C/D - Warning
+  return 'text-red-500'; // F - Failing
 }
 
 export function getGradeLetter(grade: number): string {
@@ -129,4 +128,48 @@ export function getGradeLetter(grade: number): string {
   if (grade >= 70) return 'C';
   if (grade >= 60) return 'D';
   return 'F';
+}
+
+// Semantic badge class for grades
+export function getGradeBadgeClass(grade: number): string {
+  if (grade >= 80) return 'bg-blue-500 text-white border-0'; // A/B - Excellent
+  if (grade >= 60) return 'bg-yellow-500 text-white border-0'; // C/D - Warning
+  return 'bg-red-500 text-white border-0'; // F - Failing
+}
+
+// Semantic colors for status indication
+export function getStatusBadgeClass(status: 'success' | 'warning' | 'error' | 'info'): string {
+  switch (status) {
+    case 'success':
+      return 'bg-blue-500 text-white border-0';
+    case 'warning':
+      return 'bg-yellow-500 text-white border-0';
+    case 'error':
+      return 'bg-red-500 text-white border-0';
+    case 'info':
+    default:
+      return 'bg-slate-500 text-white border-0';
+  }
+}
+
+// Get due date status based on days remaining
+export function getDueDateStatus(dueDate: string): 'error' | 'warning' | 'success' {
+  const days = Math.floor((new Date(dueDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+  if (days < 0) return 'error'; // Overdue
+  if (days <= 1) return 'error'; // Due today or tomorrow
+  if (days <= 3) return 'warning'; // Due soon
+  return 'success'; // Not urgent
+}
+
+// Get due date color class
+export function getDueDateColor(dueDate: string): string {
+  const status = getDueDateStatus(dueDate);
+  switch (status) {
+    case 'error':
+      return 'text-red-500 font-semibold';
+    case 'warning':
+      return 'text-yellow-500 font-medium';
+    default:
+      return 'text-muted-foreground';
+  }
 }

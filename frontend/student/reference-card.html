@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS 101 Course Card</title>
+    <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Patrick Hand', cursive;
+            background: black;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* Wooden frame container */
+        .blackboard-frame {
+            background: linear-gradient(135deg, #4a3426 0%, #5c4033 25%, #6b4d3a 50%, #5c4033 75%, #4a3426 100%);
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow:
+                inset 0 2px 5px rgba(0, 0, 0, 0.5),
+                inset 0 -2px 5px rgba(0, 0, 0, 0.5),
+                0 10px 30px rgba(0, 0, 0, 0.4),
+                0 0 0 2px #3a2416,
+                0 0 0 4px #4a3426,
+                0 0 0 6px #3a2416;
+            position: relative;
+            /* Wood grain texture */
+            background-image:
+                linear-gradient(135deg, #4a3426 0%, #5c4033 25%, #6b4d3a 50%, #5c4033 75%, #4a3426 100%),
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.1) 2px, rgba(0, 0, 0, 0.1) 4px),
+                repeating-linear-gradient(90deg, transparent, transparent 20px, rgba(0, 0, 0, 0.05) 20px, rgba(0, 0, 0, 0.05) 40px);
+        }
+
+        /* Wood grain detail */
+        .blackboard-frame::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(90deg,
+                    transparent,
+                    transparent 40px,
+                    rgba(0, 0, 0, 0.1) 40px,
+                    rgba(0, 0, 0, 0.1) 41px,
+                    transparent 41px,
+                    transparent 80px,
+                    rgba(0, 0, 0, 0.08) 80px,
+                    rgba(0, 0, 0, 0.08) 81px);
+            border-radius: 8px;
+            pointer-events: none;
+        }
+
+        /* Frame corners - decorative bolts */
+        .blackboard-frame::after {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border: 2px solid #2a1a0e;
+            border-radius: 4px;
+            pointer-events: none;
+            background:
+                radial-gradient(circle at 15px 15px, #2a1a0e 0%, #2a1a0e 3px, transparent 3px),
+                radial-gradient(circle at calc(100% - 15px) 15px, #2a1a0e 0%, #2a1a0e 3px, transparent 3px),
+                radial-gradient(circle at 15px calc(100% - 15px), #2a1a0e 0%, #2a1a0e 3px, transparent 3px),
+                radial-gradient(circle at calc(100% - 15px) calc(100% - 15px), #2a1a0e 0%, #2a1a0e 3px, transparent 3px);
+        }
+
+        .course-card {
+            background: #2d3436;
+            background-image:
+                /* Blackboard surface texture */
+                radial-gradient(ellipse at 20% 30%, rgba(255, 255, 255, 0.03) 0%, transparent 40%),
+                radial-gradient(ellipse at 60% 70%, rgba(255, 255, 255, 0.02) 0%, transparent 45%),
+                radial-gradient(ellipse at 85% 25%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+                /* Fine chalk dust */
+                repeating-linear-gradient(45deg,
+                    transparent,
+                    transparent 3px,
+                    rgba(255, 255, 255, 0.01) 3px,
+                    rgba(255, 255, 255, 0.01) 4px),
+                /* Blackboard grain */
+                repeating-linear-gradient(0deg,
+                    #2d3436,
+                    #2d3436 1px,
+                    #2a3133 1px,
+                    #2a3133 2px);
+            padding: 60px;
+            width: 100%;
+            max-width: 500px;
+            min-height: 600px;
+            position: relative;
+            box-shadow:
+                inset 0 0 50px rgba(0, 0, 0, 0.5),
+                inset 0 0 100px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Refined SVG Smudged chalk border */
+        .chalk-border {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            right: 30px;
+            bottom: 30px;
+            pointer-events: none;
+            z-index: 1;
+            background-image: url("data:image/svg+xml,%3Csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cfilter id='chalkDraw' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02' numOctaves='3' result='noise' seed='5'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='noise' scale='3'/%3E%3CfeGaussianBlur stdDeviation='0.8'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='discrete' tableValues='0 0.3 0.5 0.7 0.9 1 1 1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Cfilter id='smudgeEffect'%3E%3CfeGaussianBlur stdDeviation='1.5'/%3E%3CfeMorphology operator='dilate' radius='0.5'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 0.6 0.8 0.9 1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3C/defs%3E%3Cg filter='url(%23chalkDraw)'%3E%3Crect x='10' y='10' width='calc(100%25 - 20px)' height='calc(100%25 - 20px)' fill='none' stroke='rgba(255,255,255,0.85)' stroke-width='12' stroke-linejoin='round' stroke-linecap='round' stroke-dasharray='60 20 10 20 30 15' filter='url(%23smudgeEffect)' /%3E%3Crect x='15' y='15' width='calc(100%25 - 30px)' height='calc(100%25 - 30px)' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='6' stroke-dasharray='40 15 5 15' stroke-dashoffset='10' opacity='0.8' /%3E%3Crect x='20' y='20' width='calc(100%25 - 40px)' height='calc(100%25 - 40px)' fill='none' stroke='rgba(255,255,255,0.2)' stroke-width='3' stroke-dasharray='80 30' stroke-dashoffset='20' /%3E%3C/g%3E%3C/svg%3E");
+            background-position: center;
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            opacity: 0.9;
+        }
+
+        /* Additional hand-drawn smudge layer */
+        .chalk-border::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            background-image: url("data:image/svg+xml,%3Csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cfilter id='handDrawn'%3E%3CfeTurbulence type='turbulence' baseFrequency='0.03' numOctaves='1' result='turbulence'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='turbulence' scale='2'/%3E%3CfeGaussianBlur stdDeviation='0.5'/%3E%3C/filter%3E%3C/defs%3E%3Cpath d='M 25,25 Q 30,20 40,22 L 100,20 Q 110,22 120,20 L 200,25 Q 210,20 220,22 L 300,20 Q 310,22 320,20 L 400,25 Q 410,20 420,22 L calc(100%25 - 40px),20 Q calc(100%25 - 30px),22 calc(100%25 - 25px),25 L calc(100%25 - 20px),100 Q calc(100%25 - 22px),110 calc(100%25 - 20px),120 L calc(100%25 - 25px),200 Q calc(100%25 - 20px),210 calc(100%25 - 22px),220 L calc(100%25 - 20px),300 Q calc(100%25 - 22px),310 calc(100%25 - 20px),320 L calc(100%25 - 25px),calc(100%25 - 40px) Q calc(100%25 - 20px),calc(100%25 - 30px) calc(100%25 - 25px),calc(100%25 - 25px) L calc(100%25 - 100px),calc(100%25 - 20px) Q calc(100%25 - 110px),calc(100%25 - 22px) calc(100%25 - 120px),calc(100%25 - 20px) L calc(100%25 - 200px),calc(100%25 - 25px) Q calc(100%25 - 210px),calc(100%25 - 20px) calc(100%25 - 220px),calc(100%25 - 22px) L 40,calc(100%25 - 20px) Q 30,calc(100%25 - 22px) 25,calc(100%25 - 25px) L 20,calc(100%25 - 100px) Q 22,calc(100%25 - 110px) 20,calc(100%25 - 120px) L 25,200 Q 20,190 22,180 L 20,100 Q 22,90 20,80 L 25,40 Q 20,30 25,25 Z' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='8' stroke-linejoin='round' stroke-linecap='round' filter='url(%23handDrawn)' opacity='0.6'/%3E%3C/svg%3E");
+            background-position: center;
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            mix-blend-mode: screen;
+        }
+
+        /* Corner and edge smudges for more realism */
+        .chalk-border::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                /* Corner smudges - heavier */
+                radial-gradient(ellipse at 3% 3%, rgba(255, 255, 255, 0.25) 0%, transparent 12%),
+                radial-gradient(ellipse at 97% 3%, rgba(255, 255, 255, 0.25) 0%, transparent 12%),
+                radial-gradient(ellipse at 3% 97%, rgba(255, 255, 255, 0.25) 0%, transparent 12%),
+                radial-gradient(ellipse at 97% 97%, rgba(255, 255, 255, 0.25) 0%, transparent 12%),
+                /* Mid-edge smudges */
+                radial-gradient(ellipse at 50% 2%, rgba(255, 255, 255, 0.15) 0%, transparent 15%),
+                radial-gradient(ellipse at 98% 50%, rgba(255, 255, 255, 0.15) 0%, transparent 15%),
+                radial-gradient(ellipse at 50% 98%, rgba(255, 255, 255, 0.15) 0%, transparent 15%),
+                radial-gradient(ellipse at 2% 50%, rgba(255, 255, 255, 0.15) 0%, transparent 15%);
+            filter: blur(4px);
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* Multiple chalk smudge layers */
+        .course-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                /* Large smudges */
+                radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.08) 0%, transparent 25%),
+                radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.06) 0%, transparent 30%),
+                radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.04) 0%, transparent 35%),
+                /* Small dust particles */
+                radial-gradient(circle at 10% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 15%),
+                radial-gradient(circle at 90% 30%, rgba(255, 255, 255, 0.05) 0%, transparent 15%),
+                radial-gradient(circle at 30% 80%, rgba(255, 255, 255, 0.04) 0%, transparent 20%);
+            pointer-events: none;
+            mix-blend-mode: screen;
+            opacity: 0.6;
+            z-index: 1;
+        }
+
+        .course-header {
+            text-align: center;
+            margin-bottom: 35px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .course-code {
+            font-size: 72px;
+            font-weight: normal;
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow:
+                2px 2px 3px rgba(255, 255, 255, 0.2),
+                -1px -1px 2px rgba(255, 255, 255, 0.1),
+                3px 3px 8px rgba(0, 0, 0, 0.4),
+                0 0 30px rgba(255, 255, 255, 0.15);
+            letter-spacing: 8px;
+            margin-bottom: 10px;
+            font-family: 'Patrick Hand', cursive;
+            filter: blur(0.3px);
+            position: relative;
+        }
+
+        /* Add chalk texture to text */
+        .course-code::after {
+            content: 'CS 101';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            color: rgba(255, 255, 255, 0.1);
+            filter: blur(1px);
+            z-index: -1;
+        }
+
+        .course-title {
+            font-size: 26px;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow:
+                1px 1px 2px rgba(255, 255, 255, 0.15),
+                2px 2px 4px rgba(0, 0, 0, 0.3),
+                0 0 20px rgba(255, 255, 255, 0.1);
+            font-weight: normal;
+            letter-spacing: 1px;
+            filter: blur(0.2px);
+        }
+
+        .course-details {
+            padding: 20px 30px;
+            margin-bottom: 25px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .detail-item {
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 28px;
+            margin-bottom: 15px;
+            text-shadow:
+                1px 1px 2px rgba(255, 255, 255, 0.2),
+                -0.5px -0.5px 1px rgba(255, 255, 255, 0.1),
+                2px 2px 5px rgba(0, 0, 0, 0.3),
+                0 0 15px rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+            font-weight: normal;
+            filter: blur(0.2px);
+            letter-spacing: 1px;
+        }
+
+        .detail-item:last-of-type {
+            margin-bottom: 25px;
+        }
+
+        .detail-item.with-icon {
+            gap: 12px;
+        }
+
+        /* Icons */
+        .icon {
+            width: 24px;
+            height: 24px;
+            display: inline-block;
+            opacity: 0.85;
+            filter: blur(0.3px);
+        }
+
+        .icon-students {
+            position: relative;
+            top: 2px;
+        }
+
+        .icon-students svg {
+            fill: rgba(255, 255, 255, 0.9);
+            filter: drop-shadow(1px 1px 2px rgba(255, 255, 255, 0.2)) drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.3));
+        }
+
+        .icon-credits {
+            position: relative;
+            top: 2px;
+        }
+
+        .icon-credits svg {
+            fill: rgba(255, 255, 255, 0.9);
+            filter: drop-shadow(1px 1px 2px rgba(255, 255, 255, 0.2)) drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.3));
+        }
+
+        .progress-container {
+            position: relative;
+            z-index: 2;
+            margin-top: 30px;
+        }
+
+        .progress-label {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 24px;
+            margin-bottom: 12px;
+            text-shadow:
+                1px 1px 2px rgba(255, 255, 255, 0.15),
+                2px 2px 4px rgba(0, 0, 0, 0.3),
+                0 0 10px rgba(255, 255, 255, 0.1);
+            filter: blur(0.2px);
+        }
+
+        .progress-bar {
+            background: transparent;
+            height: 45px;
+            border-radius: 25px;
+            overflow: hidden;
+            position: relative;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow:
+                inset 0 2px 4px rgba(0, 0, 0, 0.2),
+                0 1px 2px rgba(255, 255, 255, 0.1);
+            /* Chalk texture for empty bar */
+            background-image:
+                radial-gradient(ellipse at 30% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 50%);
+        }
+
+        .progress-fill {
+            background: rgba(255, 255, 255, 0.15);
+            background-image:
+                /* Chalk fill texture */
+                repeating-linear-gradient(90deg,
+                    rgba(255, 255, 255, 0.2) 0px,
+                    rgba(255, 255, 255, 0.15) 2px,
+                    rgba(255, 255, 255, 0.1) 4px,
+                    rgba(255, 255, 255, 0.15) 6px),
+                radial-gradient(ellipse at 40% 50%, rgba(255, 255, 255, 0.2) 0%, transparent 60%);
+            height: 100%;
+            width: 75%;
+            border-radius: 23px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 20px;
+            transition: width 0.3s ease;
+            box-shadow:
+                inset 0 1px 3px rgba(255, 255, 255, 0.2),
+                inset 0 -1px 3px rgba(0, 0, 0, 0.1);
+            position: relative;
+            filter: blur(0.3px);
+        }
+
+        /* Chalk texture overlay for progress fill */
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 30%),
+                radial-gradient(circle at 80% 50%, rgba(255, 255, 255, 0.08) 0%, transparent 30%);
+            border-radius: 25px;
+            mix-blend-mode: overlay;
+        }
+
+        .progress-percentage {
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 26px;
+            font-weight: normal;
+            text-shadow:
+                1px 1px 2px rgba(255, 255, 255, 0.2),
+                2px 2px 4px rgba(0, 0, 0, 0.4),
+                0 0 10px rgba(255, 255, 255, 0.15);
+            z-index: 1;
+            position: relative;
+            filter: blur(0.2px);
+        }
+
+        .continue-button {
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.95);
+            font-size: 32px;
+            padding: 18px 60px;
+            border-radius: 50px;
+            cursor: pointer;
+            margin: 35px auto 0;
+            display: block;
+            text-shadow:
+                1px 1px 2px rgba(255, 255, 255, 0.2),
+                2px 2px 4px rgba(0, 0, 0, 0.4),
+                0 0 20px rgba(255, 255, 255, 0.15);
+            font-weight: normal;
+            letter-spacing: 2px;
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 2;
+            font-family: 'Patrick Hand', cursive;
+            filter: blur(0.2px);
+        }
+
+        /* Hand-drawn chalk border using SVG */
+        .continue-button::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            background: url("data:image/svg+xml,%3Csvg width='200' height='80' xmlns='http://www.w3.org/2000/svg'%3E%3Cellipse cx='100' cy='40' rx='95' ry='35' fill='none' stroke='rgba(255,255,255,0.7)' stroke-width='2.5' stroke-dasharray='4,2' stroke-linecap='round' pathLength='100' style='filter: blur(0.5px)'/%3E%3Cellipse cx='100' cy='40' rx='94' ry='34' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='1.5' stroke-dasharray='6,3' stroke-linecap='round' transform='rotate(2 100 40)' pathLength='100'/%3E%3C/svg%3E") center/contain no-repeat;
+            pointer-events: none;
+            opacity: 0.9;
+        }
+
+        /* Additional chalk texture for button */
+        .continue-button::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(ellipse at 30% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 50%, rgba(255, 255, 255, 0.04) 0%, transparent 50%);
+            border-radius: 50px;
+            pointer-events: none;
+            mix-blend-mode: overlay;
+        }
+
+        .continue-button:hover {
+            transform: translateY(-2px);
+            text-shadow:
+                1px 1px 3px rgba(255, 255, 255, 0.3),
+                3px 3px 6px rgba(0, 0, 0, 0.5),
+                0 0 30px rgba(255, 255, 255, 0.2);
+        }
+
+        .continue-button:hover::before {
+            opacity: 1;
+            filter: blur(0.3px);
+        }
+
+        .continue-button:active {
+            transform: translateY(0);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 480px) {
+            .course-card {
+                padding: 30px;
+            }
+
+            .course-code {
+                font-size: 56px;
+                letter-spacing: 6px;
+            }
+
+            .course-code::after {
+                content: 'CS 101';
+                font-size: 56px;
+            }
+
+            .course-title {
+                font-size: 22px;
+            }
+
+            .detail-item {
+                font-size: 24px;
+            }
+
+            .continue-button {
+                font-size: 28px;
+                padding: 15px 50px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="blackboard-frame">
+        <div class="course-card">
+            <div class="chalk-border"></div>
+            <div class="course-header">
+                <h1 class="course-code">CS 101</h1>
+                <p class="course-title">Introduction to Computer Science</p>
+            </div>
+
+            <div class="course-details">
+                <div class="detail-item">Dr. Smith</div>
+
+                <div class="detail-item with-icon">
+                    <span class="icon icon-students">
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path
+                                d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+                        </svg>
+                    </span>
+                    <span>45 students</span>
+                </div>
+
+                <div class="detail-item with-icon">
+                    <span class="icon icon-credits">
+                        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path
+                                d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5zm0 3.9L18 9v7.08c0 1.21-.31 2.37-.87 3.37l-5.13-5.13L8.87 17.45A7.91 7.91 0 0 1 6 12.08V9l6-3.1zm0 6.27l3.13 3.13-1.41 1.42L12 15l-1.72 1.72-1.41-1.42L12 12.17z" />
+                        </svg>
+                    </span>
+                    <span>4 credits</span>
+                </div>
+
+                <div class="detail-item">Next deadline in at days</div>
+
+                <div class="progress-container">
+                    <div class="progress-label">Progress</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill">
+                            <span class="progress-percentage">75%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="continue-button">Continue</button>
+        </div>
+    </div>
+</body>
+
+</html>

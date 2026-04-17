@@ -110,16 +110,10 @@ export const AssignmentCard = React.forwardRef<HTMLDivElement, AssignmentCardPro
         <div
           className={cn(
             'flex items-center gap-2 mb-4 text-sm font-medium',
-            dueSoon
-              ? 'text-red-600 dark:text-red-400'
-              : 'text-gray-600 dark:text-gray-400'
+            dueSoon ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'
           )}
         >
-          {dueSoon ? (
-            <Clock className="w-4 h-4" />
-          ) : (
-            <Calendar className="w-4 h-4" />
-          )}
+          {dueSoon ? <Clock className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
           <span>Due {formatDueDate(assignment.dueDate)}</span>
           {dueSoon && <span className="text-xs">(Due Soon!)</span>}
         </div>
@@ -128,10 +122,7 @@ export const AssignmentCard = React.forwardRef<HTMLDivElement, AssignmentCardPro
         {assignment.status === 'pending' && (
           <Button
             onClick={onSubmit}
-            className={cn(
-              'w-full font-semibold',
-              gradientBadgeClasses[assignment.course.gradient]
-            )}
+            className={cn('w-full font-semibold', gradientBadgeClasses[assignment.course.gradient])}
           >
             Submit Assignment
           </Button>

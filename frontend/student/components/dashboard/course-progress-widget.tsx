@@ -62,17 +62,12 @@ export function CourseProgressWidget() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">My Courses</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <h2 className="text-2xl font-bold text-foreground">My Courses</h2>
+          <p className="text-sm text-muted-foreground mt-1">
             Track your progress across all enrolled courses
           </p>
         </div>
-        <Button
-          asChild
-          variant="outline"
-          size="sm"
-          className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
-        >
+        <Button asChild variant="outline" size="sm" className="glass-card hover:bg-muted">
           <Link href="/courses">
             View All
             <ArrowRight className="ml-2 h-4 w-4" />

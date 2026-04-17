@@ -1,51 +1,22 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { Providers } from './providers';
+import { QueryProvider } from '@/components/providers/query-provider';
+
+export const dynamic = 'force-dynamic';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'Student Portal - Learning Management System',
-  description: 'Comprehensive student and instructor portal for online learning',
-  manifest: '/manifest.json',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0f172a' },
-  ],
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 5,
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'Student Portal',
-  },
-  formatDetection: {
-    telephone: false,
-  },
-  openGraph: {
-    type: 'website',
-    siteName: 'Student Portal',
-    title: 'Student Portal - Learning Management System',
-    description: 'Comprehensive student and instructor portal for online learning',
-  },
+  title: 'Slate - Student Portal',
+  description: 'Access your courses, assignments, and grades.',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.variable}>
-        <a href="#main-content" className="skip-to-content">
-          Skip to main content
-        </a>
-        <Providers>{children}</Providers>
+    <html lang="en">
+      <body className={`${inter.variable} font-sans`}>
+        <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
   );

@@ -12,7 +12,8 @@ const announcements = [
     id: '1',
     title: 'Midterm Schedule Updated',
     course: 'CS 101',
-    content: 'The midterm exam has been rescheduled to next Friday. Please check the updated syllabus.',
+    content:
+      'The midterm exam has been rescheduled to next Friday. Please check the updated syllabus.',
     priority: 'high' as const,
     publishedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     isRead: false,
@@ -38,32 +39,33 @@ const announcements = [
 ];
 
 export function AnnouncementsWidget() {
+  // Semantic colors: red for urgent, yellow for warning, blue for info
   const getPriorityIcon = (priority: 'high' | 'medium' | 'low') => {
     switch (priority) {
       case 'high':
-        return <AlertCircle className="h-4 w-4 text-red-600" />;
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
       case 'medium':
-        return <Info className="h-4 w-4 text-orange-600" />;
+        return <Info className="h-4 w-4 text-yellow-500" />;
       default:
-        return <Bell className="h-4 w-4 text-blue-600" />;
+        return <Bell className="h-4 w-4 text-blue-500" />;
     }
   };
 
   const getPriorityVariant = (priority: 'high' | 'medium' | 'low') => {
     switch (priority) {
       case 'high':
-        return 'destructive' as const;
+        return 'destructive' as const; // Red
       case 'medium':
-        return 'warning' as const;
+        return 'warning' as const; // Amber
       default:
-        return 'default' as const;
+        return 'default' as const; // Blue
     }
   };
 
   const unreadCount = announcements.filter((a) => !a.isRead).length;
 
   return (
-    <Card className="h-full">
+    <Card className="h-full glass-card">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -88,11 +90,9 @@ export function AnnouncementsWidget() {
           <Link
             key={announcement.id}
             href={`/announcements/${announcement.id}`}
-            className={`block rounded-lg border p-3 transition-colors hover:bg-accent focus-ring ${
-              !announcement.isRead ? 'border-l-4 border-l-primary bg-primary/5' : ''
-            }`}
+            className={`block rounded-xl glass-card p-3 transition-colors hover:bg-white/10 focus-ring`}
           >
-            <div className="space-y-2">
+            <div className="space-y-2 p-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-2">
                   {getPriorityIcon(announcement.priority)}
@@ -101,7 +101,10 @@ export function AnnouncementsWidget() {
                     <p className="text-xs text-muted-foreground">{announcement.course}</p>
                   </div>
                 </div>
-                <Badge variant={getPriorityVariant(announcement.priority)} className="text-xs capitalize">
+                <Badge
+                  variant={getPriorityVariant(announcement.priority)}
+                  className="text-xs capitalize"
+                >
                   {announcement.priority}
                 </Badge>
               </div>

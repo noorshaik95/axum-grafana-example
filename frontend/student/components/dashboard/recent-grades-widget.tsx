@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { getGradeColor, getGradeLetter } from '@/lib/utils';
+import { getGradeColor, getGradeLetter, getGradeBadgeClass } from '@/lib/utils';
 
 const recentGrades = [
   {
@@ -47,14 +47,15 @@ const recentGrades = [
 ];
 
 export function RecentGradesWidget() {
+  // Semantic colors: blue for up, red for down, slate for neutral
   const getTrendIcon = (trend: 'up' | 'down' | 'neutral') => {
     switch (trend) {
       case 'up':
-        return <TrendingUp className="h-3 w-3 text-green-600" />;
+        return <TrendingUp className="h-3 w-3 text-blue-500" />;
       case 'down':
-        return <TrendingDown className="h-3 w-3 text-red-600" />;
+        return <TrendingDown className="h-3 w-3 text-red-500" />;
       default:
-        return <Minus className="h-3 w-3 text-gray-600" />;
+        return <Minus className="h-3 w-3 text-slate-500" />;
     }
   };
 
@@ -81,9 +82,9 @@ export function RecentGradesWidget() {
             <Link
               key={grade.id}
               href={`/grades/${grade.id}`}
-              className="block rounded-lg border p-3 transition-colors hover:bg-accent focus-ring"
+              className="block rounded-xl glass-card p-3 transition-colors hover:bg-white/10 focus-ring"
             >
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start justify-between gap-2 p-2">
                 <div className="flex-1 space-y-1">
                   <h4 className="text-sm font-medium leading-none">{grade.assignmentName}</h4>
                   <p className="text-xs text-muted-foreground">{grade.course}</p>
@@ -98,7 +99,7 @@ export function RecentGradesWidget() {
                       {percentage}%
                     </span>
                   </div>
-                  <Badge variant="outline" className={getGradeColor(percentage)}>
+                  <Badge className={getGradeBadgeClass(percentage)}>
                     {getGradeLetter(percentage)}
                   </Badge>
                 </div>

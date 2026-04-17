@@ -56,9 +56,7 @@ export default function DiscussionsPage() {
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          {discussion.isPinned && (
-                            <Pin className="h-4 w-4 text-primary" />
-                          )}
+                          {discussion.isPinned && <Pin className="h-4 w-4 text-primary" />}
                           {discussion.isLocked && (
                             <Lock className="h-4 w-4 text-muted-foreground" />
                           )}
@@ -71,9 +69,7 @@ export default function DiscussionsPage() {
                       </div>
                     </div>
 
-                    <CardDescription className="line-clamp-2">
-                      {discussion.content}
-                    </CardDescription>
+                    <CardDescription className="line-clamp-2">{discussion.content}</CardDescription>
 
                     {/* Stats */}
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
