@@ -8,12 +8,30 @@ pub struct Config {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
     pub s3: S3Config,
+    pub minio: MinioConfig,
     pub elasticsearch: ElasticsearchConfig,
     pub redis: RedisConfig,
+    pub kafka: KafkaConfig,
     pub observability: ObservabilityConfig,
     pub analytics: AnalyticsConfig,
     pub upload: UploadConfig,
     pub transcoding: TranscodingConfig,
+}
+
+/// MinIO configuration for tenant-isolated content storage
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MinioConfig {
+    pub endpoint: String,
+    pub access_key: String,
+    pub secret_key: String,
+    pub bucket_prefix: String,
+}
+
+/// Kafka configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KafkaConfig {
+    pub brokers: String,
+    pub consumer_group: String,
 }
 
 /// Server configuration
@@ -184,6 +202,28 @@ impl Config {
         }
         if let Ok(val) = std::env::var("S3__REGION") {
             config.s3.region = val;
+        }
+
+        // MinIO
+        if let Ok(val) = std::env::var("MINIO_ENDPOINT") {
+            config.minio.endpoint = val;
+        }
+        if let Ok(val) = std::env::var("MINIO_ACCESS_KEY") {
+            config.minio.access_key = val;
+        }
+        if let Ok(val) = std::env::var("MINIO_SECRET_KEY") {
+            config.minio.secret_key = val;
+        }
+        if let Ok(val) = std::env::var("MINIO_BUCKET_PREFIX") {
+            config.minio.bucket_prefix = val;
+        }
+
+        // Kafka
+        if let Ok(val) = std::env::var("KAFKA__BROKERS") {
+            config.kafka.brokers = val;
+        }
+        if let Ok(val) = std::env::var("KAFKA__CONSUMER_GROUP") {
+            config.kafka.consumer_group = val;
         }
 
         // ElasticSearch
@@ -385,7 +425,7 @@ impl Default for Config {
             server: ServerConfig {
                 host: "0.0.0.0".to_string(),
                 port: 8082,
-                grpc_port: 50052,
+                grpc_port: 50054,
                 metrics_port: 9092,
                 shutdown_timeout_seconds: 30,
             },
@@ -407,6 +447,12 @@ impl Default for Config {
                 presigned_url_expiry_seconds: 3600, // 1 hour for documents
                 video_presigned_url_expiry_seconds: 7200, // 2 hours for videos
             },
+            minio: MinioConfig {
+                endpoint: "http://localhost:9000".to_string(),
+                access_key: "minioadmin".to_string(),
+                secret_key: "minioadmin".to_string(),
+                bucket_prefix: "slate-content".to_string(),
+            },
             elasticsearch: ElasticsearchConfig {
                 url: "http://localhost:9200".to_string(),
                 index: "content".to_string(),
@@ -418,6 +464,10 @@ impl Default for Config {
                 queue_name: "transcoding_jobs".to_string(),
                 connection_timeout_seconds: 5,
                 max_pool_size: 10,
+            },
+            kafka: KafkaConfig {
+                brokers: "localhost:9092".to_string(),
+                consumer_group: "content-management-service".to_string(),
             },
             observability: ObservabilityConfig {
                 service_name: "content-management-service".to_string(),

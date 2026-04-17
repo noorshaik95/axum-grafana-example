@@ -8,7 +8,7 @@ edition = "2021"
 common-rust = { path = "../../libs/common-rust", features = ["full"] }
 
 # Web framework
-axum = "0.7"
+axum = { version = "0.7", features = ["multipart"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["trace", "cors", "limit"] }
 
@@ -29,6 +29,9 @@ sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid"
 aws-config = "1.1"
 aws-sdk-s3 = "1.13"
 aws-credential-types = "1.1"
+
+# Kafka
+rdkafka = { version = "0.36", features = ["tokio", "dynamic-linking"] }
 
 # ElasticSearch
 elasticsearch = "9.1.0-alpha.1"

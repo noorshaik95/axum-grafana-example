@@ -108,7 +108,7 @@ async fn main() -> Result<()> {
         axum::serve(listener, app).await.unwrap();
     });
 
-    // Initialize S3 client
+    // Initialize S3 client (for existing upload/transcoding flows)
     info!("Initializing S3 client...");
     let s3_client = Arc::new(
         content_management_service::storage::S3Client::new(
@@ -121,6 +121,34 @@ async fn main() -> Result<()> {
         .await?,
     );
     info!("S3 client initialized");
+
+    // Initialize MinIO client (for tenant-isolated content storage)
+    info!("Initializing MinIO client...");
+    let minio_client = Arc::new(
+        content_management_service::storage::MinioClient::new(
+            &config.minio.endpoint,
+            &config.minio.access_key,
+            &config.minio.secret_key,
+            &config.minio.bucket_prefix,
+        )
+        .await?,
+    );
+    info!("MinIO client initialized");
+
+    // Initialize Kafka producer
+    info!("Initializing Kafka producer...");
+    let kafka_producer = Arc::new(
+        content_management_service::kafka::KafkaProducer::new(&config.kafka.brokers)
+            .map_err(|e| anyhow::anyhow!("Failed to create Kafka producer: {}", e))?,
+    );
+    info!("Kafka producer initialized");
+
+    // Initialize content object repository
+    let content_object_repo = Arc::new(
+        content_management_service::db::repositories::ContentObjectRepository::new(
+            db_pool.pool().clone(),
+        ),
+    );
 
     // Initialize ElasticSearch client
     info!("Initializing ElasticSearch client...");
@@ -333,6 +361,46 @@ async fn main() -> Result<()> {
                 error!("Failed to cleanup expired sessions: {}", e);
             }
         }
+    });
+
+    // Start Kafka consumer
+    let kafka_minio = minio_client.clone();
+    let kafka_content_repo = content_object_repo.clone();
+    let kafka_brokers = config.kafka.brokers.clone();
+    let kafka_group = config.kafka.consumer_group.clone();
+    tokio::spawn(async move {
+        match content_management_service::kafka::KafkaConsumer::new(
+            &kafka_brokers,
+            &kafka_group,
+            kafka_minio,
+            kafka_content_repo,
+        ) {
+            Ok(consumer) => {
+                info!("Kafka consumer started");
+                consumer.run().await;
+            }
+            Err(e) => {
+                error!("Failed to create Kafka consumer: {}", e);
+            }
+        }
+    });
+
+    // Start REST API server for content management
+    let rest_state = content_management_service::handlers::content_handlers::ContentAppState {
+        minio_client: minio_client.clone(),
+        content_repo: content_object_repo.clone(),
+        kafka_producer: kafka_producer.clone(),
+        bucket_prefix: config.minio.bucket_prefix.clone(),
+    };
+
+    let rest_port = config.server.port;
+    let rest_host = config.server.host.clone();
+    tokio::spawn(async move {
+        let app = content_management_service::handlers::content_routes(rest_state);
+        let addr = format!("{}:{}", rest_host, rest_port);
+        info!("Starting REST API server on {}", addr);
+        let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+        axum::serve(listener, app).await.unwrap();
     });
 
     info!("Background workers started");

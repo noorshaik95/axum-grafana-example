@@ -2,8 +2,12 @@
 # Stage 1: Builder
 FROM rust:latest as builder
 
-# Install protobuf compiler
-RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
+# Install protobuf compiler and librdkafka for Kafka support
+RUN apt-get update && apt-get install -y \
+    protobuf-compiler \
+    pkg-config \
+    librdkafka-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
@@ -42,9 +46,11 @@ FROM debian:sid-slim
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    curl \
     ffmpeg \
     libssl3 \
     libpq5 \
+    librdkafka1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
