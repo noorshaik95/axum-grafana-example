@@ -24,9 +24,9 @@ type Config struct {
 	SamplingRate   float64
 }
 
-// InitTracer initializes the OpenTelemetry tracer provider with an OTLP gRPC exporter.
-// It sets the global tracer provider and W3C Trace Context propagator.
-func InitTracer(cfg Config) (*sdktrace.TracerProvider, error) {
+// InitTracerWithConfig initializes the OpenTelemetry tracer provider with an OTLP gRPC
+// exporter using the full Config struct. Use InitTracer for the simpler two-argument form.
+func InitTracerWithConfig(cfg Config) (*sdktrace.TracerProvider, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
