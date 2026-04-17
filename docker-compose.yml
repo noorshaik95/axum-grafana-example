@@ -790,6 +790,110 @@ services:
           memory: 64M
     restart: unless-stopped
 
+  # Tenant Service (Go)
+  tenant-service:
+    build:
+      context: .
+      dockerfile: services/tenant-service/Dockerfile
+    environment:
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8083"
+      GRPC_HOST: "0.0.0.0"
+      GRPC_PORT: "50053"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_NAME: "tenantdb"
+      DB_SSLMODE: "disable"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      USER_SERVICE_URL: "user-auth-service:50051"
+      EMAIL_SERVICE_URL: "email-service:50052"
+      EMAIL_ENABLED: "true"
+      WELCOME_EMAIL_DELAY_SECONDS: "5"
+      BASE_SETUP_URL: "http://localhost:8080"
+      LOG_LEVEL: "info"
+      ENVIRONMENT: "development"
+    ports:
+      - "50057:50053"   # gRPC
+      - "8087:8083"     # HTTP
+      - "9100:9090"     # Metrics
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      user-auth-service:
+        condition: service_started
+      email-service:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+
+  # Email Service (Go)
+  email-service:
+    build:
+      context: .
+      dockerfile: services/email-service/Dockerfile
+    environment:
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8082"
+      GRPC_HOST: "0.0.0.0"
+      GRPC_PORT: "50052"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_NAME: "emaildb"
+      DB_SSLMODE: "disable"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
+      LOG_LEVEL: "info"
+    ports:
+      - "50058:50052"   # gRPC
+      - "8088:8082"     # HTTP
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Metrics Service (Go)
+  metrics-service:
+    build:
+      context: .
+      dockerfile: services/metrics-service/Dockerfile
+    environment:
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8084"
+      GRPC_HOST: "0.0.0.0"
+      GRPC_PORT: "50054"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_NAME: "metricsdb"
+      DB_SSLMODE: "disable"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
+      PROMETHEUS_URL: "http://prometheus:9090"
+      METRICS_UPDATE_INTERVAL: "30"
+      LOG_LEVEL: "info"
+      ENVIRONMENT: "development"
+    ports:
+      - "50059:50054"   # gRPC
+      - "8089:8084"     # HTTP
+      - "9101:9090"     # Metrics
+    depends_on:
+      postgres:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
+    restart: unless-stopped
+
   # Video Conferencing Service (Rust/WebRTC)
   video-conferencing-service:
     build:

@@ -44,6 +44,14 @@ scrape_configs:
         labels:
           service: 'onboarding-service'
 
+  - job_name: 'tenant-service'
+    static_configs:
+      - targets: ['tenant-service:9090']
+
+  - job_name: 'metrics-service'
+    static_configs:
+      - targets: ['metrics-service:9090']
+
   - job_name: 'video-conferencing-service'
     static_configs:
       - targets: ['video-conferencing-service:9092']

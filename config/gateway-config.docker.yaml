@@ -29,6 +29,14 @@ services:
     auto_discover: true
     tls_enabled: false
 
+  tenant-service:
+    name: "tenant-service"
+    endpoint: "http://tenant-service:50053"
+    timeout_ms: 10000
+    connection_pool_size: 10
+    auto_discover: true
+    tls_enabled: false
+
   content-management-service:
     name: "content-management-service"
     endpoint: "http://content-management-service:50052"
@@ -338,6 +346,32 @@ route_overrides:
     service: "assignment-grading-service"
 
 
+
+  # Tenant Service
+  - grpc_method: "tenant.TenantService/GetProvisioningStatus"
+    http_path: "/api/provisioning/:id"
+    http_method: "GET"
+    service: "tenant-service"
+
+  - grpc_method: "tenant.TenantService/GetStorageQuota"
+    http_path: "/api/tenants/:tenant_id/storage"
+    http_method: "GET"
+    service: "tenant-service"
+
+  - grpc_method: "tenant.TenantService/UpdateStorageUsage"
+    http_path: "/api/tenants/:tenant_id/storage"
+    http_method: "PUT"
+    service: "tenant-service"
+
+  - grpc_method: "tenant.TenantService/CreateTenantAdmin"
+    http_path: "/api/tenants/:tenant_id/admins"
+    http_method: "POST"
+    service: "tenant-service"
+
+  - grpc_method: "tenant.TenantService/GetTenantAdmin"
+    http_path: "/api/tenants/:tenant_id/admins/:admin_id"
+    http_method: "GET"
+    service: "tenant-service"
 
   # Content Management Service - Custom Content Routes
   - grpc_method: "content.ContentService/GetContentStructure"
