@@ -1,55 +1,46 @@
-# Multi-stage Docker build for Onboarding Service
+# Multi-stage Docker build for Onboarding Service (Rust)
 
 # Stage 1: Builder
-FROM golang:1.23-alpine AS builder
+FROM rust:1.86 AS builder
 
-# Install necessary build tools
-RUN apk add --no-cache git make protobuf-dev
+RUN apt-get update && apt-get install -y cmake protobuf-compiler librdkafka-dev && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-WORKDIR /build
-
-# Copy go mod files from service directory
-COPY services/onboarding-service/go.mod services/onboarding-service/go.sum ./
-COPY proto/ ../proto/
-
-# Download dependencies
-RUN go mod download
-
-# Copy source code
-COPY services/onboarding-service/ ./
-
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /app/onboarding-server ./cmd/server/main.go
-
-# Stage 2: Runtime
-FROM alpine:latest
-
-# Install CA certificates for HTTPS
-RUN apk --no-cache add ca-certificates tzdata
-
-# Create app directory
 WORKDIR /app
 
-# Copy binary from builder
-COPY --from=builder /app/onboarding-server .
+# Copy manifest first for dependency caching
+COPY services/onboarding-service/Cargo.toml ./
 
-# Copy migrations
-COPY services/onboarding-service/migrations/ ./migrations/
+# Create a dummy main.rs to build dependencies
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release 2>/dev/null || true
+RUN rm -rf src
+
+# Copy actual source
+COPY services/onboarding-service/src ./src
+
+# Touch main.rs to invalidate the dummy build
+RUN touch src/main.rs
+
+RUN cargo build --release
+
+# Stage 2: Runtime
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y ca-certificates curl librdkafka1 && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/target/release/onboarding-service /usr/local/bin/app
+
+# Copy migrations for reference
+COPY services/onboarding-service/migrations/ /app/migrations/
 
 # Create non-root user
-RUN addgroup -g 1000 appuser && \
-    adduser -D -u 1000 -G appuser appuser && \
-    chown -R appuser:appuser /app
-
+RUN groupadd -g 1000 appuser && \
+    useradd -u 1000 -g appuser -m appuser
 USER appuser
 
-# Expose ports
-EXPOSE 50052 8082 8083 9090
+EXPOSE 9080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8082/health || exit 1
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -sf http://localhost:9080/health || exit 1
 
-# Run the application
-CMD ["./onboarding-server"]
+CMD ["app"]

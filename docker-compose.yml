@@ -638,95 +638,47 @@ services:
           memory: 256M
     restart: unless-stopped
 
-  # Onboarding Service (Go)
+  # Restate Server (Durable Workflow Orchestration)
+  restate-server:
+    image: docker.restate.dev/restatedev/restate:latest
+    ports:
+      - "9080:9080"   # HTTP ingress
+      - "9090:9090"   # Admin API
+      - "5005:5005"   # Service discovery
+    environment:
+      RESTATE_LOG_LEVEL: info
+    networks:
+      - slate-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9080/restate/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    restart: unless-stopped
+
+  # Onboarding Service (Rust + Restate)
   onboarding-service:
     build:
       context: .
       dockerfile: services/onboarding-service/Dockerfile
     environment:
-      SERVER_HOST: "0.0.0.0"
-      SERVER_PORT: "8082"
-      GRPC_HOST: "0.0.0.0"
-      GRPC_PORT: "50052"
-      WEBSOCKET_HOST: "0.0.0.0"
-      WEBSOCKET_PORT: "8083"
-      DB_HOST: "postgres"
-      DB_PORT: "5432"
-      DB_USER: "postgres"
-      DB_PASSWORD: "postgres"
-      DB_NAME: "onboarding"
-      DB_SSLMODE: "disable"
-      REDIS_HOST: "redis"
-      REDIS_PORT: "6379"
+      RESTATE_ENDPOINT: "http://restate-server:9090"
       KAFKA_BROKERS: "kafka:9092"
-      KAFKA_CONSUMER_GROUP: "onboarding-service"
-      USER_AUTH_SERVICE_ENDPOINT: "user-auth-service:50051"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
-      JWT_SECRET: "your-super-secret-jwt-key-change-in-production"
-      LOG_LEVEL: "info"
-      MAX_FILE_SIZE: "104857600"
-      UPLOAD_DIR: "/tmp/uploads"
-      DB_MAX_OPEN_CONNS: "50"
-      DB_MAX_IDLE_CONNS: "10"
-      DB_CONN_MAX_LIFETIME: "5m"
+      RUST_LOG: "info,onboarding_service=debug"
     ports:
-      - "50055:50052"   # gRPC
-      - "8084:8082"     # HTTP
-      - "8085:8083"     # WebSocket
-      - "9098:9090"     # Prometheus metrics
+      - "8084:9080"   # Restate handler endpoint
+    networks:
+      - slate-network
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
-      user-auth-service:
-        condition: service_started
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-    restart: unless-stopped
-
-  # Onboarding Worker (Go)
-  onboarding-worker:
-    build:
-      context: .
-      dockerfile: services/onboarding-service/Dockerfile.worker
-    environment:
-      SERVER_HOST: "0.0.0.0"
-      SERVER_PORT: "8082"
-      GRPC_HOST: "0.0.0.0"
-      GRPC_PORT: "50052"
-      WEBSOCKET_HOST: "0.0.0.0"
-      WEBSOCKET_PORT: "8083"
-      DB_HOST: "postgres"
-      DB_PORT: "5432"
-      DB_USER: "postgres"
-      DB_PASSWORD: "postgres"
-      DB_NAME: "onboarding"
-      DB_SSLMODE: "disable"
-      REDIS_HOST: "redis"
-      REDIS_PORT: "6379"
-      KAFKA_BROKERS: "kafka:9092"
-      KAFKA_CONSUMER_GROUP: "onboarding-service"
-      USER_AUTH_SERVICE_ENDPOINT: "user-auth-service:50051"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
-      JWT_SECRET: "your-super-secret-jwt-key-change-in-production"
-      LOG_LEVEL: "info"
-      MAX_FILE_SIZE: "104857600"
-      UPLOAD_DIR: "/tmp/uploads"
-      DB_MAX_OPEN_CONNS: "50"
-      DB_MAX_IDLE_CONNS: "10"
-      DB_CONN_MAX_LIFETIME: "5m"
-    depends_on:
-      onboarding-service:
-        condition: service_started
-      postgres:
-        condition: service_healthy
-      redis:
+      restate-server:
         condition: service_healthy
       kafka:
         condition: service_healthy
@@ -1027,8 +979,6 @@ volumes:
   loki-data:
     driver: local
   grafana-data:
-    driver: local
-  onboarding-uploads:
     driver: local
   video-recordings:
     driver: local
