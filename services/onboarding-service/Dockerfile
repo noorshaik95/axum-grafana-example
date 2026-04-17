@@ -1,0 +1,59 @@
+# Multi-stage Docker build for Onboarding Service
+
+# Stage 1: Builder
+FROM golang:1.23-alpine AS builder
+
+# Install necessary build tools
+RUN apk add --no-cache git make protobuf-dev
+
+# Set working directory
+WORKDIR /build
+
+# Copy go mod files from service directory
+COPY services/onboarding-service/go.mod services/onboarding-service/go.sum ./
+COPY proto/ ../proto/
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY services/onboarding-service/ ./
+
+# Install protoc plugins
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+# Build the application
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /app/onboarding-server ./cmd/server/main.go
+
+# Stage 2: Runtime
+FROM alpine:latest
+
+# Install CA certificates for HTTPS
+RUN apk --no-cache add ca-certificates tzdata
+
+# Create app directory
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /app/onboarding-server .
+
+# Copy migrations
+COPY services/onboarding-service/migrations/ ./migrations/
+
+# Create non-root user
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+# Expose ports
+EXPOSE 50052 8082 8083 9090
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8082/health || exit 1
+
+# Run the application
+CMD ["./onboarding-server"]

@@ -1,0 +1,208 @@
+{
+  "dashboard": {
+    "title": "SaaS Admin - Usage Metrics Dashboard (Epic 9)",
+    "tags": ["saas", "admin", "metrics"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "AC1: Active Tenants Count",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "tenants_active_total",
+            "legendFormat": "Active Tenants"
+          }
+        ],
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 }
+      },
+      {
+        "id": 2,
+        "title": "Total Tenants by Tier",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "tenants_by_tier",
+            "legendFormat": "{{tier}}"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 6, "x": 6, "y": 0 }
+      },
+      {
+        "id": 3,
+        "title": "AC2: Total Users",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(tenant_metrics_user_count)",
+            "legendFormat": "Total Users"
+          }
+        ],
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 }
+      },
+      {
+        "id": 4,
+        "title": "AC2: Total Courses",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(tenant_metrics_course_count)",
+            "legendFormat": "Total Courses"
+          }
+        ],
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 }
+      },
+      {
+        "id": 5,
+        "title": "AC2: Total Storage Usage",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "sum(tenant_storage_used_bytes) / sum(tenant_storage_quota_bytes) * 100",
+            "legendFormat": "Storage Usage %"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 6, "x": 0, "y": 4 }
+      },
+      {
+        "id": 6,
+        "title": "AC3: API Requests Per Minute (Real-time)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(api_gateway_requests_total[1m])) * 60",
+            "legendFormat": "Requests/min"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 }
+      },
+      {
+        "id": 7,
+        "title": "AC4: Error Rate (Last 24 Hours)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(api_gateway_requests_total{status=~\"5..\"}[24h])) / sum(rate(api_gateway_requests_total[24h])) * 100",
+            "legendFormat": "Error Rate %"
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": { "params": [1.0], "type": "gt" },
+              "query": { "params": ["A", "5m", "now"] },
+              "type": "query"
+            }
+          ],
+          "name": "High Error Rate Alert (AC7)",
+          "message": "Error rate exceeded 1%"
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 }
+      },
+      {
+        "id": 8,
+        "title": "Uptime Percentage",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "avg(up{job=~\".*-service\"}) * 100",
+            "legendFormat": "Uptime %"
+          }
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": { "params": [99.5], "type": "lt" },
+              "query": { "params": ["A", "5m", "now"] },
+              "type": "query"
+            }
+          ],
+          "name": "Low Uptime Alert (AC7)",
+          "message": "Uptime dropped below 99.5%"
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 }
+      },
+      {
+        "id": 9,
+        "title": "AC5: Tenant-Level Breakdown (Sortable Table)",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "tenant_metrics_user_count",
+            "format": "table",
+            "legendFormat": "Users"
+          },
+          {
+            "expr": "tenant_metrics_course_count",
+            "format": "table",
+            "legendFormat": "Courses"
+          },
+          {
+            "expr": "tenant_storage_usage_percentage",
+            "format": "table",
+            "legendFormat": "Storage %"
+          },
+          {
+            "expr": "rate(tenant_api_requests_total[5m]) * 60",
+            "format": "table",
+            "legendFormat": "API Req/min"
+          },
+          {
+            "expr": "tenant_error_rate_percentage",
+            "format": "table",
+            "legendFormat": "Error Rate %"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "merge",
+            "options": {}
+          }
+        ],
+        "gridPos": { "h": 12, "w": 24, "x": 0, "y": 20 }
+      },
+      {
+        "id": 10,
+        "title": "AC7: Tenant Provisioning Duration (Must be < 120s)",
+        "type": "histogram",
+        "targets": [
+          {
+            "expr": "tenant_provisioning_duration_seconds",
+            "legendFormat": "Provisioning Time"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 }
+      },
+      {
+        "id": 11,
+        "title": "Provisioning Success Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(tenant_provisioning_total{status=\"completed\"}[5m])) / sum(rate(tenant_provisioning_total[5m])) * 100",
+            "legendFormat": "Success Rate %"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 }
+      },
+      {
+        "id": 12,
+        "title": "Active Alerts (AC7)",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "ALERTS{alertstate=\"firing\"}",
+            "format": "table"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 }
+      }
+    ],
+    "refresh": "30s",
+    "time": { "from": "now-24h", "to": "now" },
+    "timepicker": {
+      "refresh_intervals": ["10s", "30s", "1m", "5m", "15m", "30m", "1h"]
+    },
+    "version": 1
+  }
+}

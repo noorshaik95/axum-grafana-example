@@ -8,7 +8,7 @@ scrape_configs:
       - targets: ['api-gateway:8080']
         labels:
           service: 'api-gateway'
-  
+
   - job_name: 'user-auth-service'
     metrics_path: /metrics
     static_configs:
@@ -19,12 +19,31 @@ scrape_configs:
   - job_name: 'course-service'
     metrics_path: /metrics
     static_configs:
-      - targets: ['course-service:9090']
+      - targets: ['course-service:3001']
         labels:
           service: 'course-service'
+
   - job_name: 'assignment-grading-service'
     metrics_path: /metrics
     static_configs:
       - targets: ['assignment-grading-service:9090']
         labels:
           service: 'assignment-grading-service'
+
+  - job_name: 'content-management-service'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['content-management-service:9092']
+        labels:
+          service: 'content-management-service'
+
+  - job_name: 'onboarding-service'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['onboarding-service:9090']
+        labels:
+          service: 'onboarding-service'
+
+  - job_name: 'video-conferencing-service'
+    static_configs:
+      - targets: ['video-conferencing-service:9092']

@@ -1,0 +1,142 @@
+syntax = "proto3";
+
+package email;
+
+option go_package = "slate/services/email-service/api/proto";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// Email service for sending notifications and welcome emails
+service EmailService {
+  // Send emails
+  rpc SendEmail(SendEmailRequest) returns (SendEmailResponse);
+  rpc SendTemplatedEmail(SendTemplatedEmailRequest) returns (SendEmailResponse);
+  rpc SendWelcomeEmail(SendWelcomeEmailRequest) returns (SendEmailResponse);  // AC4
+
+  // Email status and tracking
+  rpc GetEmailStatus(GetEmailStatusRequest) returns (EmailStatusResponse);
+  rpc ListEmails(ListEmailsRequest) returns (ListEmailsResponse);
+}
+
+// Email template enumeration
+enum EmailTemplate {
+  TEMPLATE_UNSPECIFIED = 0;
+  WELCOME_TENANT_ADMIN = 1;           // Tenant admin welcome email (AC4)
+  PASSWORD_RESET = 2;
+  ACCOUNT_ACTIVATION = 3;
+  SUBSCRIPTION_CONFIRMATION = 4;
+  USAGE_ALERT = 5;
+  BILLING_NOTIFICATION = 6;
+}
+
+// Email delivery status
+enum EmailStatus {
+  EMAIL_STATUS_UNSPECIFIED = 0;
+  PENDING = 1;
+  SENDING = 2;
+  SENT = 3;
+  DELIVERED = 4;
+  FAILED = 5;
+  BOUNCED = 6;
+  COMPLAINED = 7;
+}
+
+// Send Email Request
+message SendEmailRequest {
+  string to_email = 1;
+  string to_name = 2;
+  string from_email = 3;
+  string from_name = 4;
+  string subject = 5;
+  string html_body = 6;
+  string text_body = 7;
+  repeated string cc = 8;
+  repeated string bcc = 9;
+  map<string, string> headers = 10;
+}
+
+message SendEmailResponse {
+  string email_id = 1;
+  EmailStatus status = 2;
+  string message = 3;
+  google.protobuf.Timestamp sent_at = 4;
+}
+
+// Send Templated Email Request
+message SendTemplatedEmailRequest {
+  string to_email = 1;
+  string to_name = 2;
+  EmailTemplate template = 3;
+  map<string, string> template_data = 4;  // Template variables
+  string language = 5;                     // Default: "en"
+}
+
+// Send Welcome Email Request (AC4)
+message SendWelcomeEmailRequest {
+  string tenant_id = 1;
+  string admin_email = 2;
+  string admin_name = 3;
+  string tenant_name = 4;
+  string setup_url = 5;                    // Setup link
+  string subdomain = 6;
+  string tier = 7;
+}
+
+// Get Email Status Request
+message GetEmailStatusRequest {
+  string email_id = 1;
+}
+
+message EmailStatusResponse {
+  string email_id = 1;
+  EmailStatus status = 2;
+  string to_email = 3;
+  string subject = 4;
+  google.protobuf.Timestamp sent_at = 5;
+  google.protobuf.Timestamp delivered_at = 6;
+  google.protobuf.Timestamp opened_at = 7;
+  int32 open_count = 8;
+  int32 click_count = 9;
+  string error_message = 10;
+  repeated EmailEvent events = 11;
+}
+
+// List Emails Request
+message ListEmailsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  optional string to_email = 3;
+  optional EmailStatus status = 4;
+  optional EmailTemplate template = 5;
+  google.protobuf.Timestamp from_date = 6;
+  google.protobuf.Timestamp to_date = 7;
+}
+
+message ListEmailsResponse {
+  repeated EmailRecord emails = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// Data Models
+message EmailRecord {
+  string email_id = 1;
+  string to_email = 2;
+  string to_name = 3;
+  string from_email = 4;
+  string from_name = 5;
+  string subject = 6;
+  EmailStatus status = 7;
+  EmailTemplate template = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp sent_at = 10;
+  google.protobuf.Timestamp delivered_at = 11;
+}
+
+message EmailEvent {
+  string event_type = 1;  // sent, delivered, opened, clicked, bounced, complained
+  google.protobuf.Timestamp timestamp = 2;
+  string details = 3;
+}

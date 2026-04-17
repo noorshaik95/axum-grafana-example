@@ -1,0 +1,267 @@
+syntax = "proto3";
+
+package metrics;
+
+option go_package = "slate/services/metrics-service/api/proto";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// Metrics service for SaaS admin usage metrics dashboard (US-9.2)
+service MetricsService {
+  // System-wide metrics (AC1, AC2, AC3, AC4)
+  rpc GetSystemMetrics(GetSystemMetricsRequest) returns (SystemMetricsResponse);
+
+  // Tenant-level breakdown (AC5)
+  rpc GetTenantMetrics(GetTenantMetricsRequest) returns (TenantMetricsResponse);
+  rpc ListTenantMetrics(ListTenantMetricsRequest) returns (ListTenantMetricsResponse);
+
+  // Real-time metrics (AC3, AC6)
+  rpc GetRealtimeMetrics(GetRealtimeMetricsRequest) returns (RealtimeMetricsResponse);
+  rpc StreamRealtimeMetrics(StreamRealtimeMetricsRequest) returns (stream RealtimeMetricsResponse);
+
+  // Alerts (AC7)
+  rpc GetActiveAlerts(GetActiveAlertsRequest) returns (AlertsResponse);
+  rpc GetAlertHistory(GetAlertHistoryRequest) returns (AlertHistoryResponse);
+
+  // Record usage (internal)
+  rpc RecordAPIRequest(RecordAPIRequestRequest) returns (google.protobuf.Empty);
+  rpc RecordError(RecordErrorRequest) returns (google.protobuf.Empty);
+}
+
+// Alert type enumeration
+enum AlertType {
+  ALERT_TYPE_UNSPECIFIED = 0;
+  ERROR_RATE_HIGH = 1;        // Error rate > 1% (AC7)
+  UPTIME_LOW = 2;             // Uptime < 99.5% (AC7)
+  STORAGE_QUOTA_EXCEEDED = 3;
+  API_RATE_LIMIT_EXCEEDED = 4;
+  DATABASE_CONNECTION_FAILED = 5;
+}
+
+// Alert severity
+enum AlertSeverity {
+  SEVERITY_UNSPECIFIED = 0;
+  INFO = 1;
+  WARNING = 2;
+  CRITICAL = 3;
+}
+
+// Metric time range
+enum TimeRange {
+  TIME_RANGE_UNSPECIFIED = 0;
+  LAST_5_MINUTES = 1;
+  LAST_15_MINUTES = 2;
+  LAST_HOUR = 3;
+  LAST_24_HOURS = 4;
+  LAST_7_DAYS = 5;
+  LAST_30_DAYS = 6;
+  CUSTOM = 7;
+}
+
+// Get System Metrics Request (AC1, AC2, AC3, AC4)
+message GetSystemMetricsRequest {
+  TimeRange time_range = 1;
+  google.protobuf.Timestamp from_time = 2;  // For custom range
+  google.protobuf.Timestamp to_time = 3;    // For custom range
+}
+
+message SystemMetricsResponse {
+  // AC1: Active tenants count
+  int32 active_tenants_count = 1;
+  int32 total_tenants_count = 2;
+
+  // AC2: Total users, courses, storage
+  int64 total_users = 3;
+  int64 total_courses = 4;
+  int64 total_storage_bytes = 5;
+  int64 total_storage_quota_bytes = 6;
+  double storage_usage_percentage = 7;
+
+  // AC3: API requests per minute (real-time)
+  double api_requests_per_minute = 8;
+  int64 total_api_requests = 9;
+
+  // AC4: Error rate (last 24 hours)
+  double error_rate_percentage = 10;
+  int64 total_errors = 11;
+  int64 total_requests = 12;
+
+  // Uptime metrics
+  double uptime_percentage = 13;
+  int64 uptime_seconds = 14;
+  int64 downtime_seconds = 15;
+
+  // Additional metrics
+  double avg_response_time_ms = 16;
+  double p95_response_time_ms = 17;
+  double p99_response_time_ms = 18;
+
+  google.protobuf.Timestamp collected_at = 19;
+  TimeRange time_range = 20;
+}
+
+// Get Tenant Metrics Request (AC5)
+message GetTenantMetricsRequest {
+  string tenant_id = 1;
+  TimeRange time_range = 2;
+  google.protobuf.Timestamp from_time = 3;
+  google.protobuf.Timestamp to_time = 4;
+}
+
+message TenantMetricsResponse {
+  string tenant_id = 1;
+  string tenant_name = 2;
+  string tier = 3;
+
+  // Usage metrics
+  int32 user_count = 4;
+  int32 course_count = 5;
+  int64 storage_used_bytes = 6;
+  int64 storage_quota_bytes = 7;
+  double storage_usage_percentage = 8;
+
+  // Activity metrics
+  int64 api_requests = 9;
+  double api_requests_per_minute = 10;
+  int64 active_users_count = 11;
+
+  // Performance metrics
+  double error_rate_percentage = 12;
+  double avg_response_time_ms = 13;
+  double uptime_percentage = 14;
+
+  google.protobuf.Timestamp last_active_at = 15;
+  google.protobuf.Timestamp collected_at = 16;
+}
+
+// List Tenant Metrics Request (AC5 - sortable table)
+message ListTenantMetricsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string sort_by = 3;         // name, tier, users, storage, api_requests, error_rate
+  string sort_order = 4;      // asc, desc
+  optional string tier = 5;
+  optional bool active_only = 6;
+  TimeRange time_range = 7;
+}
+
+message ListTenantMetricsResponse {
+  repeated TenantMetricsResponse tenants = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// Get Realtime Metrics Request (AC3, AC6 - updated every 30 seconds)
+message GetRealtimeMetricsRequest {
+  optional string tenant_id = 1;  // If empty, system-wide
+}
+
+message RealtimeMetricsResponse {
+  // Current snapshot
+  int64 api_requests_last_minute = 1;
+  int64 api_requests_last_5_minutes = 2;
+  double current_requests_per_second = 3;
+
+  int64 errors_last_minute = 4;
+  int64 errors_last_5_minutes = 5;
+  double current_error_rate_percentage = 6;
+
+  int32 active_connections = 7;
+  int32 active_users = 8;
+
+  double avg_response_time_ms = 9;
+  double max_response_time_ms = 10;
+
+  google.protobuf.Timestamp timestamp = 11;
+}
+
+// Stream Realtime Metrics Request (AC6 - updates every 30 seconds)
+message StreamRealtimeMetricsRequest {
+  optional string tenant_id = 1;
+  int32 update_interval_seconds = 2;  // Default: 30 seconds
+}
+
+// Get Active Alerts Request (AC7)
+message GetActiveAlertsRequest {
+  optional string tenant_id = 1;
+  optional AlertType alert_type = 2;
+  optional AlertSeverity severity = 3;
+}
+
+message AlertsResponse {
+  repeated Alert alerts = 1;
+  int32 total_count = 2;
+}
+
+// Get Alert History Request
+message GetAlertHistoryRequest {
+  optional string tenant_id = 1;
+  optional AlertType alert_type = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+  TimeRange time_range = 5;
+  google.protobuf.Timestamp from_time = 6;
+  google.protobuf.Timestamp to_time = 7;
+}
+
+message AlertHistoryResponse {
+  repeated Alert alerts = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// Record API Request (internal)
+message RecordAPIRequestRequest {
+  string tenant_id = 1;
+  string method = 2;
+  string path = 3;
+  int32 status_code = 4;
+  int64 response_time_ms = 5;
+  string user_id = 6;
+  google.protobuf.Timestamp timestamp = 7;
+}
+
+// Record Error (internal)
+message RecordErrorRequest {
+  string tenant_id = 1;
+  string error_type = 2;
+  string error_message = 3;
+  string stack_trace = 4;
+  string service_name = 5;
+  google.protobuf.Timestamp timestamp = 6;
+}
+
+// Data Models
+message Alert {
+  string id = 1;
+  AlertType type = 2;
+  AlertSeverity severity = 3;
+  string title = 4;
+  string message = 5;
+  string tenant_id = 6;
+  string tenant_name = 7;
+
+  // Alert thresholds (AC7)
+  double threshold_value = 8;
+  double current_value = 9;
+
+  bool is_active = 10;
+  google.protobuf.Timestamp triggered_at = 11;
+  google.protobuf.Timestamp resolved_at = 12;
+  google.protobuf.Timestamp acknowledged_at = 13;
+  string acknowledged_by = 14;
+}
+
+message MetricDataPoint {
+  google.protobuf.Timestamp timestamp = 1;
+  double value = 2;
+  map<string, string> labels = 3;
+}
+
+message MetricTimeSeries {
+  string metric_name = 1;
+  repeated MetricDataPoint data_points = 2;
+}

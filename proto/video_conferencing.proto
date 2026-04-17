@@ -1,0 +1,351 @@
+syntax = "proto3";
+
+package video_conferencing;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// Video Conferencing Service
+service VideoConferencingService {
+  // Session Management (AC1)
+  rpc ScheduleSession(ScheduleSessionRequest) returns (ScheduleSessionResponse);
+  rpc GetSession(GetSessionRequest) returns (SessionDetails);
+  rpc UpdateSession(UpdateSessionRequest) returns (SessionDetails);
+  rpc CancelSession(CancelSessionRequest) returns (google.protobuf.Empty);
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+
+  // Session Access (AC3)
+  rpc JoinSession(JoinSessionRequest) returns (JoinSessionResponse);
+  rpc LeaveSession(LeaveSessionRequest) returns (google.protobuf.Empty);
+  rpc GetSessionStatus(GetSessionStatusRequest) returns (SessionStatusResponse);
+
+  // Participant Management (AC6)
+  rpc MuteParticipant(MuteParticipantRequest) returns (google.protobuf.Empty);
+  rpc UnmuteParticipant(UnmuteParticipantRequest) returns (google.protobuf.Empty);
+  rpc KickParticipant(KickParticipantRequest) returns (google.protobuf.Empty);
+  rpc ListParticipants(ListParticipantsRequest) returns (ListParticipantsResponse);
+
+  // Screen Sharing (AC7)
+  rpc StartScreenShare(ScreenShareRequest) returns (ScreenShareResponse);
+  rpc StopScreenShare(StopScreenShareRequest) returns (google.protobuf.Empty);
+
+  // Recording (AC8, AC9)
+  rpc StartRecording(StartRecordingRequest) returns (StartRecordingResponse);
+  rpc StopRecording(StopRecordingRequest) returns (google.protobuf.Empty);
+  rpc GetRecording(GetRecordingRequest) returns (RecordingDetails);
+  rpc ListRecordings(ListRecordingsRequest) returns (ListRecordingsResponse);
+
+  // Video Quality (AC4)
+  rpc UpdateVideoQuality(UpdateVideoQualityRequest) returns (google.protobuf.Empty);
+  rpc GetVideoQualityStats(VideoQualityStatsRequest) returns (VideoQualityStatsResponse);
+
+  // Calendar Integration (AC2)
+  rpc SendCalendarInvitation(CalendarInvitationRequest) returns (CalendarInvitationResponse);
+}
+
+// Messages for Session Management
+
+message ScheduleSessionRequest {
+  string instructor_id = 1;
+  string title = 2;
+  string description = 3;
+  google.protobuf.Timestamp start_time = 4;
+  int32 duration_minutes = 5;
+  repeated string student_ids = 6;
+  SessionSettings settings = 7;
+}
+
+message ScheduleSessionResponse {
+  string session_id = 1;
+  string join_url = 2;
+  string calendar_ics = 3; // iCalendar format for AC2
+  SessionDetails session = 4;
+}
+
+message GetSessionRequest {
+  string session_id = 1;
+}
+
+message UpdateSessionRequest {
+  string session_id = 1;
+  optional string title = 2;
+  optional string description = 3;
+  optional google.protobuf.Timestamp start_time = 4;
+  optional int32 duration_minutes = 5;
+  optional SessionSettings settings = 6;
+}
+
+message CancelSessionRequest {
+  string session_id = 1;
+  string reason = 2;
+}
+
+message ListSessionsRequest {
+  string user_id = 1;
+  optional SessionStatus status_filter = 2;
+  optional google.protobuf.Timestamp start_date = 3;
+  optional google.protobuf.Timestamp end_date = 4;
+  int32 page = 5;
+  int32 page_size = 6;
+}
+
+message ListSessionsResponse {
+  repeated SessionDetails sessions = 1;
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message SessionDetails {
+  string session_id = 1;
+  string instructor_id = 2;
+  string title = 3;
+  string description = 4;
+  google.protobuf.Timestamp start_time = 5;
+  int32 duration_minutes = 6;
+  SessionStatus status = 7;
+  SessionSettings settings = 8;
+  int32 participant_count = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  string join_url = 12;
+}
+
+message SessionSettings {
+  int32 max_participants = 1; // AC5: 50 concurrent
+  bool auto_record = 2; // AC8
+  bool allow_screen_share = 3; // AC7
+  VideoQualitySettings quality_settings = 4; // AC4
+  bool require_approval = 5;
+  bool mute_on_join = 6;
+}
+
+message VideoQualitySettings {
+  VideoQuality default_quality = 1;
+  bool adaptive_bitrate = 2; // AC4: adapts to bandwidth
+  int32 min_bitrate_kbps = 3;
+  int32 max_bitrate_kbps = 4;
+}
+
+enum SessionStatus {
+  SESSION_STATUS_UNSPECIFIED = 0;
+  SCHEDULED = 1;
+  ACTIVE = 2;
+  COMPLETED = 3;
+  CANCELLED = 4;
+}
+
+enum VideoQuality {
+  VIDEO_QUALITY_UNSPECIFIED = 0;
+  QUALITY_360P = 1;  // 360p
+  QUALITY_480P = 2;  // 480p
+  QUALITY_720P = 3;  // 720p (HD)
+  QUALITY_1080P = 4; // 1080p (Full HD)
+}
+
+// Messages for Session Access
+
+message JoinSessionRequest {
+  string session_id = 1;
+  string user_id = 2;
+  string display_name = 3;
+  bool audio_enabled = 4;
+  bool video_enabled = 5;
+}
+
+message JoinSessionResponse {
+  string participant_id = 1;
+  string ice_servers_json = 2; // WebRTC ICE servers configuration
+  SessionDetails session = 3;
+  repeated ParticipantInfo current_participants = 4;
+  bool can_join = 5; // AC3: enabled 10 min before start
+  string message = 6;
+}
+
+message LeaveSessionRequest {
+  string session_id = 1;
+  string participant_id = 2;
+}
+
+message GetSessionStatusRequest {
+  string session_id = 1;
+}
+
+message SessionStatusResponse {
+  string session_id = 1;
+  SessionStatus status = 2;
+  int32 participant_count = 3;
+  google.protobuf.Timestamp started_at = 4;
+  int32 elapsed_minutes = 5;
+  bool is_recording = 6;
+  bool can_join = 7; // AC3: join enabled check
+  google.protobuf.Timestamp join_enabled_at = 8;
+}
+
+// Messages for Participant Management
+
+message MuteParticipantRequest {
+  string session_id = 1;
+  string participant_id = 2;
+  string instructor_id = 3; // AC6: instructor control
+}
+
+message UnmuteParticipantRequest {
+  string session_id = 1;
+  string participant_id = 2;
+  string instructor_id = 3; // AC6: instructor control
+}
+
+message KickParticipantRequest {
+  string session_id = 1;
+  string participant_id = 2;
+  string instructor_id = 3;
+  string reason = 4;
+}
+
+message ListParticipantsRequest {
+  string session_id = 1;
+}
+
+message ListParticipantsResponse {
+  repeated ParticipantInfo participants = 1;
+}
+
+message ParticipantInfo {
+  string participant_id = 1;
+  string user_id = 2;
+  string display_name = 3;
+  ParticipantRole role = 4;
+  bool audio_enabled = 5;
+  bool video_enabled = 6;
+  bool is_muted = 7; // AC6: mute status
+  bool is_sharing_screen = 8; // AC7
+  google.protobuf.Timestamp joined_at = 9;
+  VideoQualityStats quality_stats = 10; // AC4
+}
+
+enum ParticipantRole {
+  PARTICIPANT_ROLE_UNSPECIFIED = 0;
+  INSTRUCTOR = 1;
+  STUDENT = 2;
+}
+
+// Messages for Screen Sharing
+
+message ScreenShareRequest {
+  string session_id = 1;
+  string participant_id = 2;
+}
+
+message ScreenShareResponse {
+  string screen_share_id = 1;
+  bool allowed = 2;
+  string message = 3;
+}
+
+message StopScreenShareRequest {
+  string session_id = 1;
+  string participant_id = 2;
+}
+
+// Messages for Recording
+
+message StartRecordingRequest {
+  string session_id = 1;
+  string instructor_id = 2;
+  RecordingSettings settings = 3;
+}
+
+message StartRecordingResponse {
+  string recording_id = 1;
+  google.protobuf.Timestamp started_at = 2;
+}
+
+message StopRecordingRequest {
+  string session_id = 1;
+  string recording_id = 2;
+}
+
+message GetRecordingRequest {
+  string recording_id = 1;
+}
+
+message RecordingDetails {
+  string recording_id = 1;
+  string session_id = 2;
+  google.protobuf.Timestamp started_at = 3;
+  google.protobuf.Timestamp completed_at = 4;
+  int32 duration_seconds = 5;
+  int64 file_size_bytes = 6;
+  string gcs_url = 7; // AC8: stored in GCS
+  RecordingStatus status = 8;
+  google.protobuf.Timestamp available_at = 9; // AC9: available within 30 min
+}
+
+message ListRecordingsRequest {
+  optional string session_id = 1;
+  optional string instructor_id = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message ListRecordingsResponse {
+  repeated RecordingDetails recordings = 1;
+  int32 total_count = 2;
+}
+
+message RecordingSettings {
+  VideoQuality quality = 1;
+  bool include_audio = 2;
+  bool include_screen_share = 3;
+}
+
+enum RecordingStatus {
+  RECORDING_STATUS_UNSPECIFIED = 0;
+  RECORDING = 1;
+  PROCESSING = 2; // Post-processing and upload to GCS
+  AVAILABLE = 3; // AC9: ready for viewing
+  FAILED = 4;
+}
+
+// Messages for Video Quality
+
+message UpdateVideoQualityRequest {
+  string session_id = 1;
+  string participant_id = 2;
+  VideoQuality quality = 3;
+}
+
+message VideoQualityStatsRequest {
+  string session_id = 1;
+  string participant_id = 2;
+}
+
+message VideoQualityStatsResponse {
+  repeated VideoQualityStats stats = 1;
+}
+
+message VideoQualityStats {
+  string participant_id = 1;
+  VideoQuality current_quality = 2;
+  int32 bitrate_kbps = 3;
+  int32 frame_rate = 4;
+  int32 packet_loss_percentage = 5;
+  int32 jitter_ms = 6;
+  int32 latency_ms = 7;
+  int64 bytes_sent = 8;
+  int64 bytes_received = 9;
+}
+
+// Messages for Calendar Integration
+
+message CalendarInvitationRequest {
+  string session_id = 1;
+  repeated string recipient_emails = 2;
+}
+
+message CalendarInvitationResponse {
+  bool success = 1;
+  repeated string sent_to = 2;
+  string calendar_ics = 3;
+}

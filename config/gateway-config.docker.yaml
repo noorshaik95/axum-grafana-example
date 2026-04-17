@@ -41,6 +41,22 @@ services:
       success_threshold: 2
       timeout_seconds: 60
 
+  onboarding-service:
+    name: "onboarding-service"
+    endpoint: "http://onboarding-service:50052"
+    timeout_ms: 30000
+    connection_pool_size: 20
+    auto_discover: true
+    tls_enabled: false
+
+  video-conferencing-service:
+    name: "video-conferencing-service"
+    endpoint: "http://video-conferencing-service:50052"
+    timeout_ms: 30000
+    connection_pool_size: 10
+    auto_discover: true
+    tls_enabled: false
+
 discovery:
   enabled: true
   refresh_interval_seconds: 300
@@ -408,6 +424,52 @@ route_overrides:
     http_path: "/api/content/download"
     http_method: "POST"
     service: "content-management-service"
+
+  # Onboarding Service Routes (non-standard methods only - standard CRUD is auto-discovered)
+  - grpc_method: "onboarding.OnboardingService/CancelJob"
+    http_path: "/api/jobs/:id/cancel"
+    http_method: "POST"
+    service: "onboarding-service"
+
+  - grpc_method: "onboarding.OnboardingService/RetryJob"
+    http_path: "/api/jobs/:id/retry"
+    http_method: "POST"
+    service: "onboarding-service"
+
+  - grpc_method: "onboarding.OnboardingService/RetryTask"
+    http_path: "/api/tasks/:id/retry"
+    http_method: "POST"
+    service: "onboarding-service"
+
+  - grpc_method: "onboarding.OnboardingService/UploadCSV"
+    http_path: "/api/onboarding/upload/csv"
+    http_method: "POST"
+    service: "onboarding-service"
+
+  - grpc_method: "onboarding.OnboardingService/ProcessBatch"
+    http_path: "/api/onboarding/batch"
+    http_method: "POST"
+    service: "onboarding-service"
+
+  - grpc_method: "onboarding.OnboardingService/SyncIntegration"
+    http_path: "/api/integrationconfigs/:id/sync"
+    http_method: "POST"
+    service: "onboarding-service"
+
+  - grpc_method: "onboarding.OnboardingService/GetAuditLogs"
+    http_path: "/api/auditlogs"
+    http_method: "GET"
+    service: "onboarding-service"
+
+  - grpc_method: "onboarding.OnboardingService/ExportData"
+    http_path: "/api/onboarding/export"
+    http_method: "POST"
+    service: "onboarding-service"
+
+  - grpc_method: "onboarding.OnboardingService/Health"
+    http_path: "/api/onboarding/health"
+    http_method: "GET"
+    service: "onboarding-service"
 
 auth:
   service_endpoint: "http://user-auth-service:50051"

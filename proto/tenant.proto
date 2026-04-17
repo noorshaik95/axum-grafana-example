@@ -1,0 +1,207 @@
+syntax = "proto3";
+
+package tenant;
+
+option go_package = "slate/services/tenant-service/api/proto";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// Tenant service for SaaS admin provisioning
+service TenantService {
+  // Tenant Provisioning (US-9.1)
+  rpc CreateTenant(CreateTenantRequest) returns (CreateTenantResponse);
+  rpc GetTenant(GetTenantRequest) returns (TenantResponse);
+  rpc UpdateTenant(UpdateTenantRequest) returns (TenantResponse);
+  rpc DeleteTenant(DeleteTenantRequest) returns (google.protobuf.Empty);
+  rpc ListTenants(ListTenantsRequest) returns (ListTenantsResponse);
+
+  // Tenant provisioning status
+  rpc GetProvisioningStatus(GetProvisioningStatusRequest) returns (ProvisioningStatusResponse);
+
+  // Storage quota management (AC6)
+  rpc GetStorageQuota(GetStorageQuotaRequest) returns (StorageQuotaResponse);
+  rpc UpdateStorageUsage(UpdateStorageUsageRequest) returns (StorageQuotaResponse);
+
+  // Tenant admin management (AC3)
+  rpc CreateTenantAdmin(CreateTenantAdminRequest) returns (TenantAdminResponse);
+  rpc GetTenantAdmin(GetTenantAdminRequest) returns (TenantAdminResponse);
+}
+
+// Tenant tier enumeration
+enum TenantTier {
+  TIER_UNSPECIFIED = 0;
+  FREE = 1;
+  BASIC = 2;
+  PROFESSIONAL = 3;
+  ENTERPRISE = 4;
+}
+
+// Provisioning status enumeration
+enum ProvisioningStatus {
+  STATUS_UNSPECIFIED = 0;
+  PENDING = 1;
+  PROVISIONING_DATABASE = 2;
+  CREATING_ADMIN = 3;
+  SETTING_QUOTA = 4;
+  SENDING_EMAIL = 5;
+  COMPLETED = 6;
+  FAILED = 7;
+}
+
+// Create Tenant Request (AC1, AC2, AC3, AC4, AC5, AC6)
+message CreateTenantRequest {
+  string name = 1;                    // Tenant name
+  string domain = 2;                  // Custom domain/subdomain
+  TenantTier tier = 3;                // Subscription tier
+  string admin_email = 4;             // Default admin email
+  string admin_first_name = 5;        // Admin first name
+  string admin_last_name = 6;         // Admin last name
+  string admin_password = 7;          // Initial admin password
+}
+
+message CreateTenantResponse {
+  Tenant tenant = 1;
+  TenantAdmin admin = 2;
+  string setup_url = 3;               // Setup link for welcome email (AC4)
+  ProvisioningStatus status = 4;
+  string provisioning_id = 5;         // Track async provisioning
+}
+
+// Get Tenant Request
+message GetTenantRequest {
+  string tenant_id = 1;
+}
+
+// Update Tenant Request
+message UpdateTenantRequest {
+  string tenant_id = 1;
+  optional string name = 2;
+  optional string domain = 3;
+  optional TenantTier tier = 4;
+  optional bool is_active = 5;
+}
+
+// Delete Tenant Request
+message DeleteTenantRequest {
+  string tenant_id = 1;
+  bool force_delete = 2;              // Delete even with active users
+}
+
+// List Tenants Request
+message ListTenantsRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string search = 3;
+  optional TenantTier tier = 4;
+  optional bool is_active = 5;
+  optional string sort_by = 6;        // created_at, name, tier
+  optional string sort_order = 7;     // asc, desc
+}
+
+message ListTenantsResponse {
+  repeated Tenant tenants = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message TenantResponse {
+  Tenant tenant = 1;
+}
+
+// Provisioning Status Request
+message GetProvisioningStatusRequest {
+  string provisioning_id = 1;
+}
+
+message ProvisioningStatusResponse {
+  string provisioning_id = 1;
+  ProvisioningStatus status = 2;
+  string current_step = 3;
+  int32 progress_percentage = 4;
+  string error_message = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp completed_at = 7;
+  int64 duration_seconds = 8;         // Must be < 120 seconds (AC7)
+}
+
+// Storage Quota Request (AC6)
+message GetStorageQuotaRequest {
+  string tenant_id = 1;
+}
+
+message StorageQuotaResponse {
+  string tenant_id = 1;
+  int64 total_quota_bytes = 2;
+  int64 used_bytes = 3;
+  int64 available_bytes = 4;
+  double usage_percentage = 5;
+  int32 file_count = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message UpdateStorageUsageRequest {
+  string tenant_id = 1;
+  int64 bytes_delta = 2;              // Positive for upload, negative for delete
+  int32 file_count_delta = 3;
+}
+
+// Tenant Admin Request (AC3)
+message CreateTenantAdminRequest {
+  string tenant_id = 1;
+  string email = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string password = 5;
+}
+
+message TenantAdminResponse {
+  TenantAdmin admin = 1;
+}
+
+message GetTenantAdminRequest {
+  string tenant_id = 1;
+  string admin_id = 2;
+}
+
+// Data Models
+message Tenant {
+  string id = 1;
+  string name = 2;
+  string domain = 3;                  // Custom subdomain (AC5)
+  TenantTier tier = 4;
+  bool is_active = 5;
+  string database_name = 6;           // Dedicated database for Pro+ (AC2)
+  string database_connection_string = 7;
+  int64 storage_quota_bytes = 8;      // Set by tier (AC6)
+  int32 user_count = 9;
+  int32 course_count = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Timestamp last_active_at = 13;
+}
+
+message TenantAdmin {
+  string id = 1;
+  string tenant_id = 2;
+  string user_id = 3;                 // Reference to user service
+  string email = 4;
+  string first_name = 5;
+  string last_name = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+// Tier configuration (for reference)
+message TierConfig {
+  TenantTier tier = 1;
+  string display_name = 2;
+  int64 storage_quota_bytes = 3;
+  int32 max_users = 4;
+  int32 max_courses = 5;
+  int32 api_rate_limit = 6;
+  bool dedicated_database = 7;        // Professional+ gets dedicated DB (AC2)
+  bool custom_domain = 8;
+  bool priority_support = 9;
+  int32 price_cents_monthly = 10;
+}

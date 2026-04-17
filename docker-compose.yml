@@ -3,6 +3,10 @@ version: '3.8'
 name: slate
 
 services:
+  # ============================================================================
+  # Infrastructure Services
+  # ============================================================================
+
   # PostgreSQL Database for User Auth Service
   postgres:
     image: postgres:15-alpine
@@ -11,7 +15,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: userauth
     ports:
-      - "5432:5432"
+      - "5435:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -27,6 +31,7 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    restart: unless-stopped
 
   # PostgreSQL Database for Assignment Grading Service
   assignment-grading-db:
@@ -52,6 +57,8 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    restart: unless-stopped
+
   # PostgreSQL Database for Content Management Service
   postgres-cms:
     image: postgres:15-alpine
@@ -76,6 +83,7 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    restart: unless-stopped
 
   # Redis for Rate Limiting and Job Queue
   redis:
@@ -124,6 +132,7 @@ services:
           cpus: '0.5'
           memory: 512M
     restart: unless-stopped
+
   # MinIO for S3-compatible object storage
   minio:
     image: minio/minio:latest
@@ -177,6 +186,48 @@ services:
           memory: 512M
     restart: unless-stopped
 
+  # Kafka (KRaft mode — no Zookeeper required)
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    ports:
+      - "9097:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+
+  # ============================================================================
+  # Backend Services
+  # ============================================================================
+
   # User Auth Service (Go)
   user-auth-service:
     build:
@@ -199,39 +250,38 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
       REDIS_HOST: "redis"
       REDIS_PORT: "6379"
-      RATE_LIMIT_ENABLED: "false" # Disabled for testing to avoid blocking e2e tests
+      RATE_LIMIT_ENABLED: "false"
       RATE_LIMIT_LOGIN_MAX: "1000"
       RATE_LIMIT_LOGIN_WINDOW: "60"
       RATE_LIMIT_REGISTER_MAX: "1000"
       RATE_LIMIT_REGISTER_WINDOW: "60"
-      # Authentication Type Configuration
-      # Valid values: normal, oauth, saml
       AUTH_TYPE: "normal"
-      # OAuth 2.0 Mock Configuration for Testing
       OAUTH_GOOGLE_CLIENT_ID: "mock-google-client-id"
       OAUTH_GOOGLE_CLIENT_SECRET: "mock-google-client-secret"
       OAUTH_GOOGLE_REDIRECT_URI: "http://localhost:8080/auth/oauth/callback"
       OAUTH_GOOGLE_SCOPES: "openid,profile,email"
-      # SAML 2.0 Mock Configuration for Testing
       SAML_SP_ENTITY_ID: "http://localhost:8080/saml/metadata"
       SAML_ACS_URL: "http://localhost:8080/auth/saml/acs"
       SAML_OKTA_ENTITY_ID: "http://mock-okta.example.com"
       SAML_OKTA_SSO_URL: "http://mock-okta.example.com/sso"
       SAML_OKTA_JIT_PROVISIONING: "true"
       SAML_OKTA_ORGANIZATION_ID: "test-org"
-      # Database Connection Pool Configuration
-      DB_MAX_OPEN_CONNS: "25" # Maximum number of open connections
-      DB_MAX_IDLE_CONNS: "5" # Maximum number of idle connections
-      DB_CONN_MAX_LIFETIME: "5m" # Maximum lifetime of a connection
-      DB_CONN_MAX_IDLE_TIME: "1m" # Maximum idle time before closing
-      # Logging Configuration
-      LOG_LEVEL: "info" # Log level: debug, info, warn, error
-      # Environment Configuration
-      ENVIRONMENT: "development" # Environment: development, production (affects JWT secret validation)
+      DB_MAX_OPEN_CONNS: "25"
+      DB_MAX_IDLE_CONNS: "5"
+      DB_CONN_MAX_LIFETIME: "5m"
+      DB_CONN_MAX_IDLE_TIME: "1m"
+      LOG_LEVEL: "info"
+      ENVIRONMENT: "development"
     ports:
       - "50051:50051"
       - "8081:8081"
-      - "9091:9090" # Prometheus metrics endpoint
+      - "9091:9090"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8081/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       postgres:
         condition: service_healthy
@@ -268,88 +318,65 @@ services:
       PROTO_PATH: "/app/proto/course.proto"
       PROTO_DIR: "/app/proto"
     ports:
-      - "50052:50052" # gRPC
-      - "3001:3001" # HTTP (health/metrics)
-      - "9094:9090" # Prometheus metrics endpoint
+      - "50052:50052"
+      - "3001:3001"
+      - "9094:9090"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     depends_on:
       mongodb:
         condition: service_healthy
       tempo:
         condition: service_started
-  # Kafka (Message Broker)
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    restart: unless-stopped
-
-  kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    depends_on:
-      - zookeeper
-    ports:
-      - "9097:9092"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     deploy:
       resources:
         limits:
           cpus: '1.0'
-          memory: 1G
+          memory: 512M
         reservations:
           cpus: '0.5'
-          memory: 512M
+          memory: 256M
     restart: unless-stopped
+
   # Content Management Service (Rust)
   content-management-service:
     build:
       context: .
       dockerfile: services/content-management-service/Dockerfile
     environment:
-      # Server Configuration
       SERVER__HOST: "0.0.0.0"
       SERVER__PORT: "8082"
-      SERVER__GRPC_PORT: "50052"
+      SERVER__GRPC_PORT: "50054"
       SERVER__METRICS_PORT: "9092"
-      # Database Configuration
       DATABASE__URL: "postgresql://cms:cms_password@postgres-cms:5432/cms"
       DATABASE__MAX_CONNECTIONS: "20"
       DATABASE__MIN_CONNECTIONS: "5"
-      # S3/MinIO Configuration
       S3__ENDPOINT: "http://minio:9000"
       S3__ACCESS_KEY: "minioadmin"
       S3__SECRET_KEY: "minioadmin"
       S3__BUCKET: "content-storage"
       S3__REGION: "us-east-1"
-      # ElasticSearch Configuration
       ELASTICSEARCH__URL: "http://elasticsearch:9200"
       ELASTICSEARCH__INDEX: "content"
-      # Redis Configuration
       REDIS__URL: "redis://redis:6379"
       REDIS__QUEUE_NAME: "transcoding_jobs"
-      # Observability Configuration
       OBSERVABILITY__OTLP_ENDPOINT: "http://tempo:4317"
       OBSERVABILITY__SERVICE_NAME: "content-management-service"
       RUST_LOG: "info"
-      # Analytics Service (placeholder - will be implemented later)
-      # ANALYTICS_SERVICE_URL: "http://analytics-service:50053"
     ports:
-      - "50055:50052"
+      - "50054:50054"
       - "8082:8082"
       - "9096:9092"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:9092/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       postgres-cms:
         condition: service_healthy
@@ -403,14 +430,20 @@ services:
     ports:
       - "50053:50053"
       - "8083:8083"
-      - "9093:9090" # Prometheus metrics endpoint
+      - "9093:9090"
     volumes:
       - assignment-storage:/app/storage
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8083/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
       assignment-grading-db:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
       tempo:
         condition: service_started
     deploy:
@@ -429,36 +462,36 @@ services:
       context: .
       dockerfile: services/api-gateway/Dockerfile
     environment:
-      # Logging configuration - supports per-module levels
-      # Examples: "info", "debug", "info,api_gateway=debug,tower_http=warn"
       RUST_LOG: "info"
       GATEWAY_SERVER_HOST: "0.0.0.0"
       GATEWAY_SERVER_PORT: "8080"
       GATEWAY_AUTH_SERVICE_ENDPOINT: "http://user-auth-service:50051"
       GATEWAY_OBSERVABILITY_TEMPO_ENDPOINT: "http://tempo:4317"
-      # Authentication Type Configuration
-      # Should match the AUTH_TYPE configured in user-auth-service
-      # Valid values: normal, oauth, saml
       AUTH_TYPE: "normal"
-      # Request body size limits (DoS prevention)
-      MAX_REQUEST_BODY_SIZE: "1048576" # 1MB default limit
-      MAX_UPLOAD_BODY_SIZE: "26214400" # 25MB for upload endpoints (assignment submissions)
-      UPLOAD_PATHS: "/upload,/api/upload,/api/assignments/*/submissions" # Comma-separated paths for upload limit
-      # Trusted proxies for X-Forwarded-For header (comma-separated IPs)
-      # TRUSTED_PROXIES: "10.0.0.1,172.17.0.1"  # Uncomment and set for production
+      MAX_REQUEST_BODY_SIZE: "1048576"
+      MAX_UPLOAD_BODY_SIZE: "26214400"
+      UPLOAD_PATHS: "/upload,/api/upload,/api/assignments/*/submissions"
+      CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:3002,http://localhost:3003"
     ports:
       - "8080:8080"
     volumes:
       - ./config/gateway-config.yaml:/app/config/gateway-config.yaml
       - ./services/api-gateway/openapi:/app/services/api-gateway/openapi
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     depends_on:
-      - prometheus
-      - tempo
-      - loki
-      - grafana
-      - user-auth-service
-      - assignment-grading-service
-      - content-management-service
+      user-auth-service:
+        condition: service_healthy
+      assignment-grading-service:
+        condition: service_healthy
+      content-management-service:
+        condition: service_healthy
+      course-service:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -469,9 +502,190 @@ services:
           memory: 256M
     restart: unless-stopped
 
+  # ============================================================================
+  # Frontend Services
+  # ============================================================================
+
+  # Student Frontend (Next.js, port 3000)
+  student-frontend:
+    build:
+      context: ./frontend
+      dockerfile: student/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: "http://localhost:8080"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8080"
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    restart: unless-stopped
+
+  # Provider/Instructor Frontend (Next.js, port 3002)
+  provider-frontend:
+    build:
+      context: ./frontend
+      dockerfile: provider/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: "http://localhost:8080"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8080"
+      PORT: "3002"
+    ports:
+      - "3002:3002"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    restart: unless-stopped
+
+  # Admin Frontend (Next.js, port 3003)
+  admin-frontend:
+    build:
+      context: ./frontend
+      dockerfile: admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: "http://localhost:8080"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8080"
+      PORT: "3003"
+    ports:
+      - "3003:3003"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    restart: unless-stopped
+
+  # Onboarding Service (Go)
+  onboarding-service:
+    build:
+      context: .
+      dockerfile: services/onboarding-service/Dockerfile
+    environment:
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8082"
+      GRPC_HOST: "0.0.0.0"
+      GRPC_PORT: "50052"
+      WEBSOCKET_HOST: "0.0.0.0"
+      WEBSOCKET_PORT: "8083"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_NAME: "onboarding"
+      DB_SSLMODE: "disable"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_CONSUMER_GROUP: "onboarding-service"
+      USER_AUTH_SERVICE_ENDPOINT: "user-auth-service:50051"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
+      JWT_SECRET: "your-super-secret-jwt-key-change-in-production"
+      LOG_LEVEL: "info"
+      MAX_FILE_SIZE: "104857600"
+      UPLOAD_DIR: "/tmp/uploads"
+      DB_MAX_OPEN_CONNS: "50"
+      DB_MAX_IDLE_CONNS: "10"
+      DB_CONN_MAX_LIFETIME: "5m"
+    ports:
+      - "50055:50052"   # gRPC
+      - "8084:8082"     # HTTP
+      - "8085:8083"     # WebSocket
+      - "9098:9090"     # Prometheus metrics
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      user-auth-service:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+
+  # Onboarding Worker (Go)
+  onboarding-worker:
+    build:
+      context: .
+      dockerfile: services/onboarding-service/Dockerfile.worker
+    environment:
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8082"
+      GRPC_HOST: "0.0.0.0"
+      GRPC_PORT: "50052"
+      WEBSOCKET_HOST: "0.0.0.0"
+      WEBSOCKET_PORT: "8083"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_NAME: "onboarding"
+      DB_SSLMODE: "disable"
+      REDIS_HOST: "redis"
+      REDIS_PORT: "6379"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_CONSUMER_GROUP: "onboarding-service"
+      USER_AUTH_SERVICE_ENDPOINT: "user-auth-service:50051"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
+      JWT_SECRET: "your-super-secret-jwt-key-change-in-production"
+      LOG_LEVEL: "info"
+      MAX_FILE_SIZE: "104857600"
+      UPLOAD_DIR: "/tmp/uploads"
+      DB_MAX_OPEN_CONNS: "50"
+      DB_MAX_IDLE_CONNS: "10"
+      DB_CONN_MAX_LIFETIME: "5m"
+    depends_on:
+      onboarding-service:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    restart: unless-stopped
+
+  # ============================================================================
   # Observability Stack
+  # ============================================================================
+
   prometheus:
-    image: prom/prometheus
+    image: prom/prometheus:v2.48.0
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
@@ -487,15 +701,15 @@ services:
     restart: unless-stopped
 
   tempo:
-    image: grafana/tempo:latest
+    image: grafana/tempo:2.3.1
     command: [ "-config.file=/etc/tempo/tempo.yaml" ]
     volumes:
       - ./config/tempo.yaml:/etc/tempo/tempo.yaml
     ports:
-      - "14268:14268" # jaeger ingest
-      - "3200:3200" # tempo
-      - "4317:4317" # otlp grpc
-      - "4318:4318" # otlp http
+      - "14268:14268"
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
     deploy:
       resources:
         limits:
@@ -507,24 +721,14 @@ services:
     restart: unless-stopped
 
   loki:
-    image: grafana/loki:2.8.2
+    image: grafana/loki:2.9.3
     command: "-config.file=/etc/loki/local-config.yaml"
     volumes:
       - ./config/loki.yaml:/etc/loki/local-config.yaml
       - loki-data:/loki
     ports:
       - "3100:3100"
-    user: "root"
-    environment:
-      - PUID=1000
-      - PGID=1000
-    entrypoint:
-      - sh
-      - -c
-      - |
-        mkdir -p /loki/chunks /loki/index /loki/boltdb-cache /loki/compactor /loki/rules
-        chown -R loki:loki /loki
-        exec /usr/bin/loki -config.file=/etc/loki/local-config.yaml
+    user: root
     deploy:
       resources:
         limits:
@@ -542,10 +746,16 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_UNIFIED_ALERTING_ENABLED=true
+      - GF_ALERTING_ENABLED=false
     volumes:
       - ./config/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./config/grafana-dashboard-provider.yaml:/etc/grafana/provisioning/dashboards/default.yaml
+      - ./config/grafana-dashboards:/etc/grafana/provisioning/dashboards/slate
+      - ./config/grafana.ini:/etc/grafana/grafana.ini
+      - grafana-data:/var/lib/grafana
     ports:
-      - "3000:3000"
+      - "3500:3000"
     depends_on:
       - prometheus
       - tempo
@@ -561,7 +771,7 @@ services:
     restart: unless-stopped
 
   promtail:
-    image: grafana/promtail:2.8.2
+    image: grafana/promtail:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -578,6 +788,60 @@ services:
         reservations:
           cpus: '0.1'
           memory: 64M
+    restart: unless-stopped
+
+  # Video Conferencing Service (Rust/WebRTC)
+  video-conferencing-service:
+    build:
+      context: .
+      dockerfile: services/video-conferencing-service/Dockerfile
+    environment:
+      SERVER_HOST: "0.0.0.0"
+      GRPC_PORT: "50052"
+      WS_PORT: "8082"
+      HTTP_PORT: "8082"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_NAME: "slate_video"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_MAX_CONNECTIONS: "25"
+      WEBRTC_PORT_MIN: "51000"
+      WEBRTC_PORT_MAX: "51100"
+      RECORDING_ENABLED: "true"
+      GCS_BUCKET: "slate-recordings"
+      GCS_PROJECT_ID: "slate-project"
+      RECORDING_TIMEOUT: "1800"
+      TEMP_STORAGE_PATH: "/tmp/recordings"
+      TEMPO_ENDPOINT: "http://tempo:4317"
+      SERVICE_NAME: "video-conferencing-service"
+      PROMETHEUS_PORT: "9092"
+      RUST_LOG: "info,video_conferencing_service=debug"
+      MAX_PARTICIPANTS: "50"
+      JOIN_WINDOW_MINUTES: "10"
+      DEFAULT_DURATION_MINUTES: "60"
+      MAX_DURATION_MINUTES: "240"
+      AUTO_END_AFTER_MINUTES: "300"
+    ports:
+      - "50056:50052"        # gRPC
+      - "8086:8082"          # HTTP/WebSocket
+      - "9099:9092"          # Prometheus metrics
+      - "51000-51100:51000-51100/udp"  # WebRTC media
+    volumes:
+      - video-recordings:/tmp/recordings
+    depends_on:
+      postgres:
+        condition: service_healthy
+      tempo:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
     restart: unless-stopped
 
 volumes:
@@ -597,5 +861,13 @@ volumes:
     driver: local
   elasticsearch-data:
     driver: local
+  kafka-data:
+    driver: local
   loki-data:
+    driver: local
+  grafana-data:
+    driver: local
+  onboarding-uploads:
+    driver: local
+  video-recordings:
     driver: local
