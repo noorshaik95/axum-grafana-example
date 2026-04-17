@@ -26,9 +26,11 @@ import (
 	"slate/services/tenant-service/pkg/tracing"
 
 	commontracing "slate/libs/common-go/tracing"
+	commongrpc "slate/libs/common-go/grpc"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -215,9 +217,12 @@ func main() {
 		}
 	}()
 
-	// Create gRPC server
+	// Create gRPC server with OTel tracing interceptors
 	grpcServer := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(),
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.ChainUnaryInterceptor(
+			commongrpc.TracingUnaryInterceptor("tenant-service"),
+		),
 	)
 
 	healthServer := health.NewServer()

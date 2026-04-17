@@ -8,6 +8,7 @@ import (
 	pb "slate/services/user-auth-service/api/proto"
 	"slate/services/user-auth-service/internal/auth"
 	"slate/services/user-auth-service/internal/models"
+	"slate/services/user-auth-service/internal/repository"
 	"slate/services/user-auth-service/internal/service"
 	"slate/services/user-auth-service/pkg/logger"
 	"slate/services/user-auth-service/pkg/ratelimit"
@@ -29,14 +30,24 @@ type UserServiceServer struct {
 	userService     *service.UserService
 	strategyManager *auth.StrategyManager
 	rateLimiter     ratelimit.RateLimiter
+	groupRepo       *repository.GroupRepository
+	mfaRepo         *repository.MFARepository
 	log             *logger.Logger
 }
 
-func NewUserServiceServer(userService *service.UserService, strategyManager *auth.StrategyManager, rateLimiter ratelimit.RateLimiter) *UserServiceServer {
+func NewUserServiceServer(
+	userService *service.UserService,
+	strategyManager *auth.StrategyManager,
+	rateLimiter ratelimit.RateLimiter,
+	groupRepo *repository.GroupRepository,
+	mfaRepo *repository.MFARepository,
+) *UserServiceServer {
 	return &UserServiceServer{
 		userService:     userService,
 		strategyManager: strategyManager,
 		rateLimiter:     rateLimiter,
+		groupRepo:       groupRepo,
+		mfaRepo:         mfaRepo,
 		log:             logger.NewLogger("info"),
 	}
 }

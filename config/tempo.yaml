@@ -10,12 +10,18 @@ distributor:
         http:
           endpoint: "0.0.0.0:4318"
 
+ingester:
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    tokens_file_path: /tmp/tempo/tokens.json
+
 storage:
   trace:
     backend: local
     local:
       path: /tmp/tempo/blocks
-
-compactor:
-  compaction:
-    block_retention: 24h
+    wal:
+      path: /tmp/tempo/wal

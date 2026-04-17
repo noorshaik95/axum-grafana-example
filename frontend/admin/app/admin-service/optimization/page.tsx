@@ -1,11 +1,10 @@
-'use client';
+'use client'
 
-import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { useToast } from '@/hooks/use-toast'
 import {
   TrendingDown,
   Lightbulb,
@@ -14,14 +13,14 @@ import {
   HardDrive,
   Users,
   CheckCircle2,
-} from 'lucide-react';
+} from 'lucide-react'
 
 const RECOMMENDATIONS = [
   {
     id: '1',
     title: 'Optimize Storage Usage',
     description: 'Remove duplicate files and compress media content to save 45 GB of storage',
-    potential_savings: 22.50,
+    potential_savings: 22.5,
     impact: 'high',
     implementation_effort: 'easy',
     category: 'storage',
@@ -29,8 +28,8 @@ const RECOMMENDATIONS = [
   {
     id: '2',
     title: 'Reduce Inactive User Licenses',
-    description: 'Deactivate 450 users who haven\'t logged in for 90+ days',
-    potential_savings: 67.50,
+    description: "Deactivate 450 users who haven't logged in for 90+ days",
+    potential_savings: 67.5,
     impact: 'high',
     implementation_effort: 'medium',
     category: 'users',
@@ -38,7 +37,8 @@ const RECOMMENDATIONS = [
   {
     id: '3',
     title: 'Optimize AI Credit Usage',
-    description: 'Switch to batch processing for automated tasks to reduce AI credit consumption by 25%',
+    description:
+      'Switch to batch processing for automated tasks to reduce AI credit consumption by 25%',
     potential_savings: 49.75,
     impact: 'medium',
     implementation_effort: 'medium',
@@ -48,7 +48,7 @@ const RECOMMENDATIONS = [
     id: '4',
     title: 'Enable Content Caching',
     description: 'Implement CDN caching to reduce bandwidth usage by 30%',
-    potential_savings: 35.00,
+    potential_savings: 35.0,
     impact: 'medium',
     implementation_effort: 'easy',
     category: 'bandwidth',
@@ -57,54 +57,54 @@ const RECOMMENDATIONS = [
     id: '5',
     title: 'Downgrade Unused Features',
     description: 'Switch to a lower tier plan for departments with minimal usage',
-    potential_savings: 75.00,
+    potential_savings: 75.0,
     impact: 'low',
     implementation_effort: 'hard',
     category: 'plan',
   },
-];
+]
 
 export default function OptimizationPage() {
-  const { toast } = useToast();
+  const { toast } = useToast()
 
-  const totalSavings = RECOMMENDATIONS.reduce((sum, rec) => sum + rec.potential_savings, 0);
-  const savingsPercentage = ((totalSavings / 299) * 100).toFixed(1);
+  const totalSavings = RECOMMENDATIONS.reduce((sum, rec) => sum + rec.potential_savings, 0)
+  const savingsPercentage = ((totalSavings / 299) * 100).toFixed(1)
 
   const handleApply = (id: string, title: string) => {
     toast({
       title: 'Optimization Applied',
       description: `Successfully applied: ${title}`,
-    });
-  };
+    })
+  }
 
   const getImpactColor = (impact: string) => {
     switch (impact) {
       case 'high':
-        return 'text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400';
+        return 'text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400'
       case 'medium':
-        return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400';
+        return 'text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400'
       case 'low':
-        return 'text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400';
+        return 'text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400'
       default:
-        return '';
+        return ''
     }
-  };
+  }
 
   const getEffortColor = (effort: string) => {
     switch (effort) {
       case 'easy':
-        return 'success';
+        return 'success'
       case 'medium':
-        return 'warning';
+        return 'warning'
       case 'hard':
-        return 'destructive';
+        return 'destructive'
       default:
-        return 'default';
+        return 'default'
     }
-  };
+  }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Cost Optimization</h1>
@@ -130,9 +130,7 @@ export default function OptimizationPage() {
                 <TrendingDown className="h-5 w-5 text-green-600" />
                 <CardDescription>Potential Savings</CardDescription>
               </div>
-              <CardTitle className="text-3xl text-green-600">
-                ${totalSavings.toFixed(2)}
-              </CardTitle>
+              <CardTitle className="text-3xl text-green-600">${totalSavings.toFixed(2)}</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
                 {savingsPercentage}% reduction possible
               </p>
@@ -146,9 +144,7 @@ export default function OptimizationPage() {
                 <CardDescription>Recommendations</CardDescription>
               </div>
               <CardTitle className="text-3xl">{RECOMMENDATIONS.length}</CardTitle>
-              <p className="text-xs text-muted-foreground mt-1">
-                Actionable insights available
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">Actionable insights available</p>
             </CardHeader>
           </Card>
         </div>
@@ -156,9 +152,7 @@ export default function OptimizationPage() {
         <Card>
           <CardHeader>
             <CardTitle>Savings Breakdown</CardTitle>
-            <CardDescription>
-              Estimated monthly savings by category
-            </CardDescription>
+            <CardDescription>Estimated monthly savings by category</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -169,7 +163,7 @@ export default function OptimizationPage() {
                 </span>
                 <span className="font-medium">$22.50</span>
               </div>
-              <Progress value={22.50 / totalSavings * 100} />
+              <Progress value={(22.5 / totalSavings) * 100} />
             </div>
 
             <div className="space-y-2">
@@ -180,7 +174,7 @@ export default function OptimizationPage() {
                 </span>
                 <span className="font-medium">$67.50</span>
               </div>
-              <Progress value={67.50 / totalSavings * 100} />
+              <Progress value={(67.5 / totalSavings) * 100} />
             </div>
 
             <div className="space-y-2">
@@ -191,7 +185,7 @@ export default function OptimizationPage() {
                 </span>
                 <span className="font-medium">$49.75</span>
               </div>
-              <Progress value={49.75 / totalSavings * 100} />
+              <Progress value={(49.75 / totalSavings) * 100} />
             </div>
 
             <div className="space-y-2">
@@ -202,7 +196,7 @@ export default function OptimizationPage() {
                 </span>
                 <span className="font-medium">$110.00</span>
               </div>
-              <Progress value={110 / totalSavings * 100} />
+              <Progress value={(110 / totalSavings) * 100} />
             </div>
           </CardContent>
         </Card>
@@ -210,9 +204,7 @@ export default function OptimizationPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Recommendations</h2>
-            <Badge variant="outline">
-              {RECOMMENDATIONS.length} opportunities
-            </Badge>
+            <Badge variant="outline">{RECOMMENDATIONS.length} opportunities</Badge>
           </div>
 
           {RECOMMENDATIONS.map((rec) => (
@@ -241,25 +233,18 @@ export default function OptimizationPage() {
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">Impact:</span>
-                      <Badge className={getImpactColor(rec.impact)}>
-                        {rec.impact}
-                      </Badge>
+                      <Badge className={getImpactColor(rec.impact)}>{rec.impact}</Badge>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">Category:</span>
-                      <Badge variant="outline">
-                        {rec.category}
-                      </Badge>
+                      <Badge variant="outline">{rec.category}</Badge>
                     </div>
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm">
                       Learn More
                     </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleApply(rec.id, rec.title)}
-                    >
+                    <Button size="sm" onClick={() => handleApply(rec.id, rec.title)}>
                       <CheckCircle2 className="mr-2 h-4 w-4" />
                       Apply
                     </Button>
@@ -270,6 +255,6 @@ export default function OptimizationPage() {
           ))}
         </div>
       </div>
-    </DashboardLayout>
-  );
+    </>
+  )
 }

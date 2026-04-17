@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: Slate Dashboards
+    orgId: 1
+    folder: Slate
+    type: file
+    disableDeletion: false
+    editable: true
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/slate
+      foldersFromFilesStructure: false

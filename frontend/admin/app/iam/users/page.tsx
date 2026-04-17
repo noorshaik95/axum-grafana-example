@@ -1,259 +1,264 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react'
 import {
   Plus,
   Search,
   Edit,
-  Trash2,
   Shield,
   CheckCircle2,
   XCircle,
-  Clock,
-} from 'lucide-react';
+  Loader2,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Users,
+} from 'lucide-react'
+import { useUsers } from '../../../../shared/lib/api/hooks'
+import type { User, Role } from '../../../../shared/lib/api/types'
 
-const MOCK_USERS = [
-  {
-    id: '1',
-    email: 'admin@university.edu',
-    name: 'System Administrator',
-    policies: ['Full Access', 'Billing Admin'],
-    status: 'active',
-    created_at: '2024-01-01',
-    last_login: '2 hours ago',
-  },
-  {
-    id: '2',
-    email: 'onboarding@university.edu',
-    name: 'Onboarding Manager',
-    policies: ['Onboarding Admin'],
-    status: 'active',
-    created_at: '2024-01-05',
-    last_login: '1 day ago',
-  },
-  {
-    id: '3',
-    email: 'billing@university.edu',
-    name: 'Billing Specialist',
-    policies: ['Billing Read', 'Usage Analytics'],
-    status: 'active',
-    created_at: '2024-01-10',
-    last_login: '3 hours ago',
-  },
-  {
-    id: '4',
-    email: 'analyst@university.edu',
-    name: 'Data Analyst',
-    policies: ['Usage Analytics', 'Reports Read'],
-    status: 'inactive',
-    created_at: '2024-01-15',
-    last_login: '2 weeks ago',
-  },
-];
+const ROLE_COLORS: Record<string, string> = {
+  admin: 'bg-red-50 text-red-600',
+  superadmin: 'bg-red-50 text-red-700',
+  instructor: 'bg-blue-50 text-blue-600',
+  student: 'bg-gray-100 text-gray-600',
+  user: 'bg-gray-100 text-gray-500',
+  manager: 'bg-amber-50 text-amber-600',
+}
+
+function RoleBadge({ role }: { role: Role }) {
+  const colors = ROLE_COLORS[role.name] ?? 'bg-gray-100 text-gray-600'
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${colors}`}
+    >
+      <Shield className="h-3 w-3" />
+      {role.name}
+    </span>
+  )
+}
+
+function SkeletonRow() {
+  return (
+    <tr className="border-b border-[var(--color-border)]">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <td key={i} className="px-5 py-3">
+          <div className="h-4 w-24 animate-pulse rounded bg-gray-200" />
+        </td>
+      ))}
+    </tr>
+  )
+}
 
 export default function IAMUsersPage() {
-  const [users, setUsers] = useState(MOCK_USERS);
-  const [searchTerm, setSearchTerm] = useState('');
-  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('')
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 20
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const { data, isLoading, isError, error } = useUsers({
+    search: searchTerm || undefined,
+    page,
+    pageSize: PAGE_SIZE,
+  })
 
-  const handleDeleteUser = (id: string, name: string) => {
-    setUsers(users.filter((user) => user.id !== id));
-    toast({
-      title: 'User Deleted',
-      description: `${name} has been removed`,
-    });
-  };
-
-  const handleToggleStatus = (id: string) => {
-    setUsers(
-      users.map((user) =>
-        user.id === id
-          ? { ...user, status: user.status === 'active' ? 'inactive' : 'active' }
-          : user
-      )
-    );
-    toast({
-      title: 'Status Updated',
-      description: 'User status has been changed',
-    });
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return (
-          <Badge variant="success">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
-            Active
-          </Badge>
-        );
-      case 'inactive':
-        return (
-          <Badge variant="outline">
-            <XCircle className="mr-1 h-3 w-3" />
-            Inactive
-          </Badge>
-        );
-      case 'suspended':
-        return (
-          <Badge variant="destructive">
-            <XCircle className="mr-1 h-3 w-3" />
-            Suspended
-          </Badge>
-        );
-      default:
-        return <Badge>{status}</Badge>;
-    }
-  };
-
-  const activeUsers = users.filter((u) => u.status === 'active').length;
-  const inactiveUsers = users.filter((u) => u.status === 'inactive').length;
+  const users: readonly User[] = data?.data ?? []
+  const totalUsers = data?.pagination?.totalItems ?? 0
+  const totalPages = data?.pagination?.totalPages ?? 1
+  const activeCount = users.filter((u) => u.isActive).length
+  const inactiveCount = users.filter((u) => !u.isActive).length
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">IAM Users</h1>
-            <p className="text-muted-foreground">
-              Manage users with custom access to admin services
-            </p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--color-text)]">Users</h1>
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+            Manage all users in the Slate LMS platform.
+          </p>
+        </div>
+        <button className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)] transition-colors">
+          <Plus className="h-4 w-4" />
+          Invite User
+        </button>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-sm">
+          <p className="text-sm font-medium text-[var(--color-text-muted)]">Total Users</p>
+          <p className="mt-1 text-2xl font-bold text-[var(--color-text)]">
+            {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : totalUsers}
+          </p>
+        </div>
+        <div className="rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-sm">
+          <p className="text-sm font-medium text-[var(--color-text-muted)]">Active (this page)</p>
+          <p className="mt-1 text-2xl font-bold text-green-600">{isLoading ? '--' : activeCount}</p>
+        </div>
+        <div className="rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-sm">
+          <p className="text-sm font-medium text-[var(--color-text-muted)]">Inactive (this page)</p>
+          <p className="mt-1 text-2xl font-bold text-[var(--color-text-muted)]">
+            {isLoading ? '--' : inactiveCount}
+          </p>
+        </div>
+      </div>
+
+      {/* Table card */}
+      <div className="rounded-xl border border-[var(--color-border)] bg-white shadow-sm">
+        {/* Toolbar */}
+        <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-muted)]" />
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                setPage(1)
+              }}
+              className="w-full rounded-lg border border-[var(--color-border)] bg-white py-2 pl-10 pr-4 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            />
           </div>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Create User
-          </Button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Total Users</CardDescription>
-              <CardTitle className="text-3xl">{users.length}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Active Users</CardDescription>
-              <CardTitle className="text-3xl text-green-600">{activeUsers}</CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Inactive Users</CardDescription>
-              <CardTitle className="text-3xl text-muted-foreground">{inactiveUsers}</CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Users</CardTitle>
-                <CardDescription>Manage IAM policy users and their permissions</CardDescription>
-              </div>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search users..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Policies</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Login</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-t border-[var(--color-border)] bg-[var(--color-bg-muted)]">
+                <th className="px-5 py-3 text-left text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">
+                  Email
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">
+                  Role
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">
+                  Auth Method
+                </th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">
+                  Joined
+                </th>
+                <th className="px-5 py-3 text-right text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
+              ) : isError ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-12 text-center">
+                    <div className="flex items-center justify-center gap-2 text-[var(--color-error)]">
+                      <AlertCircle className="h-5 w-5" />
+                      <span className="text-sm">
+                        Failed to load users
+                        {error instanceof Error ? `: ${error.message}` : ''}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-12 text-center">
+                    <Users className="mx-auto h-8 w-8 text-[var(--color-text-muted)]" />
+                    <p className="mt-2 text-sm text-[var(--color-text-muted)]">No users found.</p>
+                  </td>
+                </tr>
+              ) : (
+                users.map((user) => (
+                  <tr
+                    key={user.id}
+                    className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg-muted)]/50 transition-colors"
+                  >
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-medium text-indigo-600">
+                          {user.firstName.charAt(0)}
+                          {user.lastName.charAt(0)}
+                        </div>
+                        <span className="text-sm font-medium text-[var(--color-text)]">
+                          {user.firstName} {user.lastName}
+                        </span>
                       </div>
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="px-5 py-3 text-sm text-[var(--color-text-muted)]">
+                      {user.email}
+                    </td>
+                    <td className="px-5 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {user.policies.map((policy, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs">
-                            <Shield className="mr-1 h-3 w-3" />
-                            {policy}
-                          </Badge>
+                        {user.roles.map((role) => (
+                          <RoleBadge key={role.id} role={role} />
                         ))}
                       </div>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(user.status)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {user.last_login}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleStatus(user.id)}
-                        >
-                          {user.status === 'active' ? (
-                            <XCircle className="h-4 w-4" />
-                          ) : (
-                            <CheckCircle2 className="h-4 w-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteUser(user.id, user.name)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                    </td>
+                    <td className="px-5 py-3">
+                      {user.isActive ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-600">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                          <XCircle className="h-3 w-3" />
+                          Inactive
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 capitalize">
+                        {user.authMethod}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-sm text-[var(--color-text-muted)]">
+                      {new Date(user.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <button className="rounded-lg p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-bg-muted)] hover:text-[var(--color-text)]">
+                        <Edit className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {!isLoading && totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-[var(--color-border)] px-5 py-3">
+            <span className="text-sm text-[var(--color-text-muted)]">
+              Page {page} of {totalPages} ({totalUsers} total)
+            </span>
+            <div className="flex gap-2">
+              <button
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-bg-muted)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </button>
+              <button
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                className="inline-flex items-center gap-1 rounded-lg border border-[var(--color-border)] px-3 py-1.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-bg-muted)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </DashboardLayout>
-  );
+    </div>
+  )
 }

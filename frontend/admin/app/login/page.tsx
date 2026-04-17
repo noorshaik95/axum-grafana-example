@@ -1,55 +1,58 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { authService } from '@/lib/api/auth';
-import { Shield } from 'lucide-react';
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useToast } from '@/hooks/use-toast'
+import { auth } from '../../../shared/lib/api'
+import { Shield } from 'lucide-react'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
-  const { toast } = useToast();
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const router = useRouter()
+  const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+    e.preventDefault()
+    setLoading(true)
 
     try {
-      const response = await authService.login({ email, password });
+      const response = await auth.login({ email, password })
 
-      if (!response.user.roles.includes('admin')) {
+      const isAdmin = response.user.roles.some((r) => r.name === 'admin' || r.name === 'superadmin')
+
+      if (!isAdmin) {
         toast({
           title: 'Access Denied',
           description: 'You do not have admin privileges.',
           variant: 'destructive',
-        });
-        await authService.logout();
-        return;
+        })
+        await auth.logout()
+        return
       }
 
       toast({
         title: 'Login Successful',
         description: 'Welcome to the Admin Dashboard',
-      });
+      })
 
-      router.push('/dashboard');
-    } catch (error: any) {
+      router.push('/dashboard')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Invalid credentials'
       toast({
         title: 'Login Failed',
-        description: error.response?.data?.message || 'Invalid credentials',
+        description: message,
         variant: 'destructive',
-      });
+      })
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
@@ -62,7 +65,7 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl text-center">Admin Dashboard</CardTitle>
           <CardDescription className="text-center">
-            Sign in to access the university admin portal
+            Sign in to access the Slate LMS admin portal
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -72,7 +75,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@university.edu"
+                placeholder="admin@slate.edu"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -97,5 +100,5 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

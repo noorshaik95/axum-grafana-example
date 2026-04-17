@@ -9,38 +9,20 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  # Scrape logs from user-auth-service container
+  # ── user-auth-service (Go / zerolog JSON) ──────────────────────────────────
   - job_name: user-auth-service
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 5s
     relabel_configs:
-      # Only scrape containers with name containing 'user-auth-service'
       - source_labels: ['__meta_docker_container_name']
-        regex: '/(.*)-user-auth-service-(.*)'
+        regex: '/.*-user-auth-service-.*'
         action: keep
-      # Set job label (required by Loki)
-      - source_labels: ['__meta_docker_container_name']
-        target_label: '__tmp_job'
-        replacement: 'user-auth-service'
-      # Set service_name label
-      - source_labels: ['__meta_docker_container_name']
-        target_label: '__tmp_service_name'
-        replacement: 'user-auth-service'
-      # Set environment label
-      - source_labels: ['__meta_docker_container_name']
-        target_label: '__tmp_environment'
-        replacement: 'dev'
-      # Set container_name label
-      - source_labels: ['__meta_docker_container_name']
-        target_label: '__tmp_container_name'
     pipeline_stages:
-      # Set static labels first
       - static_labels:
           job: user-auth-service
           service_name: user-auth-service
           environment: dev
-      # Parse JSON logs
       - json:
           expressions:
             level: level
@@ -49,57 +31,238 @@ scrape_configs:
             user_id: user_id
             operation: operation
             error_type: error_type
-            email: email
-      # Extract level label from JSON if it exists
       - labels:
           level:
-      # Add timestamp from log entry
       - timestamp:
           source: time
           format: RFC3339Nano
 
-  # Scrape logs from api-gateway container
+  # ── api-gateway (Rust / tracing-subscriber JSON) ───────────────────────────
   - job_name: api-gateway
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 5s
     relabel_configs:
-      # Only scrape containers with name containing 'api-gateway'
       - source_labels: ['__meta_docker_container_name']
-        regex: '/(.*)-api-gateway-(.*)'
+        regex: '/.*-api-gateway-.*'
         action: keep
-      # Set job label (required by Loki)
-      - source_labels: ['__meta_docker_container_name']
-        target_label: '__tmp_job'
-        replacement: 'api-gateway'
-      # Set service_name label
-      - source_labels: ['__meta_docker_container_name']
-        target_label: '__tmp_service_name'
-        replacement: 'api-gateway'
-      # Set environment label
-      - source_labels: ['__meta_docker_container_name']
-        target_label: '__tmp_environment'
-        replacement: 'dev'
-      # Set container_name label
-      - source_labels: ['__meta_docker_container_name']
-        target_label: '__tmp_container_name'
     pipeline_stages:
-      # Set static labels first
       - static_labels:
           job: api-gateway
           service_name: api-gateway
           environment: dev
-      # Parse JSON logs (Rust tracing format)
       - json:
           expressions:
             level: level
             trace_id: trace_id
             message: message
             target: target
-      # Extract level label from JSON if it exists
       - labels:
           level:
-      # Add timestamp from log entry if available
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+
+  # ── course-service (Node.js / NestJS JSON) ─────────────────────────────────
+  - job_name: course-service
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/.*-course-service-.*'
+        action: keep
+    pipeline_stages:
+      - static_labels:
+          job: course-service
+          service_name: course-service
+          environment: dev
+      - json:
+          expressions:
+            level: level
+            trace_id: trace_id
+            message: message
+            context: context
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+
+  # ── assignment-grading-service (Go / zerolog JSON) ─────────────────────────
+  - job_name: assignment-grading-service
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/.*-assignment-grading-service-.*'
+        action: keep
+    pipeline_stages:
+      - static_labels:
+          job: assignment-grading-service
+          service_name: assignment-grading-service
+          environment: dev
+      - json:
+          expressions:
+            level: level
+            trace_id: trace_id
+            message: message
+      - labels:
+          level:
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+  # ── content-management-service (Rust / tracing-subscriber JSON) ────────────
+  - job_name: content-management-service
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/.*-content-management-service-.*'
+        action: keep
+    pipeline_stages:
+      - static_labels:
+          job: content-management-service
+          service_name: content-management-service
+          environment: dev
+      - json:
+          expressions:
+            level: level
+            trace_id: trace_id
+            message: message
+            target: target
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+
+  # ── tenant-service (Go / zerolog JSON) ─────────────────────────────────────
+  - job_name: tenant-service
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/.*-tenant-service-.*'
+        action: keep
+    pipeline_stages:
+      - static_labels:
+          job: tenant-service
+          service_name: tenant-service
+          environment: dev
+      - json:
+          expressions:
+            level: level
+            trace_id: trace_id
+            message: message
+      - labels:
+          level:
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+  # ── email-service (Go / zerolog JSON) ──────────────────────────────────────
+  - job_name: email-service
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/.*-email-service-.*'
+        action: keep
+    pipeline_stages:
+      - static_labels:
+          job: email-service
+          service_name: email-service
+          environment: dev
+      - json:
+          expressions:
+            level: level
+            trace_id: trace_id
+            message: message
+      - labels:
+          level:
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+  # ── metrics-service (Go / zerolog JSON) ────────────────────────────────────
+  - job_name: metrics-service
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/.*-metrics-service-.*'
+        action: keep
+    pipeline_stages:
+      - static_labels:
+          job: metrics-service
+          service_name: metrics-service
+          environment: dev
+      - json:
+          expressions:
+            level: level
+            trace_id: trace_id
+            message: message
+      - labels:
+          level:
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+  # ── video-conferencing-service (Rust / tracing-subscriber JSON) ────────────
+  - job_name: video-conferencing-service
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/.*-video-conferencing-service-.*'
+        action: keep
+    pipeline_stages:
+      - static_labels:
+          job: video-conferencing-service
+          service_name: video-conferencing-service
+          environment: dev
+      - json:
+          expressions:
+            level: level
+            trace_id: trace_id
+            message: message
+            target: target
+      - labels:
+          level:
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+
+  # ── onboarding-service (Rust / tracing-subscriber JSON) ────────────────────
+  - job_name: onboarding-service
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/.*-onboarding-service-.*'
+        action: keep
+    pipeline_stages:
+      - static_labels:
+          job: onboarding-service
+          service_name: onboarding-service
+          environment: dev
+      - json:
+          expressions:
+            level: level
+            trace_id: trace_id
+            message: message
+            target: target
+      - labels:
+          level:
       - timestamp:
           source: timestamp
           format: RFC3339Nano

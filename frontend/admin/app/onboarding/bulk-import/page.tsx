@@ -1,31 +1,37 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/hooks/use-toast';
-import { Upload, FileSpreadsheet, Database, Cloud, Check, X, Loader2 } from 'lucide-react';
+import { useState } from 'react'
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { useToast } from '@/hooks/use-toast'
+import { Upload, FileSpreadsheet, Database, Cloud, Check, Loader2 } from 'lucide-react'
 
 export default function BulkImportPage() {
-  const [importMethod, setImportMethod] = useState<'csv' | 'api'>('csv');
-  const [roleType, setRoleType] = useState('student');
-  const [file, setFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const { toast } = useToast();
+  const [importMethod, setImportMethod] = useState<'csv' | 'api'>('csv')
+  const [roleType, setRoleType] = useState('student')
+  const [file, setFile] = useState<File | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const { toast } = useToast()
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      setFile(e.target.files[0])
     }
-  };
+  }
 
   const handleImport = () => {
     if (!file && importMethod === 'csv') {
@@ -33,32 +39,32 @@ export default function BulkImportPage() {
         title: 'No file selected',
         description: 'Please select a CSV file to import',
         variant: 'destructive',
-      });
-      return;
+      })
+      return
     }
 
-    setImporting(true);
-    setProgress(0);
+    setImporting(true)
+    setProgress(0)
 
     // Simulate import progress
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
-          clearInterval(interval);
-          setImporting(false);
+          clearInterval(interval)
+          setImporting(false)
           toast({
             title: 'Import Completed',
             description: 'Successfully imported 10,000 users in 1.8 minutes',
-          });
-          return 100;
+          })
+          return 100
         }
-        return prev + 5;
-      });
-    }, 200);
-  };
+        return prev + 5
+      })
+    }, 200)
+  }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Bulk Import</h1>
@@ -71,9 +77,7 @@ export default function BulkImportPage() {
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Import Configuration</CardTitle>
-              <CardDescription>
-                Upload up to 10,000+ users in under 2 minutes
-              </CardDescription>
+              <CardDescription>Upload up to 10,000+ users in under 2 minutes</CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs value={importMethod} onValueChange={(v) => setImportMethod(v as any)}>
@@ -137,11 +141,7 @@ export default function BulkImportPage() {
                     </div>
                   )}
 
-                  <Button
-                    onClick={handleImport}
-                    disabled={importing}
-                    className="w-full"
-                  >
+                  <Button onClick={handleImport} disabled={importing} className="w-full">
                     {importing ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -167,7 +167,7 @@ export default function BulkImportPage() {
                   <div className="space-y-2">
                     <Label>Sample Request Body</Label>
                     <pre className="text-xs bg-muted p-4 rounded-lg overflow-x-auto">
-{`{
+                      {`{
   "users": [
     {
       "email": "student@university.edu",
@@ -253,6 +253,6 @@ export default function BulkImportPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
-  );
+    </>
+  )
 }

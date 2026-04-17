@@ -1,11 +1,11 @@
-'use client';
+'use client'
 
-import { ProtectedRoute } from '@/components/auth/protected-route';
-import { Sidebar } from './sidebar';
-import { Header } from './header';
+import { ProtectedRoute } from '@/components/auth/protected-route'
+import { Sidebar } from './sidebar'
+import { Header } from './header'
 
 interface DashboardLayoutProps {
-  children: React.ReactNode;
+  children: React.ReactNode
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -15,11 +15,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <Sidebar />
         <div className="flex flex-1 flex-col lg:ml-64">
           <Header />
-          <main className="flex-1 overflow-y-auto p-6">
-            {children}
-          </main>
+          <main className="flex-1 overflow-y-auto p-6">{children}</main>
         </div>
       </div>
     </ProtectedRoute>
-  );
+  )
 }

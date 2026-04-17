@@ -1,9 +1,8 @@
-'use client';
+'use client'
 
-import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -11,15 +10,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { CreditCard, Download, Calendar, DollarSign, CheckCircle2 } from 'lucide-react';
+} from '@/components/ui/table'
+import { CreditCard, Download, Calendar, CheckCircle2 } from 'lucide-react'
 
 const BILLING_HISTORY = [
   {
     id: '1',
     date: '2024-01-01',
     description: 'Pro Plan - Monthly Subscription',
-    amount: 299.00,
+    amount: 299.0,
     status: 'paid',
     invoice: 'INV-2024-001',
   },
@@ -27,7 +26,7 @@ const BILLING_HISTORY = [
     id: '2',
     date: '2023-12-01',
     description: 'Pro Plan - Monthly Subscription',
-    amount: 299.00,
+    amount: 299.0,
     status: 'paid',
     invoice: 'INV-2023-012',
   },
@@ -35,7 +34,7 @@ const BILLING_HISTORY = [
     id: '3',
     date: '2023-12-15',
     description: 'Additional Storage - 100GB',
-    amount: 49.00,
+    amount: 49.0,
     status: 'paid',
     invoice: 'INV-2023-013',
   },
@@ -43,21 +42,19 @@ const BILLING_HISTORY = [
     id: '4',
     date: '2023-11-01',
     description: 'Pro Plan - Monthly Subscription',
-    amount: 299.00,
+    amount: 299.0,
     status: 'paid',
     invoice: 'INV-2023-011',
   },
-];
+]
 
 export default function BillingPage() {
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
-          <p className="text-muted-foreground">
-            Manage your subscription and payment methods
-          </p>
+          <p className="text-muted-foreground">Manage your subscription and payment methods</p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
@@ -101,9 +98,7 @@ export default function BillingPage() {
               </div>
 
               <div className="pt-4 space-y-2">
-                <Button className="w-full">
-                  Upgrade Plan
-                </Button>
+                <Button className="w-full">Upgrade Plan</Button>
                 <Button variant="outline" className="w-full">
                   Manage Subscription
                 </Button>
@@ -195,9 +190,7 @@ export default function BillingPage() {
                       })}
                     </TableCell>
                     <TableCell>{transaction.description}</TableCell>
-                    <TableCell className="font-medium">
-                      ${transaction.amount.toFixed(2)}
-                    </TableCell>
+                    <TableCell className="font-medium">${transaction.amount.toFixed(2)}</TableCell>
                     <TableCell>
                       <Badge variant="success">
                         <CheckCircle2 className="mr-1 h-3 w-3" />
@@ -219,6 +212,6 @@ export default function BillingPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
-  );
+    </>
+  )
 }

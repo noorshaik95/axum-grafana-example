@@ -17,7 +17,11 @@ describe('Card Components', () => {
     })
 
     it('should apply custom className', () => {
-      render(<Card data-testid="card" className="custom-class">Card</Card>)
+      render(
+        <Card data-testid="card" className="custom-class">
+          Card
+        </Card>
+      )
 
       expect(screen.getByTestId('card')).toHaveClass('custom-class')
     })

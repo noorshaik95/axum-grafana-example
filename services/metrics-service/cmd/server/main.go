@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	commongrpc "slate/libs/common-go/grpc"
+	"slate/libs/common-go/logging"
 	"slate/libs/common-go/tracing"
 	"slate/services/metrics-service/internal/config"
 	"slate/services/metrics-service/internal/handlers"
@@ -22,8 +24,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	_ "github.com/lib/pq"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -31,15 +33,18 @@ import (
 )
 
 func main() {
-	// Initialize logger
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	logLevel := os.Getenv("LOG_LEVEL")
+	if logLevel == "" {
+		logLevel = "info"
+	}
+	log := logging.NewLogger("metrics-service", logLevel)
 	log.Info().Msg("Starting Metrics Service...")
 
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to load configuration")
+		log.Error().Err(err).Msg("Failed to load configuration")
+		os.Exit(1)
 	}
 
 	// Initialize tracing via common-go
@@ -52,16 +57,18 @@ func main() {
 	}
 
 	// Connect to database with retries
-	db, err := connectWithRetry(cfg.Database, 5, 3*time.Second)
+	db, err := connectWithRetry(log, cfg.Database, 5, 3*time.Second)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to connect to database")
+		log.Error().Err(err).Msg("Failed to connect to database")
+		os.Exit(1)
 	}
 	defer db.Close()
 	log.Info().Msg("Database connection established")
 
 	// Run migrations
 	if err := migrations.RunMigrations(db, "./migrations"); err != nil {
-		log.Fatal().Err(err).Msg("Failed to run migrations")
+		log.Error().Err(err).Msg("Failed to run migrations")
+		os.Exit(1)
 	}
 	log.Info().Msg("Migrations completed successfully")
 
@@ -93,6 +100,9 @@ func main() {
 		w.Write([]byte(`{"status":"ok","service":"metrics-service"}`))
 	})
 
+	// Prometheus metrics endpoint
+	r.Handle("/metrics", promhttp.Handler())
+
 	// Register metrics handlers
 	handler := handlers.New(repo)
 	handler.RegisterRoutes(r)
@@ -106,12 +116,19 @@ func main() {
 	go func() {
 		log.Info().Str("address", cfg.Server.Address()).Msg("Starting HTTP server")
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal().Err(err).Msg("HTTP server failed")
+			log.Error().Err(err).Msg("HTTP server failed")
+			os.Exit(1)
 		}
 	}()
 
-	// Start gRPC server
-	grpcServer := grpc.NewServer()
+	// Start gRPC server with OTel tracing interceptors
+	grpcServer := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.ChainUnaryInterceptor(
+			commongrpc.TracingUnaryInterceptor("metrics-service"),
+			commongrpc.LoggingUnaryInterceptor(log),
+		),
+	)
 	healthServer := health.NewServer()
 	healthpb.RegisterHealthServer(grpcServer, healthServer)
 	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
@@ -119,13 +136,15 @@ func main() {
 
 	lis, err := net.Listen("tcp", cfg.GRPC.Address())
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to listen for gRPC")
+		log.Error().Err(err).Msg("Failed to listen for gRPC")
+		os.Exit(1)
 	}
 
 	go func() {
 		log.Info().Str("address", cfg.GRPC.Address()).Msg("Starting gRPC server")
 		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatal().Err(err).Msg("gRPC server failed")
+			log.Error().Err(err).Msg("gRPC server failed")
+			os.Exit(1)
 		}
 	}()
 
@@ -147,7 +166,7 @@ func main() {
 	log.Info().Msg("Metrics Service stopped")
 }
 
-func connectWithRetry(dbCfg config.DatabaseConfig, maxRetries int, delay time.Duration) (*sql.DB, error) {
+func connectWithRetry(log *logging.Logger, dbCfg config.DatabaseConfig, maxRetries int, delay time.Duration) (*sql.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		dbCfg.Host, dbCfg.Port, dbCfg.User, dbCfg.Password, dbCfg.DBName, dbCfg.SSLMode)
 

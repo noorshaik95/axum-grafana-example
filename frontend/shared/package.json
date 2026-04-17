@@ -4,35 +4,144 @@
   "description": "Shared UI components and utilities for Slate LMS frontend applications",
   "main": "index.ts",
   "types": "index.ts",
-  "scripts": {
-    "type-check": "tsc --noEmit"
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    },
+    "./tailwind.preset": {
+      "types": "./tailwind.preset.ts",
+      "default": "./tailwind.preset.ts"
+    },
+    "./styles/globals.css": "./styles/globals.css",
+    "./types": {
+      "types": "./types/index.ts",
+      "default": "./types/index.ts"
+    },
+    "./utils": {
+      "types": "./utils/index.ts",
+      "default": "./utils/index.ts"
+    },
+    "./components": {
+      "types": "./components/index.ts",
+      "default": "./components/index.ts"
+    },
+    "./components/ui": {
+      "types": "./components/ui/index.ts",
+      "default": "./components/ui/index.ts"
+    },
+    "./components/ui/button": {
+      "types": "./components/ui/button.tsx",
+      "default": "./components/ui/button.tsx"
+    },
+    "./components/ui/card": {
+      "types": "./components/ui/card.tsx",
+      "default": "./components/ui/card.tsx"
+    },
+    "./components/ui/progress": {
+      "types": "./components/ui/progress.tsx",
+      "default": "./components/ui/progress.tsx"
+    },
+    "./components/ui/input": {
+      "types": "./components/ui/input.tsx",
+      "default": "./components/ui/input.tsx"
+    },
+    "./components/widget": {
+      "types": "./components/widget.tsx",
+      "default": "./components/widget.tsx"
+    },
+    "./components/ui/badge": {
+      "types": "./components/ui/badge.tsx",
+      "default": "./components/ui/badge.tsx"
+    },
+    "./components/ui/avatar": {
+      "types": "./components/ui/avatar.tsx",
+      "default": "./components/ui/avatar.tsx"
+    },
+    "./components/ui/spinner": {
+      "types": "./components/ui/spinner.tsx",
+      "default": "./components/ui/spinner.tsx"
+    },
+    "./components/ui/empty-state": {
+      "types": "./components/ui/empty-state.tsx",
+      "default": "./components/ui/empty-state.tsx"
+    },
+    "./components/ui/page-header": {
+      "types": "./components/ui/page-header.tsx",
+      "default": "./components/ui/page-header.tsx"
+    },
+    "./components/ui/stat-card": {
+      "types": "./components/ui/stat-card.tsx",
+      "default": "./components/ui/stat-card.tsx"
+    },
+    "./components/ui/sidebar-nav": {
+      "types": "./components/ui/sidebar-nav.tsx",
+      "default": "./components/ui/sidebar-nav.tsx"
+    },
+    "./components/stat-card": {
+      "types": "./components/stat-card.tsx",
+      "default": "./components/stat-card.tsx"
+    },
+    "./components/widget": {
+      "types": "./components/widget.tsx",
+      "default": "./components/widget.tsx"
+    },
+    "./components/data-table": {
+      "types": "./components/data-table.tsx",
+      "default": "./components/data-table.tsx"
+    },
+    "./lib/api/types": {
+      "types": "./lib/api/types.ts",
+      "default": "./lib/api/types.ts"
+    }
   },
-  "keywords": ["ui", "components", "shared", "lms"],
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": [
+    "ui",
+    "components",
+    "shared",
+    "lms"
+  ],
   "author": "",
   "license": "MIT",
   "peerDependencies": {
+    "@tanstack/react-query": "^5.56.0",
+    "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "next": "^14.2.0"
+    "tailwindcss": "^3.4.0"
   },
   "dependencies": {
-    "@radix-ui/react-slot": "^1.1.0",
-    "@radix-ui/react-toast": "^1.2.0",
-    "@radix-ui/react-progress": "^1.1.0",
+    "@radix-ui/react-avatar": "^1.1.0",
     "@radix-ui/react-dialog": "^1.1.0",
     "@radix-ui/react-dropdown-menu": "^2.1.0",
+    "@radix-ui/react-progress": "^1.1.0",
     "@radix-ui/react-select": "^2.1.0",
+    "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.0",
-    "@radix-ui/react-avatar": "^1.1.0",
+    "@radix-ui/react-toast": "^1.2.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
-    "tailwind-merge": "^2.5.0",
+    "date-fns": "^4.1.0",
     "lucide-react": "^0.445.0",
-    "date-fns": "^4.1.0"
+    "tailwind-merge": "^2.5.0"
   },
   "devDependencies": {
+    "@tanstack/react-query": "^5.56.0",
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^14.1.2",
+    "@types/jest": "^29.5.11",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
+    "fast-check": "^3.22.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "ts-jest": "^29.1.1",
     "typescript": "^5.6.0"
   }
 }

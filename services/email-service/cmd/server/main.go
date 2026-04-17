@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	commongrpc "slate/libs/common-go/grpc"
+	"slate/libs/common-go/logging"
 	"slate/libs/common-go/tracing"
 	"slate/services/email-service/internal/config"
 	grpcserver "slate/services/email-service/internal/grpc"
@@ -23,8 +24,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	_ "github.com/lib/pq"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
+	grpchealth "google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 
@@ -32,26 +35,33 @@ import (
 )
 
 func main() {
-	log.Println("Starting Email Service (In-Platform Messaging)")
+	logLevel := os.Getenv("LOG_LEVEL")
+	if logLevel == "" {
+		logLevel = "info"
+	}
+	log := logging.NewLogger("email-service", logLevel)
+	log.Info().Msg("Starting Email Service (In-Platform Messaging)")
 
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Error().Err(err).Msg("Failed to load config")
+		os.Exit(1)
 	}
 
 	// Initialize OpenTelemetry tracing via common-go
 	shutdown, err := tracing.InitTracer("email-service", cfg.Observability.OTLPEndpoint)
 	if err != nil {
-		log.Printf("Failed to initialize tracing: %v (continuing without tracing)", err)
+		log.Warn().Err(err).Msg("Failed to initialize tracing (continuing without tracing)")
 	} else {
-		log.Println("OpenTelemetry tracing initialized via common-go")
+		log.Info().Msg("OpenTelemetry tracing initialized")
 		defer shutdown()
 	}
 
 	// Connect to PostgreSQL
 	db, err := sql.Open("postgres", cfg.Database.DSN())
 	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
+		log.Error().Err(err).Msg("Failed to open database")
+		os.Exit(1)
 	}
 	defer db.Close()
 
@@ -59,18 +69,18 @@ func main() {
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	// Wait for database to be ready
 	for i := 0; i < 30; i++ {
 		if err := db.Ping(); err == nil {
 			break
 		}
-		log.Println("Waiting for database...")
+		log.Info().Msg("Waiting for database...")
 		time.Sleep(time.Second)
 	}
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Database not reachable: %v", err)
+		log.Error().Err(err).Msg("Database not reachable")
+		os.Exit(1)
 	}
-	log.Println("Connected to PostgreSQL")
+	log.Info().Msg("Connected to PostgreSQL")
 
 	// Run migrations
 	migrationsPath := "./migrations"
@@ -78,9 +88,10 @@ func main() {
 		migrationsPath = envPath
 	}
 	if err := migrations.RunMigrations(db, migrationsPath); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+		log.Error().Err(err).Msg("Failed to run migrations")
+		os.Exit(1)
 	}
-	log.Println("Migrations applied")
+	log.Info().Msg("Migrations applied")
 
 	// Initialize repository
 	repo := repository.NewMessageRepository(db)
@@ -96,12 +107,11 @@ func main() {
 		defer cancel()
 		consumer.Start(ctx)
 		defer consumer.Close()
-		log.Println("Kafka consumers started")
+		log.Info().Msg("Kafka consumers started")
 	}
 
 	// Setup HTTP server with Chi router
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
 
@@ -132,22 +142,33 @@ func main() {
 		fmt.Fprint(w, `{"status":"healthy"}`)
 	})
 
-	// Start gRPC server
+	// Prometheus metrics endpoint
+	r.Handle("/metrics", promhttp.Handler())
+
+	// gRPC server with OTel stats handler + tracing interceptor
 	grpcLis, err := net.Listen("tcp", cfg.GRPC.Address())
 	if err != nil {
-		log.Fatalf("Failed to listen gRPC: %v", err)
+		log.Error().Err(err).Msg("Failed to listen gRPC")
+		os.Exit(1)
 	}
 
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.ChainUnaryInterceptor(
+			commongrpc.TracingUnaryInterceptor("email-service"),
+			commongrpc.LoggingUnaryInterceptor(log),
+		),
+	)
 	emailGrpc := grpcserver.NewEmailServer(repo)
 	pb.RegisterMessagingServiceServer(grpcSrv, emailGrpc)
-	grpc_health_v1.RegisterHealthServer(grpcSrv, health.NewServer())
+	grpc_health_v1.RegisterHealthServer(grpcSrv, grpchealth.NewServer())
 	reflection.Register(grpcSrv)
 
 	go func() {
-		log.Printf("gRPC server listening on %s", cfg.GRPC.Address())
+		log.Info().Str("address", cfg.GRPC.Address()).Msg("gRPC server listening")
 		if err := grpcSrv.Serve(grpcLis); err != nil {
-			log.Fatalf("gRPC server failed: %v", err)
+			log.Error().Err(err).Msg("gRPC server failed")
+			os.Exit(1)
 		}
 	}()
 
@@ -161,25 +182,25 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("HTTP server listening on %s", cfg.Server.Address())
+		log.Info().Str("address", cfg.Server.Address()).Msg("HTTP server listening")
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server failed: %v", err)
+			log.Error().Err(err).Msg("HTTP server failed")
+			os.Exit(1)
 		}
 	}()
 
-	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down...")
+	log.Info().Msg("Shutting down...")
 
 	grpcSrv.GracefulStop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := httpSrv.Shutdown(ctx); err != nil {
-		log.Printf("HTTP shutdown error: %v", err)
+		log.Warn().Err(err).Msg("HTTP shutdown error")
 	}
 
-	log.Println("Email service stopped")
+	log.Info().Msg("Email service stopped")
 }

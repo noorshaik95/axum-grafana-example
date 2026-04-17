@@ -1,17 +1,28 @@
-'use client';
+'use client'
 
-import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Users, HardDrive, Activity, Zap } from 'lucide-react';
-import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+} from '@/components/ui/select'
+import { Users, HardDrive, Activity, Zap } from 'lucide-react'
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts'
 
 const USER_DATA = [
   { name: 'Jan', active: 4000, total: 5000 },
@@ -20,14 +31,14 @@ const USER_DATA = [
   { name: 'Apr', active: 4800, total: 5800 },
   { name: 'May', active: 5200, total: 6200 },
   { name: 'Jun', active: 5500, total: 6500 },
-];
+]
 
 const STORAGE_DATA = [
   { name: 'Week 1', used: 120, limit: 500 },
   { name: 'Week 2', used: 145, limit: 500 },
   { name: 'Week 3', used: 168, limit: 500 },
   { name: 'Week 4', used: 195, limit: 500 },
-];
+]
 
 const BANDWIDTH_DATA = [
   { name: 'Mon', bandwidth: 1200 },
@@ -37,7 +48,7 @@ const BANDWIDTH_DATA = [
   { name: 'Fri', bandwidth: 1890 },
   { name: 'Sat', bandwidth: 980 },
   { name: 'Sun', bandwidth: 750 },
-];
+]
 
 const AI_CREDITS_DATA = [
   { name: 'Jan', credits: 8500 },
@@ -46,11 +57,11 @@ const AI_CREDITS_DATA = [
   { name: 'Apr', credits: 11500 },
   { name: 'May', credits: 12800 },
   { name: 'Jun', credits: 14200 },
-];
+]
 
 export default function AnalyticsPage() {
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -129,8 +140,20 @@ export default function AnalyticsPage() {
                     <XAxis dataKey="name" />
                     <YAxis />
                     <Tooltip />
-                    <Area type="monotone" dataKey="total" stackId="1" stroke="#8884d8" fill="#8884d8" />
-                    <Area type="monotone" dataKey="active" stackId="2" stroke="#82ca9d" fill="#82ca9d" />
+                    <Area
+                      type="monotone"
+                      dataKey="total"
+                      stackId="1"
+                      stroke="#8884d8"
+                      fill="#8884d8"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="active"
+                      stackId="2"
+                      stroke="#82ca9d"
+                      fill="#82ca9d"
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -270,6 +293,6 @@ export default function AnalyticsPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </DashboardLayout>
-  );
+    </>
+  )
 }

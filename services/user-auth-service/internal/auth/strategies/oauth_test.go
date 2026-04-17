@@ -303,6 +303,7 @@ func TestOAuthAuthStrategy_Authenticate_Success(t *testing.T) {
 		&services.SessionManager{},
 		noop.NewTracerProvider().Tracer("test"),
 		logger.NewLogger("debug"),
+		"test",
 	)
 
 	req := &auth.AuthRequest{
@@ -343,6 +344,7 @@ func TestOAuthAuthStrategy_Authenticate_MissingProvider(t *testing.T) {
 		&services.SessionManager{},
 		noop.NewTracerProvider().Tracer("test"),
 		logger.NewLogger("debug"),
+		"test",
 	)
 
 	req := &auth.AuthRequest{
@@ -371,6 +373,7 @@ func TestOAuthAuthStrategy_Authenticate_UnconfiguredProvider(t *testing.T) {
 		&services.SessionManager{},
 		noop.NewTracerProvider().Tracer("test"),
 		logger.NewLogger("debug"),
+		"test",
 	)
 
 	req := &auth.AuthRequest{
@@ -405,6 +408,7 @@ func TestOAuthAuthStrategy_Authenticate_Microsoft(t *testing.T) {
 		&services.SessionManager{},
 		noop.NewTracerProvider().Tracer("test"),
 		logger.NewLogger("debug"),
+		"test",
 	)
 
 	req := &auth.AuthRequest{
@@ -450,6 +454,7 @@ func TestOAuthAuthStrategy_Authenticate_Custom(t *testing.T) {
 		&services.SessionManager{},
 		noop.NewTracerProvider().Tracer("test"),
 		logger.NewLogger("debug"),
+		"test",
 	)
 
 	req := &auth.AuthRequest{
@@ -491,6 +496,7 @@ func TestOAuthAuthStrategy_HandleCallback_InvalidState(t *testing.T) {
 		&services.SessionManager{},
 		noop.NewTracerProvider().Tracer("test"),
 		logger.NewLogger("debug"),
+		"test",
 	)
 
 	req := &auth.CallbackRequest{
@@ -520,6 +526,7 @@ func TestOAuthAuthStrategy_HandleCallback_MissingCode(t *testing.T) {
 		&services.SessionManager{},
 		noop.NewTracerProvider().Tracer("test"),
 		logger.NewLogger("debug"),
+		"test",
 	)
 
 	req := &auth.CallbackRequest{
@@ -549,6 +556,7 @@ func TestOAuthAuthStrategy_HandleCallback_MissingState(t *testing.T) {
 		&services.SessionManager{},
 		noop.NewTracerProvider().Tracer("test"),
 		logger.NewLogger("debug"),
+		"test",
 	)
 
 	req := &auth.CallbackRequest{

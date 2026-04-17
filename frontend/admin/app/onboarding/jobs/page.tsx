@@ -1,11 +1,11 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { useState } from 'react'
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import {
   Table,
   TableBody,
@@ -13,16 +13,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { useToast } from '@/hooks/use-toast';
-import {
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  Eye,
-  Trash2,
-  Clock,
-} from 'lucide-react';
+} from '@/components/ui/table'
+import { useToast } from '@/hooks/use-toast'
+import { CheckCircle2, XCircle, Loader2, Eye, Trash2, Clock } from 'lucide-react'
 
 const MOCK_JOBS = [
   {
@@ -85,11 +78,11 @@ const MOCK_JOBS = [
     completedAt: null,
     duration: '-',
   },
-];
+]
 
 export default function JobsPage() {
-  const [jobs, setJobs] = useState(MOCK_JOBS);
-  const { toast } = useToast();
+  const [jobs, setJobs] = useState(MOCK_JOBS)
+  const { toast } = useToast()
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -99,66 +92,64 @@ export default function JobsPage() {
             <CheckCircle2 className="mr-1 h-3 w-3" />
             Completed
           </Badge>
-        );
+        )
       case 'processing':
         return (
           <Badge variant="info">
             <Loader2 className="mr-1 h-3 w-3 animate-spin" />
             Processing
           </Badge>
-        );
+        )
       case 'failed':
         return (
           <Badge variant="destructive">
             <XCircle className="mr-1 h-3 w-3" />
             Failed
           </Badge>
-        );
+        )
       case 'pending':
         return (
           <Badge variant="warning">
             <Clock className="mr-1 h-3 w-3" />
             Pending
           </Badge>
-        );
+        )
       default:
-        return <Badge>{status}</Badge>;
+        return <Badge>{status}</Badge>
     }
-  };
+  }
 
   const handleCancelJob = (id: string) => {
-    setJobs(jobs.map(job =>
-      job.id === id && job.status === 'processing'
-        ? { ...job, status: 'failed' }
-        : job
-    ));
+    setJobs(
+      jobs.map((job) =>
+        job.id === id && job.status === 'processing' ? { ...job, status: 'failed' } : job
+      )
+    )
     toast({
       title: 'Job Cancelled',
       description: 'The import job has been cancelled',
-    });
-  };
+    })
+  }
 
   const handleDeleteJob = (id: string) => {
-    setJobs(jobs.filter(job => job.id !== id));
+    setJobs(jobs.filter((job) => job.id !== id))
     toast({
       title: 'Job Deleted',
       description: 'The job record has been removed',
-    });
-  };
+    })
+  }
 
-  const totalJobs = jobs.length;
-  const completedJobs = jobs.filter(j => j.status === 'completed').length;
-  const processingJobs = jobs.filter(j => j.status === 'processing').length;
-  const failedJobs = jobs.filter(j => j.status === 'failed').length;
+  const totalJobs = jobs.length
+  const completedJobs = jobs.filter((j) => j.status === 'completed').length
+  const processingJobs = jobs.filter((j) => j.status === 'processing').length
+  const failedJobs = jobs.filter((j) => j.status === 'failed').length
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Import Jobs</h1>
-          <p className="text-muted-foreground">
-            Monitor and manage bulk import operations
-          </p>
+          <p className="text-muted-foreground">Monitor and manage bulk import operations</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
@@ -191,9 +182,7 @@ export default function JobsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Recent Jobs</CardTitle>
-            <CardDescription>
-              Real-time tracking of import operations
-            </CardDescription>
+            <CardDescription>Real-time tracking of import operations</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -221,7 +210,8 @@ export default function JobsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        {job.processedRecords.toLocaleString()} / {job.totalRecords.toLocaleString()}
+                        {job.processedRecords.toLocaleString()} /{' '}
+                        {job.totalRecords.toLocaleString()}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -231,29 +221,19 @@ export default function JobsPage() {
                         <span className="text-muted-foreground">0</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {job.duration}
-                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{job.duration}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="sm">
                           <Eye className="h-4 w-4" />
                         </Button>
                         {job.status === 'processing' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCancelJob(job.id)}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => handleCancelJob(job.id)}>
                             <XCircle className="h-4 w-4" />
                           </Button>
                         )}
                         {job.status !== 'processing' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteJob(job.id)}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteJob(job.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
@@ -266,6 +246,6 @@ export default function JobsPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
-  );
+    </>
+  )
 }

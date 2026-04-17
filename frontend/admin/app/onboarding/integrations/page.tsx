@@ -1,23 +1,12 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import {
-  Database,
-  CheckCircle2,
-  XCircle,
-  Settings,
-  Loader2,
-  Plus,
-  Cloud,
-  Building2,
-} from 'lucide-react';
+import { useState } from 'react'
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/hooks/use-toast'
+import { Database, CheckCircle2, Settings, Loader2, Plus, Cloud, Building2 } from 'lucide-react'
 
 const MOCK_INTEGRATIONS = [
   {
@@ -60,38 +49,42 @@ const MOCK_INTEGRATIONS = [
     users: 0,
     icon: Building2,
   },
-];
+]
 
 export default function IntegrationsPage() {
-  const [integrations, setIntegrations] = useState(MOCK_INTEGRATIONS);
-  const [syncing, setSyncing] = useState<string | null>(null);
-  const { toast } = useToast();
+  const [integrations, setIntegrations] = useState(MOCK_INTEGRATIONS)
+  const [syncing, setSyncing] = useState<string | null>(null)
+  const { toast } = useToast()
 
   const handleSync = (id: string) => {
-    setSyncing(id);
+    setSyncing(id)
     setTimeout(() => {
-      setSyncing(null);
+      setSyncing(null)
       toast({
         title: 'Sync Completed',
         description: 'Successfully synced users from the directory',
-      });
-    }, 2000);
-  };
+      })
+    }, 2000)
+  }
 
   const handleToggle = (id: string) => {
-    setIntegrations(integrations.map(int =>
-      int.id === id
-        ? { ...int, enabled: !int.enabled, status: !int.enabled ? 'connected' : 'disconnected' }
-        : int
-    ));
+    setIntegrations(
+      integrations.map((int) =>
+        int.id === id
+          ? { ...int, enabled: !int.enabled, status: !int.enabled ? 'connected' : 'disconnected' }
+          : int
+      )
+    )
     toast({
-      title: integrations.find(i => i.id === id)?.enabled ? 'Integration Disabled' : 'Integration Enabled',
+      title: integrations.find((i) => i.id === id)?.enabled
+        ? 'Integration Disabled'
+        : 'Integration Enabled',
       description: 'Integration status updated successfully',
-    });
-  };
+    })
+  }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -108,7 +101,7 @@ export default function IntegrationsPage() {
 
         <div className="grid gap-6 md:grid-cols-2">
           {integrations.map((integration) => {
-            const Icon = integration.icon;
+            const Icon = integration.icon
             return (
               <Card key={integration.id}>
                 <CardHeader>
@@ -124,9 +117,7 @@ export default function IntegrationsPage() {
                         </CardDescription>
                       </div>
                     </div>
-                    <Badge
-                      variant={integration.enabled ? 'success' : 'outline'}
-                    >
+                    <Badge variant={integration.enabled ? 'success' : 'outline'}>
                       {integration.status}
                     </Badge>
                   </div>
@@ -176,16 +167,14 @@ export default function IntegrationsPage() {
                   </div>
                 </CardContent>
               </Card>
-            );
+            )
           })}
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle>Integration Features</CardTitle>
-            <CardDescription>
-              Powerful directory synchronization capabilities
-            </CardDescription>
+            <CardDescription>Powerful directory synchronization capabilities</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -212,23 +201,19 @@ export default function IntegrationsPage() {
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                   <span className="font-medium">Google Workspace</span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Seamless G Suite integration
-                </p>
+                <p className="text-sm text-muted-foreground">Seamless G Suite integration</p>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                   <span className="font-medium">Microsoft 365</span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Azure AD and Office 365 sync
-                </p>
+                <p className="text-sm text-muted-foreground">Azure AD and Office 365 sync</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
-  );
+    </>
+  )
 }

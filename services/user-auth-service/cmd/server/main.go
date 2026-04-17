@@ -120,6 +120,8 @@ func main() {
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db.DB)
 	roleRepo := repository.NewRoleRepository(db.DB)
+	groupRepo := repository.NewGroupRepository(db.DB)
+	mfaRepo := repository.NewMFARepository(db.DB)
 
 	// Ensure default roles exist
 	if err := roleRepo.EnsureDefaultRoles(context.Background()); err != nil {
@@ -170,6 +172,27 @@ func main() {
 		log.Info().Str("address", metricsAddr).Msg("Starting metrics HTTP server")
 		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Error().Err(err).Msg("Metrics server failed")
+		}
+	}()
+
+	// Start HTTP health check server on SERVER_PORT
+	healthMux := http.NewServeMux()
+	healthMux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok","service":"user-auth-service"}`))
+	})
+	healthAddr := cfg.Server.Address()
+	healthServer := &http.Server{
+		Addr:              healthAddr,
+		Handler:           healthMux,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	go func() {
+		log.Info().Str("address", healthAddr).Msg("Starting HTTP health server")
+		if err := healthServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Error().Err(err).Msg("Health server failed")
 		}
 	}()
 
@@ -271,7 +294,7 @@ func main() {
 	if rateLimiter != nil {
 		rateLimiterInterface = rateLimiter
 	}
-	userServiceServer := grpcHandler.NewUserServiceServer(userService, strategyManager, rateLimiterInterface)
+	userServiceServer := grpcHandler.NewUserServiceServer(userService, strategyManager, rateLimiterInterface, groupRepo, mfaRepo)
 	pb.RegisterUserServiceServer(grpcServer, userServiceServer)
 
 	// Register AuthService (wraps UserServiceServer for API Gateway compatibility)
@@ -304,10 +327,17 @@ func main() {
 
 		log.Info().Msg("Shutting down servers")
 
-		// Shutdown metrics server
+		// Shutdown health server
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+		if err := healthServer.Shutdown(shutdownCtx); err != nil {
+			log.Error().Err(err).Msg("Failed to shutdown health server")
+		}
+
+		// Shutdown metrics server
+		shutdownCtx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel2()
+		if err := metricsServer.Shutdown(shutdownCtx2); err != nil {
 			log.Error().Err(err).Msg("Failed to shutdown metrics server")
 		}
 

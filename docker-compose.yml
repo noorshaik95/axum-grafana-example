@@ -60,6 +60,9 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    networks:
+      - slate-network
+      - tenant-dev-network
     restart: unless-stopped
 
   # PostgreSQL Database for Assignment Grading Service
@@ -86,6 +89,9 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    networks:
+      - slate-network
+      - tenant-dev-network
     restart: unless-stopped
 
   # PostgreSQL Database for Content Management Service
@@ -112,6 +118,9 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    networks:
+      - slate-network
+      - tenant-dev-network
     restart: unless-stopped
 
   # Redis for Rate Limiting and Job Queue
@@ -135,6 +144,9 @@ services:
         reservations:
           cpus: '0.25'
           memory: 128M
+    networks:
+      - slate-network
+      - tenant-dev-network
     restart: unless-stopped
 
   # MongoDB Database for Course Service
@@ -160,6 +172,9 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    networks:
+      - slate-network
+      - tenant-dev-network
     restart: unless-stopped
 
   # MinIO for S3-compatible object storage
@@ -187,6 +202,9 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
+    networks:
+      - slate-network
+      - tenant-dev-network
     restart: unless-stopped
 
   # ElasticSearch for content search
@@ -213,6 +231,9 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    networks:
+      - slate-network
+      - tenant-dev-network
     restart: unless-stopped
 
   # Kafka (KRaft mode — no Zookeeper required)
@@ -251,6 +272,9 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    networks:
+      - slate-network
+      - tenant-dev-network
     restart: unless-stopped
 
   # ============================================================================
@@ -326,6 +350,8 @@ services:
         reservations:
           cpus: '0.25'
           memory: 128M
+    networks:
+      - tenant-dev-network
     restart: unless-stopped
 
   # Course Management Service (NestJS/MongoDB)
@@ -369,6 +395,8 @@ services:
         reservations:
           cpus: '0.5'
           memory: 256M
+    networks:
+      - tenant-dev-network
     restart: unless-stopped
 
   # Content Management Service (Rust)
@@ -431,6 +459,8 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    networks:
+      - tenant-dev-network
     restart: unless-stopped
 
   # Assignment Grading Service (Go)
@@ -489,6 +519,8 @@ services:
         reservations:
           cpus: '0.5'
           memory: 256M
+    networks:
+      - tenant-dev-network
     restart: unless-stopped
 
   # API Gateway (Rust/Axum)
@@ -519,6 +551,7 @@ services:
       - "traefik.http.services.api-gateway.loadbalancer.server.port=8080"
     networks:
       - slate-network
+      - tenant-dev-network
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1" ]
       interval: 10s
@@ -714,6 +747,9 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
+    networks:
+      - slate-network
+      - tenant-dev-network
     restart: unless-stopped
 
   tempo:
@@ -734,6 +770,9 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
+    networks:
+      - slate-network
+      - tenant-dev-network
     restart: unless-stopped
 
   loki:
@@ -753,6 +792,8 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
+    networks:
+      - slate-network
     restart: unless-stopped
 
   grafana:
@@ -784,6 +825,8 @@ services:
         reservations:
           cpus: '0.25'
           memory: 128M
+    networks:
+      - slate-network
     restart: unless-stopped
 
   promtail:
@@ -804,6 +847,8 @@ services:
         reservations:
           cpus: '0.1'
           memory: 64M
+    networks:
+      - slate-network
     restart: unless-stopped
 
   # Tenant Service (Go)
@@ -858,6 +903,8 @@ services:
         limits:
           cpus: '0.5'
           memory: 256M
+    networks:
+      - slate-network
     restart: unless-stopped
 
   # Email Service (Go)
@@ -876,6 +923,9 @@ services:
       DB_PASSWORD: "postgres"
       DB_NAME: "emaildb"
       DB_SSLMODE: "disable"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_GROUP_ID: "email-service"
+      KAFKA_ENABLED: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
       LOG_LEVEL: "info"
     ports:
@@ -884,6 +934,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - slate-network
     restart: unless-stopped
 
   # Metrics Service (Go)
@@ -915,6 +969,8 @@ services:
         condition: service_healthy
       prometheus:
         condition: service_started
+    networks:
+      - slate-network
     restart: unless-stopped
 
   # Video Conferencing Service (Rust/WebRTC)
@@ -969,6 +1025,8 @@ services:
         reservations:
           cpus: '0.5'
           memory: 256M
+    networks:
+      - tenant-dev-network
     restart: unless-stopped
 
 volumes:
@@ -999,4 +1057,6 @@ volumes:
 
 networks:
   slate-network:
+    driver: bridge
+  tenant-dev-network:
     driver: bridge

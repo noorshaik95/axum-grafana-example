@@ -1,9 +1,9 @@
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://api.slate.local'
 
 class ApiClient {
-  private client: AxiosInstance;
+  private client: AxiosInstance
 
   constructor() {
     this.client = axios.create({
@@ -11,43 +11,49 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 30000, // 30 seconds
-    });
+      timeout: 30000,
+    })
 
-    // Request interceptor to add auth token
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
         if (typeof window !== 'undefined') {
-          const token = localStorage.getItem('admin_auth_token');
+          // Use impersonation token if active, otherwise admin token
+          const impersonationToken = localStorage.getItem('impersonation_token')
+          const adminToken = localStorage.getItem('admin_token')
+          const token = impersonationToken || adminToken
+
           if (token && config.headers) {
-            config.headers.Authorization = `Bearer ${token}`;
+            config.headers.Authorization = `Bearer ${token}`
           }
+
+          // Always include tenant header for admin requests
+          config.headers['X-Tenant-ID'] = 'system'
         }
-        return config;
+        return config
       },
       (error) => Promise.reject(error)
-    );
+    )
 
-    // Response interceptor to handle errors
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          // Unauthorized - redirect to login
           if (typeof window !== 'undefined') {
-            localStorage.removeItem('admin_auth_token');
-            window.location.href = '/login';
+            localStorage.removeItem('admin_token')
+            localStorage.removeItem('impersonation_token')
+            localStorage.removeItem('impersonation_user')
+            window.location.href = '/login'
           }
         }
-        return Promise.reject(error);
+        return Promise.reject(error)
       }
-    );
+    )
   }
 
   getInstance(): AxiosInstance {
-    return this.client;
+    return this.client
   }
 }
 
-export const apiClient = new ApiClient().getInstance();
-export default apiClient;
+export const apiClient = new ApiClient().getInstance()
+export default apiClient

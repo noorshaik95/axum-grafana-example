@@ -15,6 +15,14 @@ Cargo.lock
 go.work
 services/user-auth-service/bin/
 services/user-auth-service/api/proto/*.pb.go
+services/assignment-grading-service/bin/
+services/assignment-grading-service/api/proto/*.pb.go
+
+# Frontend / Node
+node_modules/
+.next/
+dist/
+.turbo/
 
 # IDEs
 .idea
@@ -23,11 +31,12 @@ services/user-auth-service/api/proto/*.pb.go
 *.swo
 *~
 
-# Environment
+# Environment (keep .env.example)
 .env
 .env.local
+.env.*.local
 
-# Docker volumes
+# Docker volumes (local)
 mongo-data
 loki-data
 postgres-data

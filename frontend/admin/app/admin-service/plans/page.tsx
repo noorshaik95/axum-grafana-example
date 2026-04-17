@@ -1,11 +1,10 @@
-'use client';
+'use client'
 
-import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { Check, Zap, Crown, Rocket } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/hooks/use-toast'
+import { Check, Zap, Crown, Rocket } from 'lucide-react'
 
 const PLANS = [
   {
@@ -81,7 +80,7 @@ const PLANS = [
       ai_credits: 200000,
     },
   },
-];
+]
 
 const ADDONS = [
   {
@@ -105,43 +104,38 @@ const ADDONS = [
     price: 79,
     unit: '5 TB',
   },
-];
+]
 
 export default function PlansPage() {
-  const { toast } = useToast();
+  const { toast } = useToast()
 
   const handleUpgrade = (planId: string) => {
     toast({
       title: 'Plan Upgrade',
       description: `Upgrading to ${planId} plan...`,
-    });
-  };
+    })
+  }
 
   const handlePurchaseAddon = (addonId: string) => {
     toast({
       title: 'Add-on Purchased',
       description: `Successfully purchased ${addonId}`,
-    });
-  };
+    })
+  }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Plans & Upgrades</h1>
-          <p className="text-muted-foreground">
-            Choose the perfect plan for your institution
-          </p>
+          <p className="text-muted-foreground">Choose the perfect plan for your institution</p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
           {PLANS.map((plan) => {
-            const Icon = plan.icon;
+            const Icon = plan.icon
             return (
-              <Card
-                key={plan.id}
-                className={plan.current ? 'border-primary shadow-lg' : ''}
-              >
+              <Card key={plan.id} className={plan.current ? 'border-primary shadow-lg' : ''}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
@@ -153,12 +147,8 @@ export default function PlansPage() {
                         <CardDescription>{plan.description}</CardDescription>
                       </div>
                     </div>
-                    {plan.popular && (
-                      <Badge variant="default">Popular</Badge>
-                    )}
-                    {plan.current && (
-                      <Badge variant="success">Current</Badge>
-                    )}
+                    {plan.popular && <Badge variant="default">Popular</Badge>}
+                    {plan.current && <Badge variant="success">Current</Badge>}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -188,16 +178,14 @@ export default function PlansPage() {
                   </Button>
                 </CardContent>
               </Card>
-            );
+            )
           })}
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle>Add-ons & Resources</CardTitle>
-            <CardDescription>
-              Purchase additional resources as needed
-            </CardDescription>
+            <CardDescription>Purchase additional resources as needed</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-3">
@@ -231,9 +219,7 @@ export default function PlansPage() {
         <Card>
           <CardHeader>
             <CardTitle>Plan Comparison</CardTitle>
-            <CardDescription>
-              Compare features across all plans
-            </CardDescription>
+            <CardDescription>Compare features across all plans</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -289,6 +275,6 @@ export default function PlansPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
-  );
+    </>
+  )
 }

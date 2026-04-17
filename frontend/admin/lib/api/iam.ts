@@ -1,101 +1,93 @@
-import apiClient from './client';
-
-export interface IAMPolicy {
-  id: string;
-  name: string;
-  description: string;
-  permissions: Permission[];
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Permission {
-  service: 'onboarding' | 'admin' | 'billing' | 'analytics' | 'iam';
-  actions: string[];
-  resources?: string[];
-}
+import apiClient from './client'
+import type { AdminRole, AuditLogEntry, PaginatedResponse, ListParams } from './types'
 
 export interface IAMUser {
-  id: string;
-  email: string;
-  name: string;
-  policies: string[];
-  created_at: string;
-  last_login?: string;
-  status: 'active' | 'inactive' | 'suspended';
+  id: string
+  email: string
+  name: string
+  role: string
+  status: 'active' | 'inactive' | 'suspended'
+  lastLogin?: string
+  createdAt: string
 }
 
-export interface CreateIAMUserRequest {
-  email: string;
-  name: string;
-  password: string;
-  policies: string[];
+export interface InviteUserRequest {
+  email: string
+  name: string
+  role: string
 }
 
-export const iamService = {
-  async listPolicies(): Promise<IAMPolicy[]> {
-    const response = await apiClient.get('/iam/policies');
-    return response.data;
+export interface ListAuditParams extends ListParams {
+  action?: string
+  userId?: string
+  startDate?: string
+  endDate?: string
+}
+
+export const ADMIN_PERMISSIONS = [
+  'manage_tenants',
+  'manage_billing',
+  'manage_users',
+  'manage_roles',
+  'view_metrics',
+  'view_audit',
+  'impersonate',
+  'manage_system',
+  'manage_onboarding',
+  'manage_content',
+] as const
+
+export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number]
+
+export const iamApi = {
+  // Users
+  async listUsers(params?: ListParams): Promise<PaginatedResponse<IAMUser>> {
+    const response = await apiClient.get('/iam/users', { params })
+    return response.data
   },
 
-  async getPolicy(id: string): Promise<IAMPolicy> {
-    const response = await apiClient.get(`/iam/policies/${id}`);
-    return response.data;
-  },
-
-  async createPolicy(policy: Omit<IAMPolicy, 'id' | 'created_at' | 'updated_at'>): Promise<IAMPolicy> {
-    const response = await apiClient.post('/iam/policies', policy);
-    return response.data;
-  },
-
-  async updatePolicy(id: string, updates: Partial<IAMPolicy>): Promise<IAMPolicy> {
-    const response = await apiClient.put(`/iam/policies/${id}`, updates);
-    return response.data;
-  },
-
-  async deletePolicy(id: string): Promise<void> {
-    await apiClient.delete(`/iam/policies/${id}`);
-  },
-
-  async listUsers(params?: {
-    status?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<{ users: IAMUser[]; total: number }> {
-    const response = await apiClient.get('/iam/users', { params });
-    return response.data;
-  },
-
-  async getUser(id: string): Promise<IAMUser> {
-    const response = await apiClient.get(`/iam/users/${id}`);
-    return response.data;
-  },
-
-  async createUser(user: CreateIAMUserRequest): Promise<IAMUser> {
-    const response = await apiClient.post('/iam/users', user);
-    return response.data;
-  },
-
-  async updateUser(id: string, updates: Partial<IAMUser>): Promise<IAMUser> {
-    const response = await apiClient.put(`/iam/users/${id}`, updates);
-    return response.data;
-  },
-
-  async deleteUser(id: string): Promise<void> {
-    await apiClient.delete(`/iam/users/${id}`);
-  },
-
-  async assignPolicy(userId: string, policyId: string): Promise<void> {
-    await apiClient.post(`/iam/users/${userId}/policies`, { policy_id: policyId });
-  },
-
-  async removePolicy(userId: string, policyId: string): Promise<void> {
-    await apiClient.delete(`/iam/users/${userId}/policies/${policyId}`);
+  async inviteUser(data: InviteUserRequest): Promise<IAMUser> {
+    const response = await apiClient.post('/iam/users/invite', data)
+    return response.data
   },
 
   async updateUserStatus(userId: string, status: IAMUser['status']): Promise<void> {
-    await apiClient.patch(`/iam/users/${userId}/status`, { status });
+    await apiClient.patch(`/iam/users/${userId}/status`, { status })
   },
-};
 
-export default iamService;
+  async deleteUser(id: string): Promise<void> {
+    await apiClient.delete(`/iam/users/${id}`)
+  },
+
+  // Roles
+  async listRoles(): Promise<AdminRole[]> {
+    const response = await apiClient.get('/iam/roles')
+    return response.data
+  },
+
+  async createRole(
+    data: Pick<AdminRole, 'name' | 'description' | 'permissions'>
+  ): Promise<AdminRole> {
+    const response = await apiClient.post('/iam/roles', data)
+    return response.data
+  },
+
+  async updateRolePermissions(roleId: string, permissions: string[]): Promise<AdminRole> {
+    const response = await apiClient.patch(`/iam/roles/${roleId}/permissions`, {
+      permissions,
+    })
+    return response.data
+  },
+
+  async deleteRole(id: string): Promise<void> {
+    await apiClient.delete(`/iam/roles/${id}`)
+  },
+
+  // Audit
+  async listAuditLogs(params?: ListAuditParams): Promise<PaginatedResponse<AuditLogEntry>> {
+    const response = await apiClient.get('/iam/audit', { params })
+    return response.data
+  },
+}
+
+export default iamApi

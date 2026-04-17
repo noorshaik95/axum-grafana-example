@@ -48,7 +48,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) (err err
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
 	user := &models.User{}
 	query := `
-		SELECT u.id, u.email, u.password_hash, u.first_name, u.last_name, u.phone,
+		SELECT u.id, u.email, u.password_hash, u.first_name, u.last_name, COALESCE(u.phone, '') as phone,
 		       COALESCE(u.timezone, 'UTC') as timezone, COALESCE(u.avatar_url, '') as avatar_url,
 		       COALESCE(u.bio, '') as bio, COALESCE(u.organization_id, '') as organization_id,
 		       u.is_active, u.created_at, u.updated_at,
@@ -88,7 +88,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (user *mo
 
 	user = &models.User{}
 	query := `
-		SELECT u.id, u.email, u.password_hash, u.first_name, u.last_name, u.phone,
+		SELECT u.id, u.email, u.password_hash, u.first_name, u.last_name, COALESCE(u.phone, '') as phone,
 		       COALESCE(u.timezone, 'UTC') as timezone, COALESCE(u.avatar_url, '') as avatar_url,
 		       COALESCE(u.bio, '') as bio, COALESCE(u.organization_id, '') as organization_id,
 		       u.is_active, u.created_at, u.updated_at,
@@ -223,7 +223,7 @@ func (r *UserRepository) List(ctx context.Context, page, pageSize int, search, r
 	args = append(args, pageSize, offset)
 
 	dataQuery := fmt.Sprintf(`
-		SELECT u.id, u.email, u.password_hash, u.first_name, u.last_name, u.phone,
+		SELECT u.id, u.email, u.password_hash, u.first_name, u.last_name, COALESCE(u.phone, '') as phone,
 		       COALESCE(u.timezone, 'UTC') as timezone, COALESCE(u.avatar_url, '') as avatar_url,
 		       COALESCE(u.bio, '') as bio, COALESCE(u.organization_id, '') as organization_id,
 		       u.is_active, u.created_at, u.updated_at,

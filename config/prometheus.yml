@@ -37,24 +37,32 @@ scrape_configs:
         labels:
           service: 'content-management-service'
 
-  - job_name: 'onboarding-service'
-    metrics_path: /health
-    static_configs:
-      - targets: ['onboarding-service:9081']
-        labels:
-          service: 'onboarding-service'
-
   - job_name: 'tenant-service'
+    metrics_path: /metrics
     static_configs:
       - targets: ['tenant-service:9090']
+        labels:
+          service: 'tenant-service'
+
+  - job_name: 'email-service'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['email-service:8082']
+        labels:
+          service: 'email-service'
 
   - job_name: 'metrics-service'
-    metrics_path: /health
+    metrics_path: /metrics
     static_configs:
       - targets: ['metrics-service:8087']
         labels:
           service: 'metrics-service'
 
   - job_name: 'video-conferencing-service'
+    metrics_path: /metrics
     static_configs:
       - targets: ['video-conferencing-service:9092']
+        labels:
+          service: 'video-conferencing-service'
+
+  # onboarding-service uses Restate durable workflows — no Prometheus metrics endpoint
