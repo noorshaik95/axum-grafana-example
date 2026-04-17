@@ -28,8 +28,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release && \
     cp target/release/onboarding-service /app/onboarding-service
 
-# Stage 2: Runtime
-FROM debian:bookworm-slim
+# Stage 2: Runtime (ubuntu:24.04 has GLIBC 2.39, needed by time crate + rdkafka)
+FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y ca-certificates curl librdkafka1 && rm -rf /var/lib/apt/lists/*
 
@@ -39,11 +39,6 @@ COPY --from=builder /app/onboarding-service /usr/local/bin/app
 
 # Copy migrations for reference
 COPY services/onboarding-service/migrations/ /app/migrations/
-
-# Create non-root user
-RUN groupadd -g 1000 appuser && \
-    useradd -u 1000 -g appuser -m appuser
-USER appuser
 
 EXPOSE 9080
 
