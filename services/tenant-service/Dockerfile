@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Install dependencies
 RUN apk add --no-cache git protobuf-dev make
@@ -26,7 +26,8 @@ ENV PATH="$PATH:/root/go/bin"
 RUN mkdir -p api/proto
 RUN protoc --go_out=./api/proto --go_opt=paths=source_relative \
     --go-grpc_out=./api/proto --go-grpc_opt=paths=source_relative \
-    ../../proto/tenant.proto
+    -I /app/proto \
+    /app/proto/tenant.proto
 
 # Download dependencies
 RUN go mod download
