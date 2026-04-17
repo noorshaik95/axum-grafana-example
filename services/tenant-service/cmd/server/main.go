@@ -25,6 +25,8 @@ import (
 	"slate/services/tenant-service/pkg/ratelimit"
 	"slate/services/tenant-service/pkg/tracing"
 
+	commontracing "slate/libs/common-go/tracing"
+
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -155,8 +157,10 @@ func main() {
 	// Initialize new CRUD repository
 	crudRepo := repository.NewTenantCRUDRepository(db)
 
-	// Start Kafka consumer
-	consumerCtx, consumerCancel := context.WithCancel(context.Background())
+	// Set up common-go tracer name for consistent span attribution
+	consumerCtx, consumerCancel := context.WithCancel(
+		commontracing.WithTracerName(context.Background(), "tenant-service"),
+	)
 	defer consumerCancel()
 
 	if provisioner != nil {

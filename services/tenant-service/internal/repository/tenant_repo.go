@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"slate/libs/common-go/tracing"
 	"slate/services/tenant-service/internal/models"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // TenantCRUDRepository defines the new CRUD operations for the upgraded tenant model.
@@ -33,7 +35,11 @@ func NewTenantCRUDRepository(db *sql.DB) TenantCRUDRepository {
 	return &tenantCRUDRepository{db: db}
 }
 
-func (r *tenantCRUDRepository) CreateTenant(ctx context.Context, tenant *models.TenantV2) error {
+func (r *tenantCRUDRepository) CreateTenant(ctx context.Context, tenant *models.TenantV2) (err error) {
+	ctx, span := tracing.StartSpan(ctx, "repository.CreateTenant",
+		attribute.String("tenant.slug", tenant.Slug))
+	defer tracing.EndSpanWithError(span, &err)
+
 	if tenant.ID == "" {
 		tenant.ID = uuid.New().String()
 	}
@@ -45,7 +51,7 @@ func (r *tenantCRUDRepository) CreateTenant(ctx context.Context, tenant *models.
 		INSERT INTO tenants_v2 (id, slug, name, admin_email, status, plan, subdomain, container_ids, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
-	_, err := r.db.ExecContext(ctx, query,
+	_, err = r.db.ExecContext(ctx, query,
 		tenant.ID, tenant.Slug, tenant.Name, tenant.AdminEmail, tenant.Status,
 		tenant.Plan, tenant.Subdomain,
 		pq.Array(models.StringArray(tenant.ContainerIDs)),
@@ -57,7 +63,11 @@ func (r *tenantCRUDRepository) CreateTenant(ctx context.Context, tenant *models.
 	return nil
 }
 
-func (r *tenantCRUDRepository) GetTenantByID(ctx context.Context, id string) (*models.TenantV2, error) {
+func (r *tenantCRUDRepository) GetTenantByID(ctx context.Context, id string) (_ *models.TenantV2, err error) {
+	ctx, span := tracing.StartSpan(ctx, "repository.GetTenantByID",
+		attribute.String("tenant.id", id))
+	defer tracing.EndSpanWithError(span, &err)
+
 	query := `
 		SELECT id, slug, name, admin_email, status, plan, subdomain, container_ids, created_at, updated_at
 		FROM tenants_v2
@@ -65,7 +75,7 @@ func (r *tenantCRUDRepository) GetTenantByID(ctx context.Context, id string) (*m
 	`
 	tenant := &models.TenantV2{}
 	var containerIDs models.StringArray
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
+	err = r.db.QueryRowContext(ctx, query, id).Scan(
 		&tenant.ID, &tenant.Slug, &tenant.Name, &tenant.AdminEmail, &tenant.Status,
 		&tenant.Plan, &tenant.Subdomain, pq.Array(&containerIDs),
 		&tenant.CreatedAt, &tenant.UpdatedAt,
@@ -103,7 +113,11 @@ func (r *tenantCRUDRepository) GetBySlug(ctx context.Context, slug string) (*mod
 	return tenant, nil
 }
 
-func (r *tenantCRUDRepository) ListTenants(ctx context.Context, page, pageSize int, search string) ([]*models.TenantV2, int, error) {
+func (r *tenantCRUDRepository) ListTenants(ctx context.Context, page, pageSize int, search string) (_ []*models.TenantV2, _ int, err error) {
+	ctx, span := tracing.StartSpan(ctx, "repository.ListTenants",
+		attribute.Int("page", page), attribute.Int("page_size", pageSize))
+	defer tracing.EndSpanWithError(span, &err)
+
 	if page < 1 {
 		page = 1
 	}
@@ -131,7 +145,7 @@ func (r *tenantCRUDRepository) ListTenants(ctx context.Context, page, pageSize i
 	}
 
 	var total int
-	err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
+	err = r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count tenants: %w", err)
 	}
