@@ -40,25 +40,12 @@ func main() {
 	}
 
 	// Initialize OpenTelemetry tracing via common-go
-	tracingCfg := tracing.Config{
-		ServiceName:    "email-service",
-		ServiceVersion: "1.0.0",
-		OTLPEndpoint:   cfg.Observability.OTLPEndpoint,
-		OTLPInsecure:   cfg.Observability.OTLPInsecure,
-		SamplingRate:   1.0,
-	}
-	tp, err := tracing.InitTracer(tracingCfg)
+	shutdown, err := tracing.InitTracer("email-service", cfg.Observability.OTLPEndpoint)
 	if err != nil {
 		log.Printf("Failed to initialize tracing: %v (continuing without tracing)", err)
 	} else {
 		log.Println("OpenTelemetry tracing initialized via common-go")
-		defer func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := tracing.Shutdown(ctx, tp); err != nil {
-				log.Printf("Tracer shutdown error: %v", err)
-			}
-		}()
+		defer shutdown()
 	}
 
 	// Connect to PostgreSQL
