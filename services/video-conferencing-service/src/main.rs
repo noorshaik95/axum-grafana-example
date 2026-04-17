@@ -38,18 +38,19 @@ async fn main() -> anyhow::Result<()> {
 
     let repo = VideoRepository::new(db_pool);
 
-    // Initialize GCS uploader
-    let gcs_uploader = Arc::new(GcsUploader::new(config.recording.clone()).await?);
-
-    // Initialize recording processor
-    let (recording_processor, recording_tx) =
-        RecordingProcessor::new(repo.clone(), gcs_uploader.clone(), config.recording.clone())
-            .await;
-
-    // Spawn recording processor task
-    tokio::spawn(async move {
-        recording_processor.run().await;
-    });
+    // Initialize GCS uploader and recording processor (only when recording is enabled)
+    if config.recording.enabled {
+        let gcs_uploader = Arc::new(GcsUploader::new(config.recording.clone()).await?);
+        let (recording_processor, _recording_tx) =
+            RecordingProcessor::new(repo.clone(), gcs_uploader.clone(), config.recording.clone())
+                .await;
+        tokio::spawn(async move {
+            recording_processor.run().await;
+        });
+        tracing::info!("Recording processor started (GCS enabled)");
+    } else {
+        tracing::info!("Recording disabled — skipping GCS uploader initialization");
+    }
 
     // Create gRPC service
     let grpc_service =

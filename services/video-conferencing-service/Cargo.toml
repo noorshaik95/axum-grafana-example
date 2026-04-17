@@ -14,6 +14,7 @@ tower-http = { version = "0.6", features = ["trace", "cors", "timeout"] }
 tonic = "0.12"
 tonic-reflection = "0.12"
 prost = "0.13"
+prost-types = "0.13"
 
 # WebRTC
 webrtc = "0.11"
@@ -33,7 +34,7 @@ chrono = { version = "0.4", features = ["serde"] }
 # Logging and tracing
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
-tracing-opentelemetry = "0.28"
+tracing-opentelemetry = "0.30"
 
 # OpenTelemetry
 opentelemetry = { version = "0.29", features = ["trace", "metrics"] }

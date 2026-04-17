@@ -1,28 +1,27 @@
-use opentelemetry::{global, KeyValue};
+use opentelemetry::trace::TracerProvider;
+use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_sdk::{runtime, trace as sdktrace, Resource};
+use opentelemetry_sdk::{trace as sdktrace, Resource};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 pub fn init_tracing(service_name: &str, tempo_endpoint: &str) -> anyhow::Result<()> {
-    // Create OTLP tracer
-    let tracer = opentelemetry_otlp::new_pipeline()
-        .tracing()
-        .with_exporter(
-            opentelemetry_otlp::new_exporter()
-                .tonic()
-                .with_endpoint(tempo_endpoint),
-        )
-        .with_trace_config(
-            sdktrace::Config::default()
-                .with_resource(Resource::new(vec![KeyValue::new(
-                    "service.name",
-                    service_name.to_string(),
-                )]))
-                .with_sampler(sdktrace::Sampler::AlwaysOn),
-        )
-        .install_batch(runtime::Tokio)?;
+    // Create OTLP exporter
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .with_endpoint(tempo_endpoint)
+        .build()?;
 
-    global::set_tracer_provider(tracer.provider().unwrap());
+    // Create tracer provider
+    let tracer_provider = sdktrace::SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
+        .with_resource(Resource::builder().with_attributes(vec![KeyValue::new(
+            "service.name",
+            service_name.to_string(),
+        )]).build())
+        .with_sampler(sdktrace::Sampler::AlwaysOn)
+        .build();
+
+    let tracer = tracer_provider.tracer(service_name.to_string());
 
     // Set up tracing subscriber with OpenTelemetry layer and JSON formatting
     tracing_subscriber::registry()
@@ -34,7 +33,7 @@ pub fn init_tracing(service_name: &str, tempo_endpoint: &str) -> anyhow::Result<
             tracing_subscriber::fmt::layer()
                 .json()
                 .with_current_span(true)
-                .with_span_list(true)
+                .with_span_list(true),
         )
         .init();
 
@@ -43,5 +42,6 @@ pub fn init_tracing(service_name: &str, tempo_endpoint: &str) -> anyhow::Result<
 }
 
 pub fn shutdown_tracing() {
-    global::shutdown_tracer_provider();
+    // OpenTelemetry 0.29 handles shutdown via drop of the SdkTracerProvider
+    tracing::info!("Shutting down tracing");
 }

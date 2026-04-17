@@ -913,7 +913,7 @@ services:
       DB_MAX_CONNECTIONS: "25"
       WEBRTC_PORT_MIN: "51000"
       WEBRTC_PORT_MAX: "51100"
-      RECORDING_ENABLED: "true"
+      RECORDING_ENABLED: "false"
       GCS_BUCKET: "slate-recordings"
       GCS_PROJECT_ID: "slate-project"
       RECORDING_TIMEOUT: "1800"
