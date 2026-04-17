@@ -31,7 +31,7 @@ services:
 
   content-management-service:
     name: "content-management-service"
-    endpoint: "http://content-management-service:50052"
+    endpoint: "http://content-management-service:50054"
     timeout_ms: 30000  # Longer timeout for uploads and transcoding
     connection_pool_size: 10
     auto_discover: true
@@ -40,6 +40,38 @@ services:
       failure_threshold: 5
       success_threshold: 2
       timeout_seconds: 60  # Longer recovery time for content operations
+
+  video-conferencing-service:
+    name: "video-conferencing-service"
+    endpoint: "http://video-conferencing-service:50055"
+    timeout_ms: 10000
+    connection_pool_size: 10
+    auto_discover: true
+    tls_enabled: false
+
+  email-service:
+    name: "email-service"
+    endpoint: "http://email-service:50056"
+    timeout_ms: 5000
+    connection_pool_size: 10
+    auto_discover: true
+    tls_enabled: false
+
+  metrics-service:
+    name: "metrics-service"
+    endpoint: "http://metrics-service:50057"
+    timeout_ms: 5000
+    connection_pool_size: 10
+    auto_discover: true
+    tls_enabled: false
+
+  tenant-service:
+    name: "tenant-service"
+    endpoint: "http://tenant-service:50053"
+    timeout_ms: 10000
+    connection_pool_size: 10
+    auto_discover: true
+    tls_enabled: false
 
 discovery:
   enabled: true
@@ -151,6 +183,22 @@ route_overrides:
   - grpc_method: "user.UserService/GetUser"
     http_path: "/api/users/:user_id"
     http_method: "GET"
+    service: "user-auth-service"
+
+  # User Profile
+  - grpc_method: "user.UserService/GetProfile"
+    http_path: "/api/users/profile"
+    http_method: "GET"
+    service: "user-auth-service"
+
+  - grpc_method: "user.UserService/UpdateProfile"
+    http_path: "/api/users/profile"
+    http_method: "PUT"
+    service: "user-auth-service"
+
+  - grpc_method: "user.UserService/ChangePassword"
+    http_path: "/api/users/password"
+    http_method: "POST"
     service: "user-auth-service"
 
   # User Groups (member management - CRUD methods auto-discover)
@@ -491,6 +539,201 @@ route_overrides:
     http_method: "POST"
     service: "content-management-service"
 
+  # Video Conferencing Service
+  - grpc_method: "video_conferencing.VideoConferencingService/ScheduleSession"
+    http_path: "/api/video/sessions"
+    http_method: "POST"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/GetSession"
+    http_path: "/api/video/sessions/:id"
+    http_method: "GET"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/UpdateSession"
+    http_path: "/api/video/sessions/:id"
+    http_method: "PUT"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/CancelSession"
+    http_path: "/api/video/sessions/:id"
+    http_method: "DELETE"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/ListSessions"
+    http_path: "/api/video/sessions"
+    http_method: "GET"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/JoinSession"
+    http_path: "/api/video/sessions/:id/join"
+    http_method: "POST"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/LeaveSession"
+    http_path: "/api/video/sessions/:id/leave"
+    http_method: "POST"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/GetSessionStatus"
+    http_path: "/api/video/sessions/:id/status"
+    http_method: "GET"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/ListParticipants"
+    http_path: "/api/video/sessions/:id/participants"
+    http_method: "GET"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/MuteParticipant"
+    http_path: "/api/video/sessions/:id/participants/:participant_id/mute"
+    http_method: "POST"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/KickParticipant"
+    http_path: "/api/video/sessions/:id/participants/:participant_id/kick"
+    http_method: "DELETE"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/StartRecording"
+    http_path: "/api/video/sessions/:id/recording/start"
+    http_method: "POST"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/StopRecording"
+    http_path: "/api/video/sessions/:id/recording/stop"
+    http_method: "POST"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/ListRecordings"
+    http_path: "/api/video/sessions/:id/recordings"
+    http_method: "GET"
+    service: "video-conferencing-service"
+
+  # Email / Messaging Service
+  - grpc_method: "email.MessagingService/SendMessage"
+    http_path: "/api/messages"
+    http_method: "POST"
+    service: "email-service"
+
+  - grpc_method: "email.MessagingService/GetInbox"
+    http_path: "/api/messages/inbox"
+    http_method: "GET"
+    service: "email-service"
+
+  - grpc_method: "email.MessagingService/MarkRead"
+    http_path: "/api/messages/:id/read"
+    http_method: "POST"
+    service: "email-service"
+
+  - grpc_method: "email.MessagingService/GetThread"
+    http_path: "/api/messages/threads/:thread_id"
+    http_method: "GET"
+    service: "email-service"
+
+  - grpc_method: "email.MessagingService/GetUnreadCount"
+    http_path: "/api/messages/unread-count"
+    http_method: "GET"
+    service: "email-service"
+
+  # Metrics Service
+  - grpc_method: "metrics.MetricsService/GetPlatformMetrics"
+    http_path: "/api/metrics/platform"
+    http_method: "GET"
+    service: "metrics-service"
+
+  - grpc_method: "metrics.MetricsService/GetTenantMetrics"
+    http_path: "/api/metrics/tenants/:id"
+    http_method: "GET"
+    service: "metrics-service"
+
+  - grpc_method: "metrics.MetricsService/GetStudentProgress"
+    http_path: "/api/metrics/students/:id/progress"
+    http_method: "GET"
+    service: "metrics-service"
+
+  - grpc_method: "metrics.MetricsService/GetGradeDistribution"
+    http_path: "/api/metrics/grades/distribution/:course_id"
+    http_method: "GET"
+    service: "metrics-service"
+
+  - grpc_method: "metrics.MetricsService/GetStudentComparison"
+    http_path: "/api/metrics/grades/comparison/:student_id/:course_id"
+    http_method: "GET"
+    service: "metrics-service"
+
+  - grpc_method: "metrics.MetricsService/GetSystemMetrics"
+    http_path: "/api/metrics/system"
+    http_method: "GET"
+    service: "metrics-service"
+
+  - grpc_method: "metrics.MetricsService/GetActiveAlerts"
+    http_path: "/api/metrics/alerts"
+    http_method: "GET"
+    service: "metrics-service"
+
+  # Tenant Service (admin operations)
+  - grpc_method: "tenant.TenantService/CreateTenant"
+    http_path: "/api/tenants"
+    http_method: "POST"
+    service: "tenant-service"
+
+  - grpc_method: "tenant.TenantService/GetTenant"
+    http_path: "/api/tenants/:id"
+    http_method: "GET"
+    service: "tenant-service"
+
+  - grpc_method: "tenant.TenantService/UpdateTenant"
+    http_path: "/api/tenants/:id"
+    http_method: "PUT"
+    service: "tenant-service"
+
+  - grpc_method: "tenant.TenantService/DeleteTenant"
+    http_path: "/api/tenants/:id"
+    http_method: "DELETE"
+    service: "tenant-service"
+
+  - grpc_method: "tenant.TenantService/ListTenants"
+    http_path: "/api/tenants"
+    http_method: "GET"
+    service: "tenant-service"
+
+  - grpc_method: "tenant.TenantService/GetProvisioningStatus"
+    http_path: "/api/tenants/:id/provisioning"
+    http_method: "GET"
+    service: "tenant-service"
+
+  - grpc_method: "tenant.TenantService/GetStorageQuota"
+    http_path: "/api/tenants/:id/storage"
+    http_method: "GET"
+    service: "tenant-service"
+
+  - grpc_method: "tenant.TenantService/CreateTenantAdmin"
+    http_path: "/api/tenants/:id/admins"
+    http_method: "POST"
+    service: "tenant-service"
+
+  # Health checks for new services
+  - grpc_method: "video_conferencing.VideoConferencingService/HealthCheck"
+    http_path: "/api/health/video"
+    http_method: "GET"
+    service: "video-conferencing-service"
+
+  - grpc_method: "email.MessagingService/HealthCheck"
+    http_path: "/api/health/messages"
+    http_method: "GET"
+    service: "email-service"
+
+  - grpc_method: "metrics.MetricsService/HealthCheck"
+    http_path: "/api/health/metrics"
+    http_method: "GET"
+    service: "metrics-service"
+
+  - grpc_method: "tenant.TenantService/HealthCheck"
+    http_path: "/api/health/tenants"
+    http_method: "GET"
+    service: "tenant-service"
+
 auth:
   service_endpoint: "http://user-auth-service:50051"
   timeout_ms: 3000
@@ -532,6 +775,14 @@ auth:
       method: "GET"
     - path: "/api/health/assignments"
       method: "GET"
+    - path: "/api/health/video"
+      method: "GET"
+    - path: "/api/health/messages"
+      method: "GET"
+    - path: "/api/health/metrics"
+      method: "GET"
+    - path: "/api/health/tenants"
+      method: "GET"
 
 rate_limit:
   enabled: false  # Disabled for testing
@@ -549,6 +800,29 @@ body_limit:
     - "/upload"
     - "/api/upload"
     - "/api/content/upload/chunk"
+
+cors:
+  enabled: true
+  allowed_origins:
+    - "http://localhost:3000"
+    - "http://localhost:3002"
+    - "http://localhost:3003"
+  allowed_methods:
+    - "GET"
+    - "POST"
+    - "PUT"
+    - "DELETE"
+    - "PATCH"
+    - "OPTIONS"
+  allowed_headers:
+    - "content-type"
+    - "authorization"
+    - "x-request-id"
+    - "x-trace-id"
+  expose_headers:
+    - "x-trace-id"
+  max_age_seconds: 3600
+  allow_credentials: false
 
 observability:
   tempo_endpoint: "http://tempo:4317"

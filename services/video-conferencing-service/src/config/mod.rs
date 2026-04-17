@@ -79,13 +79,13 @@ impl Config {
             server: ServerConfig {
                 host: env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
                 grpc_port: env::var("GRPC_PORT")
-                    .unwrap_or_else(|_| "50052".to_string())
+                    .unwrap_or_else(|_| "50055".to_string())
                     .parse()?,
                 ws_port: env::var("WS_PORT")
-                    .unwrap_or_else(|_| "8082".to_string())
+                    .unwrap_or_else(|_| "8086".to_string())
                     .parse()?,
                 http_port: env::var("HTTP_PORT")
-                    .unwrap_or_else(|_| "8083".to_string())
+                    .unwrap_or_else(|_| "8086".to_string())
                     .parse()?,
             },
             database: DatabaseConfig {
