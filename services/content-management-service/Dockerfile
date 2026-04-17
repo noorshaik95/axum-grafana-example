@@ -40,23 +40,21 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release && \
     cp target/release/content-management-service /usr/local/bin/content-management-service
 
-# Stage 2: Runtime
-FROM debian:sid-slim
+# Stage 2: Runtime (Ubuntu 24.04 provides GLIBC 2.39+)
+FROM ubuntu:24.04
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
     ffmpeg \
-    libssl3 \
+    libssl3t64 \
     libpq5 \
     librdkafka1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user for security
-RUN useradd -m -u 1000 cms && \
-    mkdir -p /app && \
-    chown -R cms:cms /app
+# Ubuntu 24.04 already has uid/gid 1000 (ubuntu user)
+RUN mkdir -p /app && chown -R 1000:1000 /app
 
 WORKDIR /app
 
@@ -64,7 +62,7 @@ WORKDIR /app
 COPY --from=builder /usr/local/bin/content-management-service /usr/local/bin/content-management-service
 
 # Switch to non-root user
-USER cms
+USER 1000
 
 # Expose ports
 # 50052: gRPC service
