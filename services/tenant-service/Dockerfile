@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Install dependencies
 RUN apk add --no-cache git protobuf-dev make
@@ -23,9 +23,8 @@ WORKDIR /app/services/tenant-service
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
-# Add go bin to PATH and enable toolchain auto-download
+# Add go bin to PATH
 ENV PATH="$PATH:/root/go/bin"
-ENV GOTOOLCHAIN=auto
 
 # Generate proto files
 RUN mkdir -p api/proto
