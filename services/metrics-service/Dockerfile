@@ -6,6 +6,9 @@ WORKDIR /app
 # Copy proto files
 COPY proto/ ./proto/
 
+# Copy shared Go library
+COPY libs/common-go/ ./libs/common-go/
+
 # Copy service files
 COPY services/metrics-service/ ./services/metrics-service/
 
