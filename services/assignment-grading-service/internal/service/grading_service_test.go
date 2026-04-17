@@ -68,6 +68,40 @@ func (m *MockGradeRepository) GetStatistics(ctx context.Context, assignmentID st
 	return args.Get(0).(*repository.GradeStatistics), args.Error(1)
 }
 
+func (m *MockGradeRepository) ListByStudentTenant(ctx context.Context, tenantID, studentID string) ([]*models.Grade, error) {
+	args := m.Called(ctx, tenantID, studentID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.Grade), args.Error(1)
+}
+
+func (m *MockGradeRepository) ListByAssignment(ctx context.Context, assignmentID string) ([]*models.Grade, error) {
+	args := m.Called(ctx, assignmentID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.Grade), args.Error(1)
+}
+
+func (m *MockGradeRepository) UpdatePercentile(ctx context.Context, gradeID string, percentile float64) error {
+	args := m.Called(ctx, gradeID, percentile)
+	return args.Error(0)
+}
+
+func (m *MockGradeRepository) GetScoresForAssignment(ctx context.Context, assignmentID string) ([]repository.GradeScore, error) {
+	args := m.Called(ctx, assignmentID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]repository.GradeScore), args.Error(1)
+}
+
+func (m *MockGradeRepository) CreateEmpty(ctx context.Context, tenantID, assignmentID, studentID, courseID string) error {
+	args := m.Called(ctx, tenantID, assignmentID, studentID, courseID)
+	return args.Error(0)
+}
+
 func TestGradingService_CreateGrade(t *testing.T) {
 	ctx := context.Background()
 
@@ -101,6 +135,7 @@ func TestGradingService_CreateGrade(t *testing.T) {
 		mockAssignmentRepo.On("GetByID", ctx, "assignment-id").Return(assignment, nil)
 		mockGradeRepo.On("Create", ctx, mock.AnythingOfType("*models.Grade")).Return(nil)
 		mockSubmissionRepo.On("Update", ctx, mock.AnythingOfType("*models.Submission")).Return(nil)
+		mockProducer.On("PublishEvent", ctx, mock.Anything).Return(nil)
 
 		grade, err := service.CreateGrade(ctx, "submission-id", 95.0, "Great work!", "INSTRUCTOR-001")
 
@@ -145,6 +180,7 @@ func TestGradingService_CreateGrade(t *testing.T) {
 		mockAssignmentRepo.On("GetByID", ctx, "assignment-id").Return(assignment, nil)
 		mockGradeRepo.On("Create", ctx, mock.AnythingOfType("*models.Grade")).Return(nil)
 		mockSubmissionRepo.On("Update", ctx, mock.AnythingOfType("*models.Submission")).Return(nil)
+		mockProducer.On("PublishEvent", ctx, mock.Anything).Return(nil)
 
 		grade, err := service.CreateGrade(ctx, "submission-id", 90.0, "Good work, but late", "INSTRUCTOR-001")
 

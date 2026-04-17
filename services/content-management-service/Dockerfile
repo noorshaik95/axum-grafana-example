@@ -1,6 +1,6 @@
 # Multi-stage build for content-management-service
 # Stage 1: Builder
-FROM rust:latest as builder
+FROM rust:1.90 as builder
 
 # Install protobuf compiler and librdkafka for Kafka support
 RUN apt-get update && apt-get install -y \

@@ -60,6 +60,14 @@ func (m *MockSubmissionRepository) ListByStudent(ctx context.Context, studentID,
 	return args.Get(0).([]*models.Submission), args.Error(1)
 }
 
+func (m *MockSubmissionRepository) ListByAssignmentPaginated(ctx context.Context, assignmentID, tenantID string, page, pageSize int) ([]*models.Submission, int, error) {
+	args := m.Called(ctx, assignmentID, tenantID, page, pageSize)
+	if args.Get(0) == nil {
+		return nil, args.Int(1), args.Error(2)
+	}
+	return args.Get(0).([]*models.Submission), args.Int(1), args.Error(2)
+}
+
 // MockFileStorage is a mock implementation of FileStorage
 type MockFileStorage struct {
 	mock.Mock
