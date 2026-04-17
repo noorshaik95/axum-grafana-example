@@ -10,6 +10,10 @@ WORKDIR /app
 # Copy proto files
 COPY proto/ ./proto/
 
+# Copy shared libs (common-go is used for observability)
+# Placed at /app/libs/common-go so ../../libs/common-go resolves from /app/services/tenant-service
+COPY libs/common-go ./libs/common-go
+
 # Copy service files
 COPY services/tenant-service/ ./services/tenant-service/
 
@@ -19,8 +23,9 @@ WORKDIR /app/services/tenant-service
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
-# Add go bin to PATH
+# Add go bin to PATH and enable toolchain auto-download
 ENV PATH="$PATH:/root/go/bin"
+ENV GOTOOLCHAIN=auto
 
 # Generate proto files
 RUN mkdir -p api/proto

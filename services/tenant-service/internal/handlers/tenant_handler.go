@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"slate/libs/common-go/tracing"
 	"slate/services/tenant-service/internal/docker"
 	"slate/services/tenant-service/internal/kafka"
 	"slate/services/tenant-service/internal/models"
@@ -12,6 +13,7 @@ import (
 	"slate/services/tenant-service/internal/traefik"
 
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // TenantHandler handles REST API requests for tenant management.
@@ -49,6 +51,10 @@ func (h *TenantHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
+	ctx, span := tracing.StartSpan(r.Context(), "handler.CreateTenant")
+	defer span.End()
+	r = r.WithContext(ctx)
+
 	var req models.ProvisionTenantRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -149,8 +155,12 @@ func (h *TenantHandler) ListTenants(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TenantHandler) GetTenant(w http.ResponseWriter, r *http.Request) {
+	ctx, span := tracing.StartSpan(r.Context(), "handler.GetTenant",
+		attribute.String("tenant.id", r.PathValue("id")))
+	defer span.End()
+
 	id := r.PathValue("id")
-	tenant, err := h.repo.GetTenantByID(r.Context(), id)
+	tenant, err := h.repo.GetTenantByID(ctx, id)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "tenant not found")
 		return
@@ -269,16 +279,20 @@ func (h *TenantHandler) GetUsage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TenantHandler) DeleteTenant(w http.ResponseWriter, r *http.Request) {
+	ctx, span := tracing.StartSpan(r.Context(), "handler.DeleteTenant",
+		attribute.String("tenant.id", r.PathValue("id")))
+	defer span.End()
+
 	id := r.PathValue("id")
 
-	tenant, err := h.repo.GetTenantByID(r.Context(), id)
+	tenant, err := h.repo.GetTenantByID(ctx, id)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "tenant not found")
 		return
 	}
 
 	// Deprovision containers
-	if err := h.provisioner.Deprovision(r.Context(), id); err != nil {
+	if err := h.provisioner.Deprovision(ctx, id); err != nil {
 		log.Error().Err(err).Msg("failed to deprovision containers")
 	}
 
@@ -288,7 +302,7 @@ func (h *TenantHandler) DeleteTenant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Soft delete
-	if err := h.repo.SoftDeleteTenant(r.Context(), id); err != nil {
+	if err := h.repo.SoftDeleteTenant(ctx, id); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete tenant")
 		return
 	}
