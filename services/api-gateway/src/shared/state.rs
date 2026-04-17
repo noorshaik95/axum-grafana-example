@@ -31,7 +31,6 @@ pub struct GatewayMetrics {
     pub request_counter: IntCounterVec,
     pub request_duration: HistogramVec,
     pub grpc_call_counter: IntCounterVec,
-    #[allow(dead_code)]
     pub auth_failure_counter: IntCounter,
     pub rate_limit_counter: IntCounter,
     #[allow(dead_code)]

@@ -54,6 +54,7 @@ pub struct AuthMiddlewareState {
     pub grpc_pool: Arc<GrpcClientPool>,
     pub router_lock: Arc<RwLock<RequestRouter>>,
     pub public_routes: Vec<(String, String)>, // (path, method) tuples
+    pub auth_failure_counter: prometheus::IntCounter,
 }
 
 /// Check if path should skip authentication.
@@ -144,6 +145,7 @@ async fn perform_authorization(
     headers: &HeaderMap,
     auth_policy: &crate::auth::types::AuthPolicy,
     routing_decision: &crate::router::RoutingDecision,
+    auth_failure_counter: &prometheus::IntCounter,
 ) -> Result<AuthContext, AuthMiddlewareResponse> {
     let token = AuthService::extract_token(headers);
 
@@ -151,6 +153,9 @@ async fn perform_authorization(
         .check_authorization(token.as_deref(), auth_policy)
         .await
         .map_err(|e| {
+            // Increment auth failure counter
+            auth_failure_counter.inc();
+            
             warn!(
                 service = %routing_decision.service,
                 method = %routing_decision.grpc_method,
@@ -222,6 +227,7 @@ pub async fn auth_middleware(
         &headers,
         &auth_policy,
         &routing_decision,
+        &state.auth_failure_counter,
     )
     .await?;
 

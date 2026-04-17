@@ -19,6 +19,7 @@ pub fn health_routes(health_checker: Arc<HealthChecker>) -> Router {
     let state = HealthState { health_checker };
 
     Router::new()
+        .route("/health", get(readiness_handler))
         .route("/health/live", get(liveness_handler))
         .route("/health/ready", get(readiness_handler))
         .with_state(state)

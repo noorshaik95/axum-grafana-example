@@ -1,0 +1,14 @@
+commit_msg=$(head -1 "$1")
+
+# Allow merge commits
+if echo "$commit_msg" | grep -qE '^Merge '; then
+  exit 0
+fi
+
+# Validate conventional commit prefix
+if ! echo "$commit_msg" | grep -qE '^(feat|fix|chore|refactor|docs|test|style|ci)(\(.+\))?!?: .+'; then
+  echo "ERROR: Commit message must start with one of: feat, fix, chore, refactor, docs, test, style, ci"
+  echo "Example: feat(auth): add JWT refresh token rotation"
+  echo "Got: $commit_msg"
+  exit 1
+fi

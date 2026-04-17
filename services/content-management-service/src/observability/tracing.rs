@@ -1,34 +1,23 @@
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::EnvFilter;
+use common_rust::observability::TracingConfig;
 
 /// Initialize distributed tracing with OpenTelemetry and structured logging
+/// Delegates to common-rust shared observability library for standardized setup.
 pub fn init_tracing(service_name: &str, _otlp_endpoint: &str) -> anyhow::Result<()> {
-    // Create JSON formatting layer for structured logging
-    let json_layer = tracing_subscriber::fmt::layer()
-        .json()
-        .with_current_span(true)
-        .with_span_list(true)
-        .with_target(true)
-        .with_level(true)
-        .with_thread_ids(true)
-        .with_thread_names(true);
+    let config = TracingConfig {
+        service_name: service_name.to_string(),
+        otlp_endpoint: Some(_otlp_endpoint.to_string()),
+        log_level: std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()),
+        json_format: true,
+    };
 
-    // Create environment filter for log levels
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    common_rust::observability::init_tracing(config)?;
 
-    // Combine layers and initialize subscriber
-    tracing_subscriber::registry()
-        .with(env_filter)
-        .with(json_layer)
-        .init();
-
-    tracing::info!(service_name = %service_name, "Tracing initialized");
+    tracing::info!(service_name = %service_name, "Tracing initialized via common-rust");
 
     Ok(())
 }
 
 /// Shutdown tracing and flush pending spans
 pub fn shutdown_tracing() {
-    // Shutdown is handled automatically
+    common_rust::observability::shutdown_tracing();
 }

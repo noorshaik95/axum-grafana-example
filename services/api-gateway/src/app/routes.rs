@@ -67,6 +67,7 @@ fn create_auth_middleware_state(app_state: &Arc<AppState>) -> AuthMiddlewareStat
         grpc_pool: app_state.grpc_pool.clone(),
         router_lock: app_state.router_lock.clone(),
         public_routes,
+        auth_failure_counter: app_state.metrics.auth_failure_counter.clone(),
     }
 }
 

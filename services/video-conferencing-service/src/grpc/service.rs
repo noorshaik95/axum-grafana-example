@@ -781,13 +781,12 @@ impl video_conferencing_service_server::VideoConferencingService for VideoConfer
     ) -> Result<Response<ListRecordingsResponse>, Status> {
         let req = request.into_inner();
 
-        let session_id = if !req.session_id.is_empty() {
-            Some(
-                Uuid::parse_str(&req.session_id)
+        let session_id = match req.session_id {
+            Some(ref id) if !id.is_empty() => Some(
+                Uuid::parse_str(id)
                     .map_err(|_| Status::invalid_argument("Invalid session ID"))?,
-            )
-        } else {
-            None
+            ),
+            _ => None,
         };
 
         let page = if req.page <= 0 { 1 } else { req.page };
@@ -880,7 +879,9 @@ impl video_conferencing_service_server::VideoConferencingService for VideoConfer
             calendar_ics: calendar_ics.clone(),
         }))
     }
+}
 
+impl VideoConferencingServiceImpl {
     // Helper methods
     fn session_to_proto(&self, session: &crate::database::models::VideoSession) -> SessionDetails {
         let status = match session.status.as_str() {

@@ -243,8 +243,9 @@ fn get_routing_decision(
     state: &Arc<AppState>,
     start_time: Instant,
 ) -> Result<crate::router::RoutingDecision, GatewayError> {
-    // Route the request
-    let router_guard = state.router_lock.blocking_read();
+    // Route the request - use try_read to avoid blocking
+    let router_guard = state.router_lock.try_read()
+        .map_err(|_| GatewayError::InternalError("Failed to acquire router lock".to_string()))?;
     router_guard.route(path, method).map_err(|e| {
         let duration_ms = start_time.elapsed().as_millis();
         error!(

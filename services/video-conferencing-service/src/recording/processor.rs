@@ -83,7 +83,7 @@ impl RecordingProcessor {
                 let object_key = gcs_url.trim_start_matches(&format!(
                     "gs://{}/",
                     self.config.gcs_bucket
-                ));
+                )).to_string();
 
                 let duration_seconds = start.elapsed().as_secs() as i32;
 
@@ -96,7 +96,7 @@ impl RecordingProcessor {
                         file_size,
                         gcs_url,
                         self.config.gcs_bucket.clone(),
-                        object_key.to_string(),
+                        object_key.clone(),
                     )
                     .await
                 {

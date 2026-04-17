@@ -1,6 +1,7 @@
 use crate::config::RecordingConfig;
 use crate::observability::METRICS;
 use google_cloud_storage::client::{Client, ClientConfig};
+use google_cloud_storage::http::objects::delete::DeleteObjectRequest;
 use google_cloud_storage::http::objects::upload::{Media, UploadObjectRequest, UploadType};
 use std::path::Path;
 use tokio::fs::File;
@@ -92,7 +93,11 @@ impl GcsUploader {
 
     pub async fn delete_recording(&self, object_key: &str) -> anyhow::Result<()> {
         self.client
-            .delete_object(&self.config.gcs_bucket, object_key, None)
+            .delete_object(&DeleteObjectRequest {
+                bucket: self.config.gcs_bucket.clone(),
+                object: object_key.to_string(),
+                ..Default::default()
+            })
             .await?;
 
         tracing::info!("Recording deleted from GCS: {}", object_key);

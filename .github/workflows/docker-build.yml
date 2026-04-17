@@ -1,0 +1,63 @@
+name: Docker Build
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: "docker-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  docker-build:
+    name: "Docker Build (${{ matrix.image }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Backend services (build context is repo root)
+          - image: api-gateway
+            context: "."
+            dockerfile: services/api-gateway/Dockerfile
+          - image: user-auth-service
+            context: "."
+            dockerfile: services/user-auth-service/Dockerfile
+          - image: course-service
+            context: "."
+            dockerfile: services/course-service/Dockerfile
+          - image: assignment-grading-service
+            context: "."
+            dockerfile: services/assignment-grading-service/Dockerfile
+          - image: content-management-service
+            context: "."
+            dockerfile: services/content-management-service/Dockerfile
+          # Frontend services (build context is each frontend dir)
+          - image: student-frontend
+            context: frontend/student
+            dockerfile: frontend/student/Dockerfile
+            build-args: "NEXT_PUBLIC_API_URL=http://localhost:8080"
+          - image: provider-frontend
+            context: frontend/provider
+            dockerfile: frontend/provider/Dockerfile
+            build-args: "NEXT_PUBLIC_API_URL=http://localhost:8080"
+          - image: admin-frontend
+            context: frontend/admin
+            dockerfile: frontend/admin/Dockerfile
+            build-args: "NEXT_PUBLIC_API_URL=http://localhost:8080"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: "${{ matrix.context }}"
+          file: "${{ matrix.dockerfile }}"
+          push: false
+          tags: |
+            slate/${{ matrix.image }}:${{ github.sha }}
+            slate/${{ matrix.image }}:latest
+          build-args: "${{ matrix.build-args || '' }}"
+          cache-from: "type=gha,scope=${{ matrix.image }}"
+          cache-to: "type=gha,mode=max,scope=${{ matrix.image }}"

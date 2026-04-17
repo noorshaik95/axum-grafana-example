@@ -445,7 +445,7 @@ async fn handle_socket(socket: WebSocket, server: Arc<SignalingServer>) {
                         match serde_json::from_str::<SignalingMessage>(&text) {
                             Ok(signaling_msg) => {
                                 // Store session info on first join
-                                if let SignalingMessage::Join { ref session_id: sid, .. } = signaling_msg {
+                                if let SignalingMessage::Join { session_id: ref sid, .. } = signaling_msg {
                                     session_id = Some(sid.clone());
                                     let session = server.get_or_create_session(sid);
                                     rx = Some(session.tx.subscribe());
