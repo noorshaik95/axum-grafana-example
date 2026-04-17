@@ -85,10 +85,8 @@ impl GrpcClientPool {
             );
         }
 
-        // Connect to the service
-        let channel = endpoint.connect().await.map_err(|e| {
-            GrpcError::ConnectionError(format!("Failed to connect to {}: {}", config.endpoint, e))
-        })?;
+        // Use connect_lazy — defers TCP connection to first RPC call.
+        let channel = endpoint.connect_lazy();
 
         Ok(channel)
     }

@@ -44,7 +44,7 @@ impl ConnectionPool {
                 "Establishing connection"
             );
 
-            let channel = Self::create_channel(config).await?;
+            let channel = Self::create_channel(config)?;
             channels.push(channel);
         }
 
@@ -61,8 +61,9 @@ impl ConnectionPool {
         })
     }
 
-    /// Create a single channel with the configured settings
-    async fn create_channel(config: &ServiceConfig) -> Result<Channel, GrpcError> {
+    /// Create a single channel with the configured settings.
+    /// Uses connect_lazy — no TCP connection is made until the first RPC call.
+    fn create_channel(config: &ServiceConfig) -> Result<Channel, GrpcError> {
         use std::time::Duration;
 
         let endpoint = config.endpoint.parse::<Endpoint>().map_err(|e| {
@@ -80,14 +81,11 @@ impl ConnectionPool {
             .keep_alive_timeout(Duration::from_secs(20))
             .keep_alive_while_idle(true);
 
-        // Note: TLS configuration is handled by the existing GrpcClientPool::create_channel
-        // We're keeping this simple for now and focusing on connection pooling
-        // TLS support can be added later if needed
-
-        // Connect to the service
-        let channel = endpoint.connect().await.map_err(|e| {
-            GrpcError::ConnectionError(format!("Failed to connect to {}: {}", config.endpoint, e))
-        })?;
+        // Use connect_lazy so the gateway starts even when backends are not yet
+        // ready. The actual TCP connection is established on the first RPC call.
+        // This prevents a cold-start cascade where one unavailable service
+        // prevents the gateway from starting at all.
+        let channel = endpoint.connect_lazy();
 
         Ok(channel)
     }
