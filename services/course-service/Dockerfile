@@ -26,8 +26,7 @@ WORKDIR /app
 
 # Install only production dependencies
 COPY services/course-service/package*.json ./
-RUN --mount=type=cache,target=/root/.npm \
-  npm install --only=production && npm cache clean --force
+RUN npm install --omit=dev
 
 # Copy built application from builder
 COPY --from=builder /build/dist ./dist

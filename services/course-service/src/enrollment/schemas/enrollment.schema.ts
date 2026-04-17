@@ -47,3 +47,5 @@ EnrollmentSchema.index({ courseId: 1, studentId: 1 }, { unique: true });
 EnrollmentSchema.index({ studentId: 1, status: 1 });
 EnrollmentSchema.index({ courseId: 1, status: 1 });
 EnrollmentSchema.index({ sectionId: 1 });
+EnrollmentSchema.index({ enrolledBy: 1 });
+EnrollmentSchema.index({ enrolledAt: -1 });

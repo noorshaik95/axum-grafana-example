@@ -102,7 +102,7 @@ describe('CourseController', () => {
         title: 'Test Course',
         description: 'Test Description',
         term: 'Fall 2024',
-        instructorId: 'instructor-1',
+        instructor_id: 'instructor-1',
         syllabus: 'Syllabus content',
       });
 
@@ -138,7 +138,7 @@ describe('CourseController', () => {
       });
 
       const result = await controller.listCourses({
-        instructorId: 'instructor-1',
+        instructor_id: 'instructor-1',
         page: 1,
         pageSize: 20,
       });
@@ -194,7 +194,7 @@ describe('CourseController', () => {
       const result = await controller.instructorAddStudent({
         courseId: 'course-1',
         studentId: 'student-1',
-        instructorId: 'instructor-1',
+        instructor_id: 'instructor-1',
       });
 
       expect(enrollmentService.instructorAddStudent).toHaveBeenCalledWith(
@@ -277,7 +277,7 @@ describe('CourseController', () => {
 
       const result = await controller.addCoInstructor({
         courseId: 'course-1',
-        coInstructorId: 'co-instructor-1',
+        co_instructor_id: 'co-instructor-1',
       });
 
       expect(courseService.addCoInstructor).toHaveBeenCalledWith('course-1', 'co-instructor-1');

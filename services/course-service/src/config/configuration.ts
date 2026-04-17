@@ -8,6 +8,9 @@ export default () => ({
     uri: process.env.MONGO_URI || 'mongodb://mongodb:27017/courses',
     dbName: process.env.MONGO_DB_NAME || 'courses',
   },
+  kafka: {
+    brokers: process.env.KAFKA_BROKERS || 'kafka:9092',
+  },
   observability: {
     logLevel: process.env.LOG_LEVEL || 'info',
     metricsPort: parseInt(process.env.METRICS_PORT, 10) || 9090,

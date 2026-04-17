@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
@@ -17,6 +18,9 @@ async function bootstrap() {
 
   // Use Pino logger
   app.useLogger(app.get(Logger));
+
+  // Enable validation
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   // Enable graceful shutdown
   app.enableShutdownHooks();

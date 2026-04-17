@@ -4,6 +4,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { LoggerModule } from 'nestjs-pino';
 import { CourseModule } from './course/course.module';
 import { EnrollmentModule } from './enrollment/enrollment.module';
+import { ProgressModule } from './progress/progress.module';
+import { KafkaModule } from './kafka/kafka.module';
 import { HealthController } from './health/health.controller';
 import { MetricsController } from './observability/metrics.controller';
 import { MetricsService } from './observability/metrics.service';
@@ -36,6 +38,8 @@ import configuration from './config/configuration';
     }),
     CourseModule,
     EnrollmentModule,
+    ProgressModule,
+    KafkaModule,
   ],
   controllers: [HealthController, MetricsController],
   providers: [MetricsService],
