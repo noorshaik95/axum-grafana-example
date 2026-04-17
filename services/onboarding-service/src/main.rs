@@ -2,21 +2,21 @@ mod kafka;
 mod state;
 mod workflow;
 
+use common_rust::observability::{init_tracing, TracingConfig};
 use restate_sdk::prelude::*;
 use tracing::info;
-use tracing_subscriber::EnvFilter;
 use workflow::{OnboardingWorkflow, OnboardingWorkflowImpl};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info,onboarding_service=debug")),
-        )
-        .json()
-        .init();
+    // Initialize tracing via common-rust observability
+    init_tracing(TracingConfig {
+        service_name: "onboarding-service".to_string(),
+        otlp_endpoint: std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").ok(),
+        log_level: std::env::var("RUST_LOG")
+            .unwrap_or_else(|_| "info,onboarding_service=debug".to_string()),
+        json_format: true,
+    })?;
 
     info!("Starting onboarding service");
 

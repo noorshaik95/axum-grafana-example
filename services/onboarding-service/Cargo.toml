@@ -14,4 +14,4 @@ uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 rdkafka = { version = "0.37", features = ["tokio"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+common-rust = { path = "../../libs/common-rust" }
