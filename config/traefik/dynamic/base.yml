@@ -1,0 +1,52 @@
+http:
+  routers:
+    admin-frontend:
+      rule: "Host(`admin.slate.local`)"
+      entryPoints:
+        - web
+      service: admin-frontend-svc
+
+    student-frontend:
+      rule: "Host(`app.slate.local`)"
+      entryPoints:
+        - web
+      service: student-frontend-svc
+
+    provider-frontend:
+      rule: "Host(`teach.slate.local`)"
+      entryPoints:
+        - web
+      service: provider-frontend-svc
+
+    api-gateway:
+      rule: "Host(`api.slate.local`)"
+      entryPoints:
+        - web
+      service: api-gateway-svc
+
+    traefik-dashboard:
+      rule: "Host(`traefik.slate.local`)"
+      entryPoints:
+        - web
+      service: api@internal
+
+  services:
+    admin-frontend-svc:
+      loadBalancer:
+        servers:
+          - url: "http://admin-frontend:3003"
+
+    student-frontend-svc:
+      loadBalancer:
+        servers:
+          - url: "http://student-frontend:3000"
+
+    provider-frontend-svc:
+      loadBalancer:
+        servers:
+          - url: "http://provider-frontend:3002"
+
+    api-gateway-svc:
+      loadBalancer:
+        servers:
+          - url: "http://api-gateway:8080"

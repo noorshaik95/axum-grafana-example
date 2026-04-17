@@ -1,0 +1,23 @@
+# Demo tenant config for testing — demo-university.slate.local
+# Tenant ID: demo-001
+http:
+  routers:
+    tenant-demo-001:
+      rule: "Host(`demo-university.slate.local`)"
+      entryPoints:
+        - web
+      service: api-gateway-svc
+      middlewares:
+        - inject-tenant-demo-001
+
+  middlewares:
+    inject-tenant-demo-001:
+      headers:
+        customRequestHeaders:
+          X-Tenant-ID: "demo-001"
+
+  services:
+    api-gateway-svc:
+      loadBalancer:
+        servers:
+          - url: "http://api-gateway:8080"

@@ -4,6 +4,34 @@ name: slate
 
 services:
   # ============================================================================
+  # Reverse Proxy
+  # ============================================================================
+
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--configFile=/config/traefik/traefik.yml"
+    ports:
+      - "80:80"
+      - "8090:8080"   # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/traefik:/config/traefik
+    networks:
+      - slate-network
+    labels:
+      - "traefik.enable=true"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # ============================================================================
   # Infrastructure Services
   # ============================================================================
 
@@ -472,12 +500,19 @@ services:
       MAX_REQUEST_BODY_SIZE: "1048576"
       MAX_UPLOAD_BODY_SIZE: "26214400"
       UPLOAD_PATHS: "/upload,/api/upload,/api/assignments/*/submissions"
-      CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:3002,http://localhost:3003"
+      CORS_ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:3002,http://localhost:3003,http://app.slate.local,http://teach.slate.local,http://admin.slate.local"
     ports:
       - "8080:8080"
     volumes:
       - ./config/gateway-config.yaml:/app/config/gateway-config.yaml
       - ./services/api-gateway/openapi:/app/services/api-gateway/openapi
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-gateway.rule=Host(`api.slate.local`)"
+      - "traefik.http.routers.api-gateway.entrypoints=web"
+      - "traefik.http.services.api-gateway.loadbalancer.server.port=8080"
+    networks:
+      - slate-network
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1" ]
       interval: 10s
@@ -519,6 +554,13 @@ services:
       PORT: "3000"
     ports:
       - "3000:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.student-frontend.rule=Host(`app.slate.local`)"
+      - "traefik.http.routers.student-frontend.entrypoints=web"
+      - "traefik.http.services.student-frontend.loadbalancer.server.port=3000"
+    networks:
+      - slate-network
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -544,6 +586,13 @@ services:
       PORT: "3002"
     ports:
       - "3002:3002"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.provider-frontend.rule=Host(`teach.slate.local`)"
+      - "traefik.http.routers.provider-frontend.entrypoints=web"
+      - "traefik.http.services.provider-frontend.loadbalancer.server.port=3002"
+    networks:
+      - slate-network
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -569,6 +618,13 @@ services:
       PORT: "3003"
     ports:
       - "3003:3003"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.admin-frontend.rule=Host(`admin.slate.local`)"
+      - "traefik.http.routers.admin-frontend.entrypoints=web"
+      - "traefik.http.services.admin-frontend.loadbalancer.server.port=3003"
+    networks:
+      - slate-network
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -976,3 +1032,7 @@ volumes:
     driver: local
   video-recordings:
     driver: local
+
+networks:
+  slate-network:
+    driver: bridge

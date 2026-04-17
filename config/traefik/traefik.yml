@@ -1,0 +1,19 @@
+api:
+  dashboard: true
+  insecure: true  # dev only — do not use in production
+
+entryPoints:
+  web:
+    address: ":80"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: slate-network
+  file:
+    directory: /config/traefik/dynamic
+    watch: true
+
+log:
+  level: INFO
