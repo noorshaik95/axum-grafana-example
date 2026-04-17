@@ -8,6 +8,7 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
 // Metrics service for SaaS admin usage metrics dashboard (US-9.2)
+// and student analytics (grade distribution, progress tracking)
 service MetricsService {
   // System-wide metrics (AC1, AC2, AC3, AC4)
   rpc GetSystemMetrics(GetSystemMetricsRequest) returns (SystemMetricsResponse);
@@ -27,6 +28,18 @@ service MetricsService {
   // Record usage (internal)
   rpc RecordAPIRequest(RecordAPIRequestRequest) returns (google.protobuf.Empty);
   rpc RecordError(RecordErrorRequest) returns (google.protobuf.Empty);
+
+  // Platform metrics (admin dashboard)
+  rpc GetPlatformMetrics(PlatformMetricsRequest) returns (PlatformMetricsResponse);
+
+  // Student progress analytics
+  rpc GetStudentProgress(StudentProgressRequest) returns (StudentProgressResponse);
+
+  // Grade distribution for a course
+  rpc GetGradeDistribution(GradeDistributionRequest) returns (GradeDistributionResponse);
+
+  // Student comparison against class
+  rpc GetStudentComparison(StudentComparisonRequest) returns (StudentComparisonResponse);
 }
 
 // Alert type enumeration
@@ -264,4 +277,76 @@ message MetricDataPoint {
 message MetricTimeSeries {
   string metric_name = 1;
   repeated MetricDataPoint data_points = 2;
+}
+
+// --- New analytics RPCs ---
+
+// Platform Metrics (admin dashboard aggregates)
+message PlatformMetricsRequest {}
+
+message PlatformMetricsResponse {
+  int32 active_tenants = 1;
+  int32 dau = 2;
+  int32 mau = 3;
+  int32 total_courses = 4;
+  int32 total_students = 5;
+}
+
+// Student Progress
+message StudentProgressRequest {
+  string tenant_id = 1;
+  string student_id = 2;
+}
+
+message StudentProgressEntry {
+  string id = 1;
+  string tenant_id = 2;
+  string student_id = 3;
+  string course_id = 4;
+  double completion_pct = 5;
+  int32 time_on_task_minutes = 6;
+  int32 lessons_completed = 7;
+  google.protobuf.Timestamp last_activity_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message StudentProgressResponse {
+  repeated StudentProgressEntry entries = 1;
+}
+
+// Grade Distribution
+message GradeDistributionRequest {
+  string tenant_id = 1;
+  string course_id = 2;
+}
+
+message DistributionBucket {
+  double min = 1;
+  double max = 2;
+  int32 count = 3;
+}
+
+message GradeDistributionResponse {
+  string course_id = 1;
+  string assignment_id = 2;
+  repeated DistributionBucket buckets = 3;
+  double mean = 4;
+  double median = 5;
+  double p25 = 6;
+  double p75 = 7;
+  int32 total_students = 8;
+}
+
+// Student Comparison
+message StudentComparisonRequest {
+  string tenant_id = 1;
+  string student_id = 2;
+  string course_id = 3;
+}
+
+message StudentComparisonResponse {
+  GradeDistributionResponse distribution = 1;
+  double student_score = 2;
+  double student_percentile = 3;
+  string letter_grade = 4;
 }
