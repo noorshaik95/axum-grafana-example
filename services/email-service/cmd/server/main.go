@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"slate/libs/common-go/tracing"
 	"slate/services/email-service/internal/config"
 	grpcserver "slate/services/email-service/internal/grpc"
 	"slate/services/email-service/internal/handlers"
@@ -36,6 +37,28 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Initialize OpenTelemetry tracing via common-go
+	tracingCfg := tracing.Config{
+		ServiceName:    "email-service",
+		ServiceVersion: "1.0.0",
+		OTLPEndpoint:   cfg.Observability.OTLPEndpoint,
+		OTLPInsecure:   cfg.Observability.OTLPInsecure,
+		SamplingRate:   1.0,
+	}
+	tp, err := tracing.InitTracer(tracingCfg)
+	if err != nil {
+		log.Printf("Failed to initialize tracing: %v (continuing without tracing)", err)
+	} else {
+		log.Println("OpenTelemetry tracing initialized via common-go")
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := tracing.Shutdown(ctx, tp); err != nil {
+				log.Printf("Tracer shutdown error: %v", err)
+			}
+		}()
 	}
 
 	// Connect to PostgreSQL

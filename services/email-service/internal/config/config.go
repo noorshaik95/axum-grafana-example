@@ -8,10 +8,16 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	GRPC     GRPCConfig
-	Kafka    KafkaConfig
+	Server        ServerConfig
+	Database      DatabaseConfig
+	GRPC          GRPCConfig
+	Kafka         KafkaConfig
+	Observability ObservabilityConfig
+}
+
+type ObservabilityConfig struct {
+	OTLPEndpoint string
+	OTLPInsecure bool
 }
 
 type ServerConfig struct {
@@ -61,6 +67,10 @@ func Load() (*Config, error) {
 			Brokers: getEnvAsSlice("KAFKA_BROKERS", []string{"localhost:9092"}),
 			Enabled: getEnvAsBool("KAFKA_ENABLED", true),
 			GroupID: getEnv("KAFKA_GROUP_ID", "email-service"),
+		},
+		Observability: ObservabilityConfig{
+			OTLPEndpoint: getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "tempo:4317"),
+			OTLPInsecure: getEnvAsBool("OTEL_EXPORTER_OTLP_INSECURE", true),
 		},
 	}, nil
 }
