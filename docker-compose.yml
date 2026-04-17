@@ -479,7 +479,7 @@ services:
       - ./config/gateway-config.yaml:/app/config/gateway-config.yaml
       - ./services/api-gateway/openapi:/app/services/api-gateway/openapi
     healthcheck:
-      test: [ "CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1" ]
+      test: [ "CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5

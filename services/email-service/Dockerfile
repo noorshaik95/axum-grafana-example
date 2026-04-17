@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN go mod download 2>/dev/null || true
 
 # Build the application (placeholder — no main.go yet)
 # TODO: Add cmd/server/main.go with gRPC server implementation
-RUN echo 'package main; import "fmt"; func main() { fmt.Println("email-service: not yet implemented") }' > main_placeholder.go && \
+RUN echo 'package main; import ("fmt";"os";"time"); func main() { fmt.Println("email-service: placeholder — not yet implemented"); for { fmt.Fprintf(os.Stdout, "email-service running (stub)\n"); time.Sleep(30 * time.Second) } }' > main_placeholder.go && \
     CGO_ENABLED=0 GOOS=linux go build -o /email-service main_placeholder.go
 
 # Runtime stage
