@@ -19,10 +19,6 @@ RUN go mod download
 # Copy source code
 COPY services/onboarding-service/ ./
 
-# Install protoc plugins
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /app/onboarding-server ./cmd/server/main.go
 
