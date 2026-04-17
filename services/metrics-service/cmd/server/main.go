@@ -43,23 +43,11 @@ func main() {
 	}
 
 	// Initialize tracing via common-go
-	tp, err := tracing.InitTracer(tracing.Config{
-		ServiceName:    "metrics-service",
-		ServiceVersion: "1.0.0",
-		OTLPEndpoint:   os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
-		OTLPInsecure:   true,
-		SamplingRate:   1.0,
-	})
+	shutdownTracer, err := tracing.InitTracer("metrics-service", os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to initialize tracing, continuing without it")
 	} else {
-		defer func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := tracing.Shutdown(ctx, tp); err != nil {
-				log.Error().Err(err).Msg("Failed to shutdown tracer")
-			}
-		}()
+		defer shutdownTracer()
 		log.Info().Msg("Tracing initialized via common-go")
 	}
 

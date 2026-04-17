@@ -5,6 +5,9 @@ WORKDIR /app
 # Copy proto files
 COPY proto/ ./proto/
 
+# Copy shared libs
+COPY libs/common-go ./libs/common-go
+
 # Copy service files
 COPY services/email-service/ ./services/email-service/
 
