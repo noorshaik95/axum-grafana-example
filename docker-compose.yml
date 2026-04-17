@@ -643,7 +643,7 @@ services:
     image: docker.restate.dev/restatedev/restate:latest
     ports:
       - "9080:9080"   # HTTP ingress
-      - "9090:9090"   # Admin API
+      - "9095:9090"   # Admin API (9090 taken by Prometheus)
       - "5005:5005"   # Service discovery
     environment:
       RESTATE_LOG_LEVEL: info
@@ -825,6 +825,14 @@ services:
       BASE_SETUP_URL: "http://localhost:8080"
       LOG_LEVEL: "info"
       ENVIRONMENT: "development"
+      DOCKER_SOCKET: "/var/run/docker.sock"
+      DOCKER_NETWORK: "slate-network"
+      TRAEFIK_CONFIG_DIR: "/config/traefik/dynamic"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_GROUP_ID: "tenant-service"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./config/traefik/dynamic:/config/traefik/dynamic
     ports:
       - "50057:50053"   # gRPC
       - "8087:8083"     # HTTP

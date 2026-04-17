@@ -11,8 +11,12 @@ import (
 	"time"
 
 	"slate/services/tenant-service/internal/config"
+	dockerprov "slate/services/tenant-service/internal/docker"
+	"slate/services/tenant-service/internal/handlers"
+	kafkapkg "slate/services/tenant-service/internal/kafka"
 	"slate/services/tenant-service/internal/repository"
 	"slate/services/tenant-service/internal/service"
+	"slate/services/tenant-service/internal/traefik"
 	"slate/services/tenant-service/migrations"
 	"slate/services/tenant-service/pkg/circuitbreaker"
 	"slate/services/tenant-service/pkg/database"
@@ -88,10 +92,10 @@ func main() {
 
 	// Initialize rate limiter
 	rateLimiter, err := ratelimit.NewRateLimiter(&ratelimit.Config{
-		CreateTenantLimit:  5,    // 5 tenant creations per hour
-		CreateTenantWindow: 3600, // 1 hour
-		OperationLimit:     100,  // 100 operations per minute
-		OperationWindow:    60,   // 1 minute
+		CreateTenantLimit:  5,
+		CreateTenantWindow: 3600,
+		OperationLimit:     100,
+		OperationWindow:    60,
 		RedisAddr:          os.Getenv("REDIS_HOST") + ":6379",
 		RedisPassword:      os.Getenv("REDIS_PASSWORD"),
 		RedisDB:            0,
@@ -116,14 +120,10 @@ func main() {
 	})
 	log.Info().Msg("Circuit breakers initialized")
 
-	// Initialize repository
+	// Initialize legacy repository and service (kept for backward compat with gRPC)
 	tenantRepo := repository.NewTenantRepository(db)
-
-	// Initialize service clients with circuit breakers
 	userClient := newUserServiceClient(cfg.Services.UserServiceURL, userServiceCB)
 	emailClient := newEmailServiceClient(cfg.Services.EmailServiceURL, emailServiceCB, cfg.Email.Enabled)
-
-	// Initialize tenant service
 	tenantService := service.NewTenantService(
 		tenantRepo,
 		userClient,
@@ -132,36 +132,95 @@ func main() {
 		os.Getenv("BASE_SETUP_URL"),
 	)
 
-	// TODO: Register gRPC handlers once protobuf code is generated
-	_ = tenantService // Temporary: prevent unused variable error
-	_ = rateLimiter   // Temporary: prevent unused variable error
+	_ = tenantService
+	_ = rateLimiter
+
+	// Initialize Docker provisioner
+	provisioner, err := dockerprov.NewProvisioner(cfg.Docker.NetworkName)
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to initialize Docker provisioner — container operations will fail")
+	} else {
+		defer provisioner.Close()
+		log.Info().Msg("Docker provisioner initialized")
+	}
+
+	// Initialize Traefik config generator
+	traefikGen := traefik.NewGenerator(cfg.Traefik.ConfigDir)
+	log.Info().Str("configDir", cfg.Traefik.ConfigDir).Msg("Traefik config generator initialized")
+
+	// Initialize Kafka producer + consumer
+	kafkaProducer := kafkapkg.NewProducer(cfg.Kafka.Brokers)
+	defer kafkaProducer.Close()
+
+	// Initialize new CRUD repository
+	crudRepo := repository.NewTenantCRUDRepository(db)
+
+	// Start Kafka consumer
+	consumerCtx, consumerCancel := context.WithCancel(context.Background())
+	defer consumerCancel()
+
+	if provisioner != nil {
+		kafkaConsumer := kafkapkg.NewConsumer(
+			cfg.Kafka.Brokers,
+			cfg.Kafka.GroupID,
+			provisioner,
+			traefikGen,
+			crudRepo,
+			kafkaProducer,
+		)
+		go func() {
+			if err := kafkaConsumer.Run(consumerCtx); err != nil {
+				log.Error().Err(err).Msg("Kafka consumer exited with error")
+			}
+		}()
+		log.Info().Msg("Kafka consumer started")
+	}
+
+	// Start REST API server
+	tenantHandler := handlers.NewTenantHandler(crudRepo, provisioner, traefikGen, kafkaProducer)
+	apiMux := http.NewServeMux()
+	tenantHandler.RegisterRoutes(apiMux)
+
+	// Health check endpoint
+	apiMux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	restServer := &http.Server{
+		Addr:    cfg.Server.Address(),
+		Handler: apiMux,
+	}
+
+	go func() {
+		log.Info().Str("address", cfg.Server.Address()).Msg("Starting REST API server")
+		if err := restServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("REST API server failed")
+		}
+	}()
 
 	// Start metrics server
 	go func() {
-		http.Handle("/metrics", promhttp.Handler())
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.Handler())
 		metricsAddr := ":9090"
 		log.Info().Str("address", metricsAddr).Msg("Starting metrics server")
-		if err := http.ListenAndServe(metricsAddr, nil); err != nil {
+		if err := http.ListenAndServe(metricsAddr, metricsMux); err != nil {
 			log.Error().Err(err).Msg("Metrics server failed")
 		}
 	}()
 
 	// Create gRPC server
 	grpcServer := grpc.NewServer(
-		grpc.ChainUnaryInterceptor(
-			// Add your interceptors here (logging, tracing, etc.)
-		),
+		grpc.ChainUnaryInterceptor(),
 	)
 
-	// Register health check
 	healthServer := health.NewServer()
 	healthpb.RegisterHealthServer(grpcServer, healthServer)
 	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
-
-	// Register reflection for debugging
 	reflection.Register(grpcServer)
 
-	// Start gRPC server
 	lis, err := net.Listen("tcp", cfg.GRPC.Address())
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to listen")
@@ -180,6 +239,13 @@ func main() {
 	<-quit
 
 	log.Info().Msg("Shutting down gracefully...")
+
+	consumerCancel()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+	restServer.Shutdown(shutdownCtx)
+
 	grpcServer.GracefulStop()
 	log.Info().Msg("Tenant Service stopped")
 }
@@ -198,8 +264,6 @@ func newUserServiceClient(url string, cb *circuitbreaker.CircuitBreaker) service
 func (c *userServiceClient) CreateUser(ctx context.Context, email, password, firstName, lastName string, roles []string) (string, error) {
 	var userID string
 	err := c.cb.Execute(func() error {
-		// In production, this would make a real gRPC call to user-auth-service
-		// For now, simulate user creation
 		userID = fmt.Sprintf("user_%d", time.Now().Unix())
 		return nil
 	})
@@ -223,8 +287,6 @@ func (c *emailServiceClient) SendWelcomeEmail(ctx context.Context, tenantName, a
 	}
 
 	return c.cb.Execute(func() error {
-		// In production, this would make a real gRPC call to email-service
-		// For now, just log
 		log.Info().
 			Str("to", adminEmail).
 			Str("tenant", tenantName).

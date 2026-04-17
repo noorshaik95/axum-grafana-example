@@ -12,6 +12,9 @@ type Config struct {
 	GRPC     GRPCConfig
 	Services ServicesConfig
 	Email    EmailConfig
+	Docker   DockerConfig
+	Traefik  TraefikConfig
+	Kafka    KafkaConfig
 }
 
 type ServerConfig struct {
@@ -43,6 +46,20 @@ type EmailConfig struct {
 	WelcomeEmailDelay int // seconds to wait before sending welcome email
 }
 
+type DockerConfig struct {
+	Socket      string
+	NetworkName string
+}
+
+type TraefikConfig struct {
+	ConfigDir string
+}
+
+type KafkaConfig struct {
+	Brokers []string
+	GroupID string
+}
+
 func Load() (*Config, error) {
 	return &Config{
 		Server: ServerConfig{
@@ -68,6 +85,17 @@ func Load() (*Config, error) {
 		Email: EmailConfig{
 			Enabled:           getEnvAsBool("EMAIL_ENABLED", true),
 			WelcomeEmailDelay: getEnvAsInt("WELCOME_EMAIL_DELAY_SECONDS", 5),
+		},
+		Docker: DockerConfig{
+			Socket:      getEnv("DOCKER_SOCKET", "/var/run/docker.sock"),
+			NetworkName: getEnv("DOCKER_NETWORK", "slate-network"),
+		},
+		Traefik: TraefikConfig{
+			ConfigDir: getEnv("TRAEFIK_CONFIG_DIR", "/config/traefik/dynamic"),
+		},
+		Kafka: KafkaConfig{
+			Brokers: []string{getEnv("KAFKA_BROKERS", "kafka:9092")},
+			GroupID: getEnv("KAFKA_GROUP_ID", "tenant-service"),
 		},
 	}, nil
 }
