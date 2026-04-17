@@ -1,6 +1,8 @@
 module slate/services/tenant-service
 
-go 1.25.0
+go 1.24
+
+toolchain go1.24.13
 
 require (
 	github.com/docker/docker v28.5.2+incompatible
