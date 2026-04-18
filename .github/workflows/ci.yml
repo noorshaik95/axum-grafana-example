@@ -33,7 +33,15 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: "frontend/${{ matrix.app }}/package-lock.json"
+          # include shared lockfile so cache busts when shared deps change
+          cache-dependency-path: |
+            frontend/${{ matrix.app }}/package-lock.json
+            frontend/shared/package-lock.json
+
+      # shared has its own deps (@radix-ui/* etc.) not duplicated in app package.json.
+      # Next.js resolves them from shared/node_modules/ when compiling shared files.
+      - name: Install shared dependencies
+        run: npm ci --prefix ../shared
 
       - run: npm ci
 
@@ -67,7 +75,12 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: "frontend/${{ matrix.app }}/package-lock.json"
+          cache-dependency-path: |
+            frontend/${{ matrix.app }}/package-lock.json
+            frontend/shared/package-lock.json
+
+      - name: Install shared dependencies
+        run: npm ci --prefix ../shared
 
       - run: npm ci
       - run: npm run build
@@ -122,7 +135,9 @@ jobs:
 
       - run: go build ./...
       - run: go vet ./...
-      - run: go test ./... -timeout 60s
+      # Exclude tests/integration — they require a running database; those are
+      # covered by the per-service CI workflows that spin up service containers.
+      - run: go test $(go list ./... | grep -v '/tests/integration') -timeout 60s
 
   # ──────────────────────────────────────────────────
   # Rust services: check + test

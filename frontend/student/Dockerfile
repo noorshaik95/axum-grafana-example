@@ -5,6 +5,11 @@ FROM node:20-alpine AS builder
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
+# Install shared deps before copying source so node_modules layer is preserved.
+# Must run before NODE_ENV=production is set so devDependencies are included.
+COPY shared/package.json shared/package-lock.json* ./shared/
+RUN npm ci --prefix shared
+
 COPY shared ./shared
 
 WORKDIR /app/student

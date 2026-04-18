@@ -69,8 +69,8 @@ jobs:
 
       - name: Run tests
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/user_auth_test?sslmode=disable
-          REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/user_auth_test?sslmode=disable
+          REDIS_URL: redis://127.0.0.1:6379
           JWT_SECRET: test-jwt-secret-key-for-ci
           ENVIRONMENT: test
         run: |
