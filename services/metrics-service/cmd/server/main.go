@@ -107,6 +107,9 @@ func main() {
 	handler := handlers.New(repo)
 	handler.RegisterRoutes(r)
 
+	// Register roster health routes
+	handler.RegisterRosterRoutes(r)
+
 	// Start HTTP server
 	httpServer := &http.Server{
 		Addr:    cfg.Server.Address(),

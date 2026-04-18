@@ -1,11 +1,11 @@
-import { apiClient } from '../../../../shared/lib/api/client'
+import { apiClient } from '../../../shared/lib/api/client'
 import type {
   Course,
   CourseFilters,
   Module,
   Lesson,
   PaginatedResponse,
-} from '../../../../shared/lib/api/types'
+} from '../../../shared/lib/api/types'
 
 export interface ModuleOrder {
   moduleId: string

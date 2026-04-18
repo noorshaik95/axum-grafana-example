@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Loader2, ChevronLeft, ChevronRight, FileText, CheckCircle } from 'lucide-react'
 import { useGradeSubmission } from '@/lib/api/hooks'
 import { formatDateTime } from '@/lib/utils'
-import type { Submission } from '../../../../../shared/lib/api/types'
+import type { Submission } from '../../../shared/lib/api/types'
 
 interface SubmissionGraderProps {
   assignmentId: string

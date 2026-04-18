@@ -6,7 +6,7 @@ import * as gradingApi from './grading'
 import * as videoApi from './video'
 import * as announcementsApi from './announcements'
 import * as messagesApi from './messages'
-import type { Course, CourseFilters } from '../../../../shared/lib/api/types'
+import type { Course, CourseFilters } from '../../../shared/lib/api/types'
 
 // -- Courses --
 

@@ -2,126 +2,214 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ClipboardList, Loader2, AlertCircle, Clock, Filter } from 'lucide-react';
+import { ClipboardList, Loader2, AlertCircle } from 'lucide-react';
 import { useStudentAssignments } from '@/lib/api/hooks';
 import { formatDate } from '@/lib/utils';
 
-type StatusFilter = 'all' | 'not_started' | 'in_progress' | 'submitted' | 'graded';
+type WorkFilter = 'open' | 'done' | 'late';
 
-const statusColors: Record<string, string> = {
-  not_started: 'bg-gray-100 text-gray-600',
-  in_progress: 'bg-amber-50 text-amber-700',
-  submitted: 'bg-blue-50 text-blue-700',
-  graded: 'bg-green-50 text-green-700',
-};
-
-function dueUrgencyClass(dateStr: string): string {
+function getDueBadge(
+  dateStr: string,
+  status: string
+): { label: string; bg: string; color: string } {
+  if (status === 'graded' || status === 'submitted') {
+    return { label: 'Done', bg: 'var(--forest-50)', color: 'var(--forest-700)' };
+  }
   const diffMs = new Date(dateStr).getTime() - Date.now();
+  const diffHours = diffMs / (1000 * 60 * 60);
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
-  if (diffMs < 0) return 'text-red-600 font-semibold';
-  if (diffDays <= 1) return 'text-red-500 font-medium';
-  if (diffDays <= 3) return 'text-amber-500 font-medium';
-  return 'text-[var(--color-text-muted)]';
+
+  if (diffMs < 0) return { label: 'Overdue', bg: '#fde8e6', color: '#c0392b' };
+  if (diffHours < 6)
+    return { label: `${Math.round(diffHours)}h left`, bg: '#fff3cd', color: '#7a4900' };
+  if (diffDays <= 1) return { label: 'Due tomorrow', bg: '#fff3cd', color: '#7a4900' };
+  if (diffDays <= 3)
+    return { label: `${Math.ceil(diffDays)}d left`, bg: 'rgba(255,182,72,0.15)', color: '#7a4900' };
+  return { label: formatDate(dateStr), bg: 'var(--paper)', color: 'var(--muted)' };
 }
 
+const ICONS: Record<string, string> = {
+  not_started: '○',
+  in_progress: '◑',
+  submitted: '●',
+  graded: '✓',
+};
+
 export default function AllAssignmentsPage() {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [filter, setFilter] = useState<WorkFilter>('open');
   const { data, isLoading, isError } = useStudentAssignments();
 
   const allAssignments = Array.isArray(data) ? data : [];
-  const assignments =
-    statusFilter === 'all'
-      ? allAssignments
-      : allAssignments.filter((a) => a.status === statusFilter);
 
-  // Sort by due date ascending
-  const sorted = [...assignments].sort(
+  const filtered = allAssignments.filter((a) => {
+    const isLate =
+      new Date(a.dueDate).getTime() < Date.now() &&
+      a.status !== 'graded' &&
+      a.status !== 'submitted';
+    const isDone = a.status === 'graded' || a.status === 'submitted';
+    if (filter === 'open') return !isDone && !isLate;
+    if (filter === 'done') return isDone;
+    if (filter === 'late') return isLate;
+    return true;
+  });
+
+  const openCount = allAssignments.filter((a) => {
+    const isLate =
+      new Date(a.dueDate).getTime() < Date.now() &&
+      a.status !== 'graded' &&
+      a.status !== 'submitted';
+    return !isLate && a.status !== 'graded' && a.status !== 'submitted';
+  }).length;
+  const doneCount = allAssignments.filter(
+    (a) => a.status === 'graded' || a.status === 'submitted'
+  ).length;
+  const lateCount = allAssignments.filter((a) => {
+    return (
+      new Date(a.dueDate).getTime() < Date.now() &&
+      a.status !== 'graded' &&
+      a.status !== 'submitted'
+    );
+  }).length;
+
+  const sorted = [...filtered].sort(
     (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
   );
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-2xl mx-auto space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--color-text)]">All Assignments</h1>
-        <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Assignments across all your courses, sorted by deadline
+        <h1 className="serif text-2xl" style={{ color: 'var(--ink)' }}>
+          Work
+        </h1>
+        <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
+          Assignments across all your courses
         </p>
       </div>
 
-      {/* Filter */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <Filter className="h-4 w-4 text-[var(--color-text-muted)]" />
-        {(['all', 'not_started', 'in_progress', 'submitted', 'graded'] as const).map((status) => (
-          <button
-            key={status}
-            onClick={() => setStatusFilter(status)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
-              statusFilter === status
-                ? 'bg-indigo-600 text-white'
-                : 'bg-white border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-muted)]'
-            }`}
-          >
-            {status.replace('_', ' ')}
-          </button>
-        ))}
+      {/* Segment tabs */}
+      <div
+        className="flex gap-1 p-1 rounded-xl w-fit"
+        style={{ background: 'var(--paper)', border: '1px solid var(--border)' }}
+      >
+        {(
+          [
+            { key: 'open', label: `Open ${openCount}` },
+            { key: 'done', label: `Done ${doneCount}` },
+            { key: 'late', label: `Late ${lateCount}` },
+          ] as const
+        ).map((tab) => {
+          const isActive = filter === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setFilter(tab.key)}
+              className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: isActive ? '#fff' : 'transparent',
+                color: isActive
+                  ? tab.key === 'late'
+                    ? '#c0392b'
+                    : 'var(--forest-700)'
+                  : 'var(--muted)',
+                boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
+                border: isActive ? '1px solid var(--border)' : '1px solid transparent',
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="rounded-xl border border-[var(--color-border)] bg-white shadow-sm">
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{ background: '#fff', border: '1px solid var(--border)' }}
+      >
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-[var(--color-text-muted)]" />
+            <Loader2
+              style={{ width: 28, height: 28, color: 'var(--muted)' }}
+              className="animate-spin"
+            />
           </div>
         ) : isError ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-[var(--color-error)]">
-            <AlertCircle className="h-5 w-5" />
+          <div
+            className="flex items-center justify-center gap-2 py-16"
+            style={{ color: 'var(--warm)' }}
+          >
+            <AlertCircle style={{ width: 18, height: 18 }} />
             <span className="text-sm">Failed to load assignments</span>
           </div>
         ) : sorted.length === 0 ? (
           <div className="py-16 text-center">
-            <ClipboardList className="mx-auto h-10 w-10 text-[var(--color-text-muted)]" />
-            <p className="mt-3 text-sm text-[var(--color-text-muted)]">
-              {statusFilter === 'all'
-                ? 'No assignments yet.'
-                : `No ${statusFilter.replace('_', ' ')} assignments.`}
+            <ClipboardList
+              style={{ width: 32, height: 32, color: 'var(--muted)', margin: '0 auto 8px' }}
+            />
+            <p className="text-sm" style={{ color: 'var(--muted)' }}>
+              No {filter} assignments.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-[var(--color-border)]">
-            {sorted.map((assignment) => (
-              <Link
-                key={assignment.id}
-                href={`/courses/${assignment.courseId}/assignments/${assignment.id}`}
-                className="flex items-center justify-between p-5 hover:bg-[var(--color-bg-muted)]/50 transition-colors"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-[var(--color-text)]">{assignment.title}</p>
-                  <div className="mt-1 flex items-center gap-3 text-xs text-[var(--color-text-muted)]">
-                    <span>{assignment.courseTitle}</span>
-                    <span>{assignment.maxPoints} pts</span>
-                  </div>
-                </div>
-                <div className="ml-3 flex items-center gap-3">
-                  <div
-                    className={`flex items-center gap-1 text-xs ${dueUrgencyClass(assignment.dueDate)}`}
-                  >
-                    <Clock className="h-3 w-3" />
-                    {formatDate(assignment.dueDate)}
-                  </div>
-                  {assignment.status === 'graded' && assignment.grade !== null && (
-                    <span className="text-sm font-semibold text-[var(--color-text)]">
-                      {assignment.grade}/{assignment.maxPoints}
-                    </span>
-                  )}
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {sorted.map((assignment) => {
+              const badge = getDueBadge(assignment.dueDate, assignment.status);
+              const icon = ICONS[assignment.status] ?? '○';
+              const isDone = assignment.status === 'graded' || assignment.status === 'submitted';
+              return (
+                <Link
+                  key={assignment.id}
+                  href={`/courses/${assignment.courseId}/assignments/${assignment.id}`}
+                  className="flex items-center gap-4 p-4 transition-colors hover:bg-[var(--forest-50)]"
+                >
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-                      statusColors[assignment.status] ?? statusColors.not_started
-                    }`}
+                    className="shrink-0 mono text-base"
+                    style={{
+                      color: isDone ? 'var(--forest-500)' : 'var(--muted)',
+                      width: 20,
+                      textAlign: 'center',
+                    }}
                   >
-                    {assignment.status.replace('_', ' ')}
+                    {icon}
                   </span>
-                </div>
-              </Link>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="text-sm font-medium"
+                      style={{
+                        color: 'var(--ink)',
+                        textDecoration: isDone ? 'line-through' : 'none',
+                        opacity: isDone ? 0.7 : 1,
+                      }}
+                    >
+                      {assignment.title}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                        {assignment.courseTitle}
+                      </span>
+                      <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                        · {assignment.maxPoints} pts
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {assignment.status === 'graded' && assignment.grade !== null && (
+                      <span
+                        className="text-sm font-bold mono"
+                        style={{ color: 'var(--forest-600)' }}
+                      >
+                        {assignment.grade}/{assignment.maxPoints}
+                      </span>
+                    )}
+                    <span
+                      className="text-xs font-medium px-2.5 py-1 rounded-full mono"
+                      style={{ background: badge.bg, color: badge.color }}
+                    >
+                      {badge.label}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

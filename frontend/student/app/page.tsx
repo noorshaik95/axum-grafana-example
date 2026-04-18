@@ -9,7 +9,7 @@ export default function HomePage() {
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('slate_token') : null;
     if (token) {
-      router.replace('/dashboard');
+      router.replace('/today');
     } else {
       router.replace('/login');
     }

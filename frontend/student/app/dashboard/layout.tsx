@@ -1,7 +1,7 @@
 'use client';
 
-import { StudentShell } from '@/components/layout/student-shell';
+import { StudentTopbar } from '@/components/layout/student-topbar';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return <StudentShell>{children}</StudentShell>;
+  return <StudentTopbar>{children}</StudentTopbar>;
 }

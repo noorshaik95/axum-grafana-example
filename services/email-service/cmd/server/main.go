@@ -131,6 +131,15 @@ func main() {
 		r.Delete("/{id}", handler.DeleteMessage)
 	})
 
+	// Discussion threads (course Q&A)
+	discussionHandler := handlers.NewDiscussionHandler()
+	discussionHandler.RegisterDiscussionRoutes(r)
+
+	// Admin broadcast
+	broadcastHandler := handlers.NewBroadcastHandler()
+	r.Post("/admin/broadcast", broadcastHandler.CreateBroadcast)
+	r.Get("/admin/broadcast/history", broadcastHandler.GetHistory)
+
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		if err := db.Ping(); err != nil {

@@ -4,6 +4,31 @@
 
 @layer base {
   :root {
+    /* New design system tokens */
+    --forest-50: #f2f7f3;
+    --forest-100: #dde9df;
+    --forest-200: #b8d2bd;
+    --forest-300: #8ab694;
+    --forest-400: #5d9a6c;
+    --forest-500: #3e7d4f;
+    --forest-600: #2d6640;
+    --forest-700: #234e32;
+    --forest-800: #1a3a26;
+    --forest-900: #0f2617;
+    --cream: #fbfaf5;
+    --paper: #f6f3ec;
+    --ink: #12170f;
+    --muted-color: #6a6e62;
+    --warm: #d97757;
+    --amber-color: #ffb648;
+    --line: #e4e0d4;
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 18px;
+    --r-xl: 24px;
+    --r-pill: 999px;
+
+    /* Shadcn/radix HSL variables — keep for component library compatibility */
     --background: 0 0% 100%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
@@ -20,19 +45,31 @@
     --accent-foreground: 222 47% 11%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
+    --border: 36 18% 87%;
     --input: 214 32% 91%;
     --ring: 239 84% 67%;
     --radius: 0.75rem;
   }
-}
 
-@layer base {
   * {
-    @apply border-border;
+    border-color: #e4e0d4;
   }
 
   body {
-    @apply bg-white text-slate-900 min-h-screen antialiased;
+    background: #fbfaf5;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: #12170f;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .font-serif {
+    font-family: 'Instrument Serif', Georgia, serif;
+  }
+  .font-mono-brand {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
   }
 }

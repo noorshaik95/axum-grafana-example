@@ -14,6 +14,7 @@ type Router struct {
 	gradingHandler      *GradingHandler
 	gradebookHandler    *GradebookHandler
 	gradingRuleHandler  *GradingRuleHandler
+	gradingQueueHandler *GradingQueueHandler
 }
 
 // NewRouter creates a new REST API router
@@ -25,11 +26,12 @@ func NewRouter(
 	gradingRuleSvc service.GradingRuleService,
 ) *Router {
 	return &Router{
-		assignmentHandler:  NewAssignmentHandler(assignmentSvc),
-		submissionHandler:  NewSubmissionHandler(submissionSvc),
-		gradingHandler:     NewGradingHandler(gradingSvc),
-		gradebookHandler:   NewGradebookHandler(gradebookSvc),
-		gradingRuleHandler: NewGradingRuleHandler(gradingRuleSvc),
+		assignmentHandler:   NewAssignmentHandler(assignmentSvc),
+		submissionHandler:   NewSubmissionHandler(submissionSvc),
+		gradingHandler:      NewGradingHandler(gradingSvc),
+		gradebookHandler:    NewGradebookHandler(gradebookSvc),
+		gradingRuleHandler:  NewGradingRuleHandler(gradingRuleSvc),
+		gradingQueueHandler: NewGradingQueueHandler(),
 	}
 }
 
@@ -43,6 +45,9 @@ func (r *Router) Handler() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok","service":"assignment-grading-service"}`))
 	})
+
+	// Grading queue (instructor queue-style grading + batch grading)
+	r.gradingQueueHandler.RegisterRoutes(mux)
 
 	// Assignments
 	mux.HandleFunc("/assignments", func(w http.ResponseWriter, req *http.Request) {

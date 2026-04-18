@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Video, VideoOff, Mic, MicOff, Clock, Users, ExternalLink, Loader2 } from 'lucide-react';
+import { Video, VideoOff, Mic, MicOff, Clock, Users, ExternalLink } from 'lucide-react';
 import type { VideoSession } from '@/lib/api/video';
 
 interface JoinSessionProps {

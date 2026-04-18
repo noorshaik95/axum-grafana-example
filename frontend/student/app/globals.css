@@ -4,25 +4,61 @@
 
 @layer base {
   :root {
-    --color-bg: #ffffff;
-    --color-bg-muted: #f8fafc;
-    --color-sidebar: #0f172a;
-    --color-sidebar-hover: #1e293b;
-    --color-sidebar-active: #334155;
-    --color-border: #e2e8f0;
-    --color-text: #0f172a;
-    --color-text-muted: #64748b;
-    --color-primary: #6366f1;
-    --color-primary-hover: #4f46e5;
-    --color-primary-light: #e0e7ff;
-    --color-success: #22c55e;
-    --color-success-light: #dcfce7;
-    --color-warning: #f59e0b;
-    --color-warning-light: #fef3c7;
-    --color-error: #ef4444;
-    --color-error-light: #fee2e2;
-    --color-info: #3b82f6;
-    --color-info-light: #dbeafe;
+    /* Forest palette */
+    --forest-50: #f2f7f3;
+    --forest-100: #dde9df;
+    --forest-200: #b8d2bd;
+    --forest-300: #8ab694;
+    --forest-400: #5d9a6c;
+    --forest-500: #3e7d4f;
+    --forest-600: #2d6640;
+    --forest-700: #234e32;
+    --forest-800: #1a3a26;
+    --forest-900: #0f2617;
+
+    /* Neutral palette */
+    --cream: #fbfaf5;
+    --paper: #f6f3ec;
+    --ink: #12170f;
+    --muted: #6a6e62;
+    --warm: #d97757;
+    --amber: #ffb648;
+
+    /* UI tokens */
+    --border: #e4e0d4;
+    --line: #e4e0d4;
+
+    /* Radius */
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 18px;
+    --r-xl: 24px;
+    --r-pill: 999px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(18, 23, 15, 0.05);
+    --shadow-md: 0 6px 20px -6px rgba(18, 23, 15, 0.12);
+
+    /* Legacy compat */
+    --color-bg: #fbfaf5;
+    --color-bg-muted: #f6f3ec;
+    --color-sidebar: #234e32;
+    --color-sidebar-hover: #1a3a26;
+    --color-sidebar-active: #2d6640;
+    --color-border: #e4e0d4;
+    --color-text: #12170f;
+    --color-text-muted: #6a6e62;
+    --color-primary: #2d6640;
+    --color-primary-hover: #234e32;
+    --color-primary-light: #dde9df;
+    --color-success: #3e7d4f;
+    --color-success-light: #dde9df;
+    --color-warning: #ffb648;
+    --color-warning-light: #fff8e6;
+    --color-error: #c0392b;
+    --color-error-light: #fde8e6;
+    --color-info: #2d6640;
+    --color-info-light: #dde9df;
   }
 }
 
@@ -32,9 +68,77 @@
   }
 
   body {
-    @apply bg-[var(--color-bg)] text-[var(--color-text)] min-h-screen antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    background: var(--cream);
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
   }
+}
+
+.serif {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-weight: 400;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Action hero gradient */
+.hero-gradient {
+  background: linear-gradient(135deg, var(--forest-700) 0%, var(--forest-900) 100%);
+}
+
+/* Card styles */
+.card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Pill button */
+.btn-primary {
+  background: var(--forest-700);
+  color: #ffffff;
+  border-radius: var(--r-pill);
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.btn-primary:hover {
+  background: var(--forest-800);
+}
+
+.btn-secondary {
+  background: #ffffff;
+  color: var(--forest-700);
+  border: 1px solid var(--forest-300);
+  border-radius: var(--r-pill);
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.btn-secondary:hover {
+  background: var(--forest-50);
+}
+
+.btn-amber {
+  background: var(--amber);
+  color: var(--ink);
+  border-radius: var(--r-pill);
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: background 0.15s;
+}
+.btn-amber:hover {
+  background: #e09000;
+  color: #ffffff;
 }
 
 @media (prefers-reduced-motion: reduce) {

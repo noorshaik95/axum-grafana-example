@@ -25,7 +25,7 @@ import {
   useCreateLesson,
   useDeleteLesson,
 } from '@/lib/api/hooks'
-import type { Module, Lesson } from '../../../../../../shared/lib/api/types'
+import type { Module, Lesson } from '../../../../shared/lib/api/types'
 
 interface ContentManagerProps {
   courseId: string

@@ -4,178 +4,230 @@ import Link from 'next/link';
 import {
   GraduationCap,
   BookOpen,
-  BarChart3,
+  TrendingUp,
   Loader2,
   AlertCircle,
   ChevronRight,
 } from 'lucide-react';
 import { useGradesOverview } from '@/lib/api/hooks';
-import { getGradeLetter, getGradeColor } from '@/lib/utils';
+
+function getLetterGrade(pct: number): string {
+  if (pct >= 93) return 'A';
+  if (pct >= 90) return 'A-';
+  if (pct >= 87) return 'B+';
+  if (pct >= 83) return 'B';
+  if (pct >= 80) return 'B-';
+  if (pct >= 77) return 'C+';
+  if (pct >= 73) return 'C';
+  if (pct >= 70) return 'C-';
+  if (pct >= 60) return 'D';
+  return 'F';
+}
+
+function getLetterColor(pct: number): string {
+  if (pct >= 90) return 'var(--forest-600)';
+  if (pct >= 80) return '#2980b9';
+  if (pct >= 70) return 'var(--muted)';
+  return 'var(--warm)';
+}
+
+function getOnTrackNote(pct: number): string {
+  if (pct >= 90) return 'On track for A';
+  if (pct >= 80) return 'On track for B';
+  if (pct >= 70) return 'On track for C';
+  return 'Needs attention';
+}
+
+function computeGpa(grades: { currentGrade: number }[]): string {
+  if (grades.length === 0) return '--';
+  const total = grades.reduce((sum, g) => {
+    const pct = g.currentGrade;
+    const pts =
+      pct >= 93
+        ? 4.0
+        : pct >= 90
+          ? 3.7
+          : pct >= 87
+            ? 3.3
+            : pct >= 83
+              ? 3.0
+              : pct >= 80
+                ? 2.7
+                : pct >= 77
+                  ? 2.3
+                  : pct >= 73
+                    ? 2.0
+                    : pct >= 70
+                      ? 1.7
+                      : pct >= 60
+                        ? 1.0
+                        : 0;
+    return sum + pts;
+  }, 0);
+  return (total / grades.length).toFixed(2);
+}
 
 export default function GradesPage() {
   const { data: grades, isLoading, isError } = useGradesOverview();
 
   const gradeList = Array.isArray(grades) ? grades : [];
-
-  // Calculate cumulative GPA estimate
-  const gpa =
+  const gpa = computeGpa(gradeList);
+  const avg =
     gradeList.length > 0
-      ? (
-          gradeList.reduce((sum, g) => {
-            const gradePoint =
-              g.currentGrade >= 90
-                ? 4.0
-                : g.currentGrade >= 80
-                  ? 3.0
-                  : g.currentGrade >= 70
-                    ? 2.0
-                    : g.currentGrade >= 60
-                      ? 1.0
-                      : 0.0;
-            return sum + gradePoint;
-          }, 0) / gradeList.length
-        ).toFixed(2)
-      : '--';
+      ? Math.round(gradeList.reduce((s, g) => s + g.currentGrade, 0) / gradeList.length)
+      : null;
 
-  const totalGraded = gradeList.reduce((sum, g) => sum + g.completedAssignments, 0);
+  // Trend: compare top half avg to bottom half avg
+  const sorted = [...gradeList].sort((a, b) => a.currentGrade - b.currentGrade);
+  const trendLabel =
+    sorted.length >= 2 && sorted[sorted.length - 1].currentGrade > sorted[0].currentGrade
+      ? '↑ Improving'
+      : sorted.length >= 2
+        ? '→ Steady'
+        : '--';
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-2xl mx-auto space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--color-text)]">Grades</h1>
-        <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Track your academic performance across all courses
+        <h1 className="serif text-2xl" style={{ color: 'var(--ink)' }}>
+          Grades
+        </h1>
+        <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
+          Your academic performance
         </p>
       </div>
 
-      {/* Summary stats */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-[var(--color-text-muted)]">GPA Estimate</p>
-            <GraduationCap className="h-4 w-4 text-[var(--color-text-muted)]" />
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          {
+            label: 'Projection',
+            value: avg !== null ? `${avg}%` : '--',
+            icon: TrendingUp,
+            note: avg !== null ? getLetterGrade(avg) : '',
+          },
+          {
+            label: 'GPA',
+            value: isLoading ? null : gpa,
+            icon: GraduationCap,
+            note: 'Estimate',
+          },
+          {
+            label: 'Trend',
+            value: trendLabel,
+            icon: BookOpen,
+            note: `${gradeList.length} courses`,
+          },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="rounded-xl p-4"
+            style={{ background: '#fff', border: '1px solid var(--border)' }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <p
+                className="text-xs font-semibold uppercase tracking-wide"
+                style={{ color: 'var(--muted)' }}
+              >
+                {stat.label}
+              </p>
+              <stat.icon style={{ width: 13, height: 13, color: 'var(--muted)' }} />
+            </div>
+            <p className="text-xl font-bold mono" style={{ color: 'var(--ink)' }}>
+              {stat.value === null ? (
+                <Loader2 style={{ width: 18, height: 18 }} className="animate-spin" />
+              ) : (
+                stat.value
+              )}
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+              {stat.note}
+            </p>
           </div>
-          <p className="mt-2 text-2xl font-bold text-[var(--color-text)]">
-            {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : gpa}
-          </p>
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">Cumulative</p>
-        </div>
-        <div className="rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-[var(--color-text-muted)]">Courses</p>
-            <BookOpen className="h-4 w-4 text-[var(--color-text-muted)]" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-[var(--color-text)]">
-            {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : gradeList.length}
-          </p>
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">Active</p>
-        </div>
-        <div className="rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-[var(--color-text-muted)]">Graded Items</p>
-            <BarChart3 className="h-4 w-4 text-[var(--color-text-muted)]" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-[var(--color-text)]">
-            {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : totalGraded}
-          </p>
-          <p className="mt-1 text-xs text-[var(--color-text-muted)]">Total</p>
-        </div>
+        ))}
       </div>
 
-      {/* Course grade cards */}
+      {/* Course rows */}
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
             <div
               key={i}
-              className="h-40 rounded-xl border border-[var(--color-border)] bg-white animate-pulse"
+              className="h-20 rounded-xl animate-pulse"
+              style={{ background: 'var(--paper)' }}
             />
           ))}
         </div>
       ) : isError ? (
-        <div className="rounded-xl border border-[var(--color-border)] bg-white p-12 text-center shadow-sm">
-          <AlertCircle className="mx-auto h-8 w-8 text-[var(--color-error)]" />
-          <p className="mt-2 text-sm text-[var(--color-error)]">Failed to load grades</p>
+        <div
+          className="rounded-xl p-12 text-center"
+          style={{ background: '#fff', border: '1px solid var(--border)' }}
+        >
+          <AlertCircle
+            style={{ width: 28, height: 28, color: 'var(--warm)', margin: '0 auto 8px' }}
+          />
+          <p className="text-sm" style={{ color: 'var(--warm)' }}>
+            Failed to load grades
+          </p>
         </div>
       ) : gradeList.length === 0 ? (
-        <div className="rounded-xl border border-[var(--color-border)] bg-white p-12 text-center shadow-sm">
-          <GraduationCap className="mx-auto h-10 w-10 text-[var(--color-text-muted)]" />
-          <p className="mt-3 text-sm text-[var(--color-text-muted)]">
-            No grades yet. Your grades will appear here once assignments are graded.
+        <div
+          className="rounded-xl p-12 text-center"
+          style={{ background: '#fff', border: '1px solid var(--border)' }}
+        >
+          <GraduationCap
+            style={{ width: 32, height: 32, color: 'var(--muted)', margin: '0 auto 8px' }}
+          />
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>
+            No grades yet. They&apos;ll appear once assignments are graded.
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {gradeList.map((g) => (
-            <Link
-              key={g.courseId}
-              href={`/grades/${g.courseId}`}
-              className="group rounded-xl border border-[var(--color-border)] bg-white p-5 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-md bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white">
-                      {g.courseCode}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm font-medium text-[var(--color-text)] truncate group-hover:text-indigo-600 transition-colors">
-                    {g.courseTitle}
-                  </p>
-                </div>
-                <div className="text-right shrink-0 ml-3">
-                  <p className={`text-2xl font-bold ${getGradeColor(g.currentGrade)}`}>
-                    {g.letterGrade}
-                  </p>
-                  <p className="text-xs text-[var(--color-text-muted)]">
-                    {Math.round(g.currentGrade)}%
-                  </p>
-                </div>
-              </div>
-
-              {/* Progress bar */}
-              <div className="mt-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-[var(--color-text-muted)]">
-                    {g.completedAssignments}/{g.totalAssignments} graded
-                  </span>
-                  <span className="text-xs text-[var(--color-text-muted)]">
-                    {g.earnedPoints}/{g.totalPoints} pts
-                  </span>
-                </div>
-                <div className="h-1.5 w-full rounded-full bg-gray-100">
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{ background: '#fff', border: '1px solid var(--border)' }}
+        >
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {gradeList.map((g) => {
+              const pct = Math.round(g.currentGrade);
+              const letterColor = getLetterColor(pct);
+              const onTrack = getOnTrackNote(pct);
+              return (
+                <Link
+                  key={g.courseId}
+                  href={`/grades/${g.courseId}`}
+                  className="flex items-center gap-4 p-4 transition-colors hover:bg-[var(--forest-50)]"
+                >
                   <div
-                    className="h-1.5 rounded-full bg-indigo-600 transition-all"
+                    className="flex items-center justify-center rounded-xl shrink-0 font-bold text-xs"
                     style={{
-                      width: `${
-                        g.totalAssignments > 0
-                          ? (g.completedAssignments / g.totalAssignments) * 100
-                          : 0
-                      }%`,
+                      width: 40,
+                      height: 40,
+                      background: 'var(--forest-50)',
+                      border: '1px solid var(--forest-200)',
+                      color: 'var(--forest-700)',
                     }}
-                  />
-                </div>
-              </div>
-
-              {/* Category breakdown preview */}
-              {g.breakdown && g.breakdown.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {g.breakdown.slice(0, 3).map((cat) => (
-                    <span
-                      key={cat.category}
-                      className="rounded-full bg-gray-50 px-2 py-0.5 text-xs text-[var(--color-text-muted)]"
-                    >
-                      {cat.category} {cat.weight}%
+                  >
+                    {g.courseCode?.substring(0, 2) ?? 'CS'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--ink)' }}>
+                      {g.courseTitle}
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                      {pct}% · {onTrack}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-lg font-bold mono" style={{ color: letterColor }}>
+                      {g.letterGrade}
                     </span>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-3 flex items-center justify-end text-xs font-medium text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                View Details <ChevronRight className="h-3 w-3 ml-0.5" />
-              </div>
-            </Link>
-          ))}
+                    <ChevronRight style={{ width: 14, height: 14, color: 'var(--muted)' }} />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

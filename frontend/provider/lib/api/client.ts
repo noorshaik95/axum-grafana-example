@@ -1,6 +1,4 @@
-import { apiClient } from '../../../../shared/lib/api/client'
-
-export { apiClient, ApiError } from '../../../../shared/lib/api/client'
+export { apiClient, ApiError } from '../../../shared/lib/api/client'
 
 export function getTenantId(): string | null {
   if (typeof window === 'undefined') return null

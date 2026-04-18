@@ -48,6 +48,65 @@ func (h *TenantHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /tenants/{id}/plan", h.UpdatePlan)
 	mux.HandleFunc("GET /tenants/{id}/usage", h.GetUsage)
 	mux.HandleFunc("DELETE /tenants/{id}", h.DeleteTenant)
+
+	// Admin schools endpoints (alias tenants with richer data)
+	mux.HandleFunc("GET /admin/schools", h.ListSchools)
+	mux.HandleFunc("GET /admin/schools/{id}", h.GetSchool)
+
+	// Admin incidents
+	incidentHandler := NewIncidentHandler()
+	incidentHandler.RegisterIncidentRoutes(mux)
+
+	// Admin feature flags
+	flagsHandler := NewFlagsHandler()
+	flagsHandler.RegisterFlagsRoutes(mux)
+}
+
+// ListSchools handles GET /admin/schools — tenants with health + renewal metadata.
+func (h *TenantHandler) ListSchools(w http.ResponseWriter, r *http.Request) {
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
+	search := r.URL.Query().Get("search")
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 20
+	}
+
+	tenants, total, err := h.repo.ListTenants(r.Context(), page, pageSize, search)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to list schools")
+		writeError(w, http.StatusInternalServerError, "failed to list schools")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"schools":  tenants,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+	})
+}
+
+// GetSchool handles GET /admin/schools/:id — detailed school view with incident data.
+func (h *TenantHandler) GetSchool(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	tenant, err := h.repo.GetTenantByID(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "school not found")
+		return
+	}
+
+	// Augment with mock health/renewal data
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"school":         tenant,
+		"health":         "healthy",
+		"renewalDate":    nil,
+		"openIncidents":  0,
+		"activeStudents": 0,
+	})
 }
 
 func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {

@@ -1,5 +1,5 @@
-import { apiClient } from '../../../../shared/lib/api/client'
-import type { Assignment, Submission, Grade } from '../../../../shared/lib/api/types'
+import { apiClient } from '../../../shared/lib/api/client'
+import type { Assignment, Submission, Grade } from '../../../shared/lib/api/types'
 
 export interface CreateAssignmentDto {
   courseId: string

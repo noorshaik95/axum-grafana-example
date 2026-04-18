@@ -1,150 +1,185 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Loader2, BarChart2, BookOpen, Users, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
-import { useCourses, useProfile } from '../../../../shared/lib/api/hooks'
-import type { Course } from '../../../../shared/lib/api/types'
+import { TrendingUp, CheckSquare, BarChart2, AlertTriangle, ArrowRight } from 'lucide-react'
+
+const struggleTopics = [
+  { topic: 'Tail recursion', pct: 68, students: 32 },
+  { topic: 'Type inference', pct: 52, students: 24 },
+  { topic: 'Monadic bind', pct: 44, students: 21 },
+  { topic: 'Pattern matching', pct: 28, students: 13 },
+  { topic: 'List comprehensions', pct: 18, students: 9 },
+]
 
 export default function AnalyticsPage() {
-  const { data: profile } = useProfile()
-  const {
-    data: coursesData,
-    isLoading,
-    error,
-  } = useCourses(profile ? { instructorId: profile.id } : undefined)
-
-  const courses: readonly Course[] = coursesData?.data ?? []
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
-        Failed to load analytics data. Please try again later.
-      </div>
-    )
-  }
-
-  const publishedCount = courses.filter((c) => c.isPublished).length
+  const maxPct = Math.max(...struggleTopics.map((t) => t.pct))
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Analytics</h1>
-        <p className="text-slate-500 mt-1">Track course metrics and student performance.</p>
+        <h1 className="font-serif text-2xl text-[#12170f]">Analytics</h1>
+        <p className="text-sm mt-1" style={{ color: '#6a6e62' }}>
+          CS 3110 · Spring 2026 · Week 7
+        </p>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Total Courses</CardTitle>
-            <BookOpen className="h-4 w-4 text-indigo-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{courses.length}</div>
-            <p className="text-xs text-slate-500 mt-1">{publishedCount} published</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Total Students</CardTitle>
-            <Users className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">--</div>
-            <p className="text-xs text-slate-500 mt-1">Across all courses</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Avg Class Score</CardTitle>
-            <TrendingUp className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">--</div>
-            <p className="text-xs text-slate-500 mt-1">Across all assignments</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Engagement</CardTitle>
-            <BarChart2 className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">--</div>
-            <p className="text-xs text-slate-500 mt-1">Activity data coming soon</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Course-level analytics */}
-      {courses.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <BarChart2 className="h-12 w-12 text-slate-300 mb-3" />
-            <p className="text-slate-500 mb-4">
-              No courses yet. Analytics will appear once you create courses.
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          {
+            label: 'Engagement',
+            value: '82%',
+            sub: '+4% vs last week',
+            Icon: TrendingUp,
+            color: '#234e32',
+            bg: '#f2f7f3',
+          },
+          {
+            label: 'Completion',
+            value: '71%',
+            sub: 'modules finished avg',
+            Icon: CheckSquare,
+            color: '#234e32',
+            bg: '#f2f7f3',
+          },
+          {
+            label: 'Median grade',
+            value: '78%',
+            sub: 'across all assignments',
+            Icon: BarChart2,
+            color: '#234e32',
+            bg: '#f2f7f3',
+          },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="rounded-xl border p-5"
+            style={{ background: '#ffffff', borderColor: '#e4e0d4' }}
+          >
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-lg mb-3"
+              style={{ background: stat.bg }}
+            >
+              <stat.Icon className="h-5 w-5" style={{ color: stat.color }} />
+            </div>
+            <p className="font-serif text-2xl font-bold" style={{ color: stat.color }}>
+              {stat.value}
             </p>
-            <Button asChild>
-              <Link href="/courses">Go to Courses</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-slate-900">Course Overview</h2>
-          <div className="grid gap-4">
-            {courses.map((course) => (
-              <Card key={course.id} className="hover:shadow-sm transition-shadow">
-                <CardContent className="flex items-center justify-between p-5">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-semibold text-slate-900 truncate">{course.title}</h3>
-                      <Badge
-                        variant={course.isPublished ? 'default' : 'secondary'}
-                        className="shrink-0"
-                      >
-                        {course.isPublished ? 'Published' : 'Draft'}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-slate-500">
-                      <span>{course.term}</span>
-                      {course.metadata?.courseCode && <span>{course.metadata.courseCode}</span>}
-                      {course.metadata?.department && <span>{course.metadata.department}</span>}
-                    </div>
+            <p className="text-sm font-medium text-[#12170f] mt-0.5">{stat.label}</p>
+            <p className="text-xs mt-0.5" style={{ color: '#6a6e62' }}>
+              {stat.sub}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Where students struggle */}
+      <div
+        className="rounded-xl border overflow-hidden"
+        style={{ background: '#ffffff', borderColor: '#e4e0d4' }}
+      >
+        <div
+          className="px-5 py-3 border-b"
+          style={{ background: '#f6f3ec', borderColor: '#e4e0d4' }}
+        >
+          <h2 className="text-sm font-semibold text-[#12170f]">Where students struggle</h2>
+          <p className="text-xs mt-0.5" style={{ color: '#6a6e62' }}>
+            % of students getting below 70% on topics
+          </p>
+        </div>
+        <div className="p-5 space-y-3">
+          {struggleTopics.map((topic) => {
+            const barWidth = (topic.pct / maxPct) * 100
+            const barColor = topic.pct >= 60 ? '#d97757' : topic.pct >= 40 ? '#ffb648' : '#3e7d4f'
+            return (
+              <div key={topic.topic}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm text-[#12170f]">{topic.topic}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs" style={{ color: '#6a6e62' }}>
+                      {topic.students} students
+                    </span>
+                    <span className="font-mono text-sm font-semibold" style={{ color: barColor }}>
+                      {topic.pct}%
+                    </span>
                   </div>
-                  <Button size="sm" variant="outline" asChild>
-                    <Link href={`/courses/${course.id}?tab=grades`}>View Gradebook</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: '#f6f3ec' }}>
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${barWidth}%`, background: barColor }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Actionable card */}
+      <div
+        className="rounded-xl border px-5 py-5"
+        style={{
+          background: 'linear-gradient(135deg, #f2f7f3 0%, #dde9df 100%)',
+          borderColor: '#b8d2bd',
+        }}
+      >
+        <div className="flex items-start gap-3">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl mt-0.5"
+            style={{ background: '#234e32' }}
+          >
+            <AlertTriangle className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-[#12170f] mb-1">Suggested action</h3>
+            <p className="text-sm leading-relaxed" style={{ color: '#234e32' }}>
+              68% of students are struggling with <strong>tail recursion</strong>. Consider adding a
+              live demo in Lecture 8, or creating a worked example in the course materials.
+              Batch-grading PS4 with shared feedback is also a high-leverage action.
+            </p>
           </div>
         </div>
-      )}
+        <div className="flex items-center gap-2 mt-4">
+          <Link
+            href="/grade/ps4"
+            className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-all hover:opacity-80"
+            style={{ background: '#234e32', color: '#ffffff' }}
+          >
+            Open grading queue
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link
+            href="/courses/cs3110/content"
+            className="flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-medium transition-colors hover:bg-white/50"
+            style={{ borderColor: '#8ab694', color: '#234e32' }}
+          >
+            Add course material
+          </Link>
+        </div>
+      </div>
 
-      {/* Placeholder */}
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <BarChart2 className="h-10 w-10 text-slate-300 mb-3" />
-          <p className="text-slate-500">
-            Detailed analytics charts and engagement trends will be available soon.
+      {/* At-risk alert */}
+      <div
+        className="rounded-xl border px-5 py-4 flex items-center gap-4"
+        style={{ background: 'rgba(217,119,87,0.06)', borderColor: 'rgba(217,119,87,0.3)' }}
+      >
+        <AlertTriangle className="h-5 w-5 shrink-0" style={{ color: '#d97757' }} />
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-[#12170f]">2 students at risk</p>
+          <p className="text-xs mt-0.5" style={{ color: '#6a6e62' }}>
+            Alex Morrison and Jordan Kim haven't submitted in 2+ weeks.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+        <Link
+          href="/roster"
+          className="shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all hover:opacity-80"
+          style={{ background: '#d97757', color: '#ffffff' }}
+        >
+          View roster
+        </Link>
+      </div>
     </div>
   )
 }

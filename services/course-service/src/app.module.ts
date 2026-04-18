@@ -6,6 +6,8 @@ import { CourseModule } from './course/course.module';
 import { EnrollmentModule } from './enrollment/enrollment.module';
 import { ProgressModule } from './progress/progress.module';
 import { KafkaModule } from './kafka/kafka.module';
+import { OfficeHoursModule } from './office-hours/office-hours.module';
+import { StudyPlanModule } from './study-plan/study-plan.module';
 import { HealthController } from './health/health.controller';
 import { MetricsController } from './observability/metrics.controller';
 import { MetricsService } from './observability/metrics.service';
@@ -40,6 +42,8 @@ import configuration from './config/configuration';
     EnrollmentModule,
     ProgressModule,
     KafkaModule,
+    OfficeHoursModule,
+    StudyPlanModule,
   ],
   controllers: [HealthController, MetricsController],
   providers: [MetricsService],

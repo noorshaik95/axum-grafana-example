@@ -4,7 +4,24 @@
 
 @layer base {
   :root {
-    --color-bg: #ffffff;
+    --forest-50: #f2f7f3;
+    --forest-100: #dde9df;
+    --forest-200: #b8d2bd;
+    --forest-300: #8ab694;
+    --forest-400: #5d9a6c;
+    --forest-500: #3e7d4f;
+    --forest-600: #2d6640;
+    --forest-700: #234e32;
+    --forest-800: #1a3a26;
+    --forest-900: #0f2617;
+    --cream: #fbfaf5;
+    --paper: #f6f3ec;
+    --ink: #12170f;
+    --muted-text: #6a6e62;
+    --warm: #d97757;
+    --amber-accent: #ffb648;
+    --forest-border: #e4e0d4;
+    --color-bg: #fbfaf5;
     --color-bg-muted: #f8fafc;
     --color-sidebar: #0f172a;
     --color-sidebar-hover: #1e293b;
@@ -53,7 +70,8 @@
   }
 
   body {
-    @apply bg-[var(--color-bg)] text-[var(--color-text)] min-h-screen antialiased;
+    background: #fbfaf5;
+    @apply text-[var(--color-text)] min-h-screen antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
