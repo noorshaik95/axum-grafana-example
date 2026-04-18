@@ -184,7 +184,8 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./services/user-auth-service
+          context: .
+          file: services/user-auth-service/Dockerfile
           push: false
           tags: user-auth-service:${{ github.sha }}
           cache-from: type=gha

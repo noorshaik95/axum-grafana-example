@@ -2,28 +2,26 @@
 # Build context: repo root
 
 # Stage 1: Builder
-FROM rust:1.90 AS builder
+FROM rust:1.91 AS builder
 
 RUN apt-get update && apt-get install -y cmake protobuf-compiler librdkafka-dev && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy common-rust library (shared observability, health, error handling)
 COPY libs/common-rust /libs/common-rust
-
-# Copy manifest files for dependency caching
 COPY services/onboarding-service/Cargo.toml ./Cargo.toml
 
-# Create a dummy main.rs to pre-build all dependencies
-RUN mkdir -p src && echo "fn main() {}" > src/main.rs && \
-    cargo build --release 2>/dev/null || true && \
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/root/.cargo/git \
+    --mount=type=cache,target=/app/target \
+    mkdir -p src && echo "fn main() {}" > src/main.rs && \
+    cargo build --release && \
     rm -rf src
 
-# Copy actual source
 COPY services/onboarding-service/src ./src
 
-# Build the real binary (dependencies already cached above)
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/root/.cargo/git \
     --mount=type=cache,target=/app/target \
     cargo build --release && \
     cp target/release/onboarding-service /app/onboarding-service
@@ -36,8 +34,6 @@ RUN apt-get update && apt-get install -y ca-certificates curl librdkafka1 && rm 
 WORKDIR /app
 
 COPY --from=builder /app/onboarding-service /usr/local/bin/app
-
-# Copy migrations for reference
 COPY services/onboarding-service/migrations/ /app/migrations/
 
 EXPOSE 9080 9081

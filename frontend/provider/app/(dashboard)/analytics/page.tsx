@@ -169,7 +169,7 @@ export default function AnalyticsPage() {
         <div className="flex-1">
           <p className="text-sm font-semibold text-[#12170f]">2 students at risk</p>
           <p className="text-xs mt-0.5" style={{ color: '#6a6e62' }}>
-            Alex Morrison and Jordan Kim haven't submitted in 2+ weeks.
+            Alex Morrison and Jordan Kim haven&apos;t submitted in 2+ weeks.
           </p>
         </div>
         <Link

@@ -4,12 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Upload, X, FileText, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { useAssignmentSubmissions, useSubmitAssignment, useGradedResult } from '@/lib/api/hooks';
 import { formatFileSize, formatDateTime } from '@/lib/utils';
-import type {
-  StudentAssignment,
-  SubmissionRecord,
-  GradedResult,
-  RubricItem,
-} from '@/lib/api/assignments';
+import type { StudentAssignment, SubmissionRecord } from '@/lib/api/assignments';
 
 interface SubmissionUploaderProps {
   assignment: StudentAssignment;

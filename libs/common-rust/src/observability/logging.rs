@@ -1,6 +1,10 @@
 #[cfg(feature = "observability")]
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "observability")]
+static TRACER_PROVIDER: std::sync::OnceLock<opentelemetry_sdk::trace::SdkTracerProvider> =
+    std::sync::OnceLock::new();
+
 /// Tracing configuration
 #[cfg(feature = "observability")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,13 +34,10 @@ pub fn init_tracing(config: TracingConfig) -> Result<(), anyhow::Error> {
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new(&config.log_level));
 
-    // --- JSON formatter layer (always on) -----------------------------------------
-    let fmt_layer = tracing_subscriber::fmt::layer()
-        .json()
-        .with_current_span(true) // emits trace_id / span_id fields
-        .with_span_list(false);
-
     // --- OTel / Tempo layer (only when endpoint is provided) ----------------------
+    // fmt_layer is constructed inside each branch so that the subscriber type
+    // parameter is inferred independently per branch — sharing one instance across
+    // branches with different subscriber stacks causes unsatisfied Layer<S> bounds.
     if let Some(endpoint) = config.otlp_endpoint.as_deref().filter(|e| !e.is_empty()) {
         let exporter = opentelemetry_otlp::SpanExporter::builder()
             .with_tonic()
@@ -56,21 +57,36 @@ pub fn init_tracing(config: TracingConfig) -> Result<(), anyhow::Error> {
             .with_sampler(sdktrace::Sampler::AlwaysOn)
             .build();
 
+        // `tracer()` lives on the TracerProvider trait in OTel 0.29+.
+        use opentelemetry::trace::TracerProvider as _;
         let tracer = tracer_provider.tracer(config.service_name.clone());
 
         // Set the global OTel provider so other code can use `opentelemetry::global`.
-        opentelemetry::global::set_tracer_provider(tracer_provider);
+        opentelemetry::global::set_tracer_provider(tracer_provider.clone());
+
+        // Store provider so shutdown_tracing() can call .shutdown() on it.
+        TRACER_PROVIDER.set(tracer_provider).ok();
 
         tracing_subscriber::registry()
             .with(env_filter)
             .with(tracing_opentelemetry::layer().with_tracer(tracer))
-            .with(fmt_layer)
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .json()
+                    .with_current_span(true)
+                    .with_span_list(false),
+            )
             .init();
     } else {
         // No OTLP endpoint — local logging only (trace_id will be absent).
         tracing_subscriber::registry()
             .with(env_filter)
-            .with(fmt_layer)
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .json()
+                    .with_current_span(true)
+                    .with_span_list(false),
+            )
             .init();
     }
 
@@ -87,6 +103,8 @@ pub fn init_tracing(config: TracingConfig) -> Result<(), anyhow::Error> {
 /// Call during graceful shutdown to ensure all spans are exported.
 #[cfg(feature = "observability")]
 pub fn shutdown_tracing() {
-    opentelemetry::global::shutdown_tracer_provider();
+    if let Some(provider) = TRACER_PROVIDER.get() {
+        let _ = provider.shutdown();
+    }
     tracing::info!("OpenTelemetry tracer provider shut down");
 }

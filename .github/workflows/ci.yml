@@ -91,6 +91,11 @@ jobs:
           cache: true
           cache-dependency-path: "services/${{ matrix.service }}/go.sum"
 
+      - name: Install protoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y protobuf-compiler
+
       - run: go build ./...
       - run: go vet ./...
       - run: go test ./... -timeout 60s
@@ -104,12 +109,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [api-gateway, content-management-service]
+        include:
+          - service: api-gateway
+            # build.rs compiles proto files
+            apt-deps: protobuf-compiler
+          - service: content-management-service
+            # rdkafka cmake-build compiles librdkafka from source
+            apt-deps: protobuf-compiler cmake libssl-dev libsasl2-dev
     defaults:
       run:
         working-directory: "services/${{ matrix.service }}"
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ${{ matrix.apt-deps }}
 
       - uses: dtolnay/rust-toolchain@stable
 

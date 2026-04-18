@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { MessageSquare, Loader2, AlertCircle, Send, Inbox } from 'lucide-react';
+import { Loader2, AlertCircle, Send, Inbox } from 'lucide-react';
 import { useSentMessages } from '@/lib/api/hooks';
 import { formatRelativeTime } from '@/lib/utils';
 

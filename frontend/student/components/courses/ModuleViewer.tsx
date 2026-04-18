@@ -1,12 +1,10 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import Link from 'next/link';
 import {
   CheckCircle2,
   Circle,
   FileText,
-  Video,
   ExternalLink,
   ChevronRight,
   ChevronLeft,
@@ -18,12 +16,6 @@ import { useMarkLessonComplete } from '@/lib/api/hooks';
 interface ModuleViewerProps {
   courseId: string;
   module: CourseModule;
-}
-
-function ResourceIcon({ contentType }: { contentType: string }) {
-  if (contentType.startsWith('video/')) return <Video className="h-4 w-4" />;
-  if (contentType === 'application/pdf') return <FileText className="h-4 w-4" />;
-  return <ExternalLink className="h-4 w-4" />;
 }
 
 function LessonContent({ resource }: { resource: LessonResource }) {

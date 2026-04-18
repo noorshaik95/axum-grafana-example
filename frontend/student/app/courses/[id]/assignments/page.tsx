@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ClipboardList, Clock, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Clock, Loader2, AlertCircle } from 'lucide-react';
 import { useCourse } from '../../../../../shared/lib/api/hooks';
 import { useStudentAssignments } from '@/lib/api/hooks';
 import { formatDate } from '@/lib/utils';

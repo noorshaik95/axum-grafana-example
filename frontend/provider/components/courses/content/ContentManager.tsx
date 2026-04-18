@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -9,7 +9,6 @@ import {
   ChevronRight,
   GripVertical,
   Plus,
-  Pencil,
   Trash2,
   Check,
   X,
@@ -25,7 +24,7 @@ import {
   useCreateLesson,
   useDeleteLesson,
 } from '@/lib/api/hooks'
-import type { Module, Lesson } from '../../../../shared/lib/api/types'
+import type { Module } from '../../../../shared/lib/api/types'
 
 interface ContentManagerProps {
   courseId: string

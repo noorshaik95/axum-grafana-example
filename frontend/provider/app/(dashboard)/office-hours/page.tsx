@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Clock, User, MessageSquare, CheckCircle2, Plus } from 'lucide-react'
+import { Clock, MessageSquare, CheckCircle2, Plus } from 'lucide-react'
 
 const bookedSlots = [
   {

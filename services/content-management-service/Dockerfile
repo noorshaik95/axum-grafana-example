@@ -1,74 +1,65 @@
 # Multi-stage build for content-management-service
-# Stage 1: Builder
-FROM rust:1.90 as builder
+# Build context: repo root
 
-# Install protobuf compiler and librdkafka for Kafka support
+# Stage 1: Builder
+FROM rust:1.91 as builder
+
+# cmake-build compiles librdkafka from source (avoids system version mismatch)
 RUN apt-get update && apt-get install -y \
     protobuf-compiler \
     pkg-config \
-    librdkafka-dev \
+    cmake \
+    libssl-dev \
+    libsasl2-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
-# Copy common-rust library to match the path in Cargo.toml (../../libs/common-rust from /build/services/content-management-service)
 COPY libs/common-rust /build/libs/common-rust
-
-# Copy proto files to match build.rs expectations
 COPY proto /build/proto
 
-# Set up the service directory structure
 WORKDIR /build/services/content-management-service
 
-# Copy Cargo files first for better caching
 COPY services/content-management-service/Cargo.toml ./Cargo.toml
 COPY services/content-management-service/build.rs ./build.rs
 
-# Create dummy main.rs to build dependencies
-RUN mkdir -p src && \
+# target path must match the actual cargo output dir for cache hits to land
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/root/.cargo/git \
+    --mount=type=cache,target=/build/services/content-management-service/target \
+    mkdir -p src && \
     echo "fn main() {}" > src/main.rs && \
     cargo build --release && \
     rm -rf src
 
-# Now copy actual source code
 COPY services/content-management-service/src ./src
 COPY services/content-management-service/migrations ./migrations
 
-# Build the application with cache mounts
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/build/target \
+    --mount=type=cache,target=/root/.cargo/git \
+    --mount=type=cache,target=/build/services/content-management-service/target \
     cargo build --release && \
     cp target/release/content-management-service /usr/local/bin/content-management-service
 
-# Stage 2: Runtime (Ubuntu 24.04 provides GLIBC 2.39+)
+# Stage 2: Runtime
 FROM ubuntu:24.04
 
-# Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
     ffmpeg \
     libssl3t64 \
     libpq5 \
-    librdkafka1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Ubuntu 24.04 already has uid/gid 1000 (ubuntu user)
 RUN mkdir -p /app && chown -R 1000:1000 /app
 
 WORKDIR /app
 
-# Copy compiled binary from builder
 COPY --from=builder /usr/local/bin/content-management-service /usr/local/bin/content-management-service
 
-# Switch to non-root user
 USER 1000
 
-# Expose ports
-# 50052: gRPC service
-# 8082: HTTP health check
-# 9092: Prometheus metrics
 EXPOSE 50052 8082 9092
 
-# Run the service
 CMD ["content-management-service"]

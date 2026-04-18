@@ -165,7 +165,6 @@ export default function TodayPage() {
           {WEEK_DAYS.map((day, idx) => {
             const isDone = idx < todayDotIdx;
             const isToday = idx === todayDotIdx;
-            const isUpcoming = idx > todayDotIdx;
             return (
               <div key={day} className="flex flex-col items-center gap-1">
                 <span

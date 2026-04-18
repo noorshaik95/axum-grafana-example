@@ -2,37 +2,42 @@ FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Copy proto files
+# Copy local module deps that go.mod references so go mod download can resolve them
 COPY proto/ ./proto/
-
-# Copy shared libs
-COPY libs/common-go ./libs/common-go
-
-# Copy service files
-COPY services/email-service/ ./services/email-service/
+COPY libs/common-go /app/libs/common-go
 
 WORKDIR /app/services/email-service
 
-# Download dependencies
-RUN go mod download
+# Copy go.mod/go.sum first — download layer only busts when these change,
+# not every time source code changes.
+COPY services/email-service/go.mod .
+COPY services/email-service/go.sum* .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o /email-service ./cmd/server/
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go mod download
+
+# Copy full source now that deps are cached
+COPY services/email-service/ .
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -o /email-service ./cmd/server/
 
 # Runtime stage
-FROM alpine:latest
+FROM alpine:3.20
 
 RUN apk --no-cache add ca-certificates curl
 
-WORKDIR /root/
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy the binary from builder
+WORKDIR /app
+
 COPY --from=builder /email-service .
-
-# Copy migrations
 COPY --from=builder /app/services/email-service/migrations ./migrations
 
-# Expose ports: HTTP 8086, gRPC 50056
+USER appuser
+
 EXPOSE 8086 50056
 
 CMD ["./email-service"]

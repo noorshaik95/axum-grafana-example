@@ -21,7 +21,7 @@ const mockStudent = {
 }
 
 export default function StudentDetailPage() {
-  const params = useParams()
+  useParams()
   const [messageSent, setMessageSent] = useState(false)
   const [snoozed, setSnoozed] = useState(false)
 

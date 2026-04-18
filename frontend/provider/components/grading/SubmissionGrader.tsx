@@ -18,7 +18,7 @@ interface SubmissionGraderProps {
   submissions: Submission[]
 }
 
-export function SubmissionGrader({ assignmentId, maxPoints, submissions }: SubmissionGraderProps) {
+export function SubmissionGrader({ assignmentId: _assignmentId, maxPoints, submissions }: SubmissionGraderProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [score, setScore] = useState('')
   const [feedback, setFeedback] = useState('')

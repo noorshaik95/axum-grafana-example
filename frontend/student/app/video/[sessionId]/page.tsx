@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { useVideoSession } from '@/lib/api/hooks';
@@ -8,7 +8,6 @@ import { JoinSession } from '@/components/video/JoinSession';
 
 export default function VideoSessionDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const sessionId = params.sessionId as string;
 
   const { data: session, isLoading, isError } = useVideoSession(sessionId);

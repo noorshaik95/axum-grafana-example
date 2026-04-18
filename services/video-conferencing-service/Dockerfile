@@ -1,9 +1,6 @@
 # Build stage
-FROM rust:latest AS builder
+FROM rust:1.91 AS builder
 
-WORKDIR /build
-
-# Install dependencies
 RUN apt-get update && apt-get install -y \
     protobuf-compiler \
     libprotobuf-dev \
@@ -11,45 +8,51 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy proto files first
 COPY proto/ /build/proto/
 
-# Copy service files
+# Copy manifest only — pre-build all deps before touching source so the
+# expensive compile step is only repeated when Cargo.toml changes.
+COPY services/video-conferencing-service/Cargo.toml /build/services/video-conferencing-service/Cargo.toml
+COPY services/video-conferencing-service/Cargo.lock* /build/services/video-conferencing-service/
+
+WORKDIR /build/services/video-conferencing-service
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/root/.cargo/git \
+    --mount=type=cache,target=/build/services/video-conferencing-service/target \
+    mkdir -p src && \
+    echo "fn main() {}" > src/main.rs && \
+    cargo build --release && \
+    rm -rf src
+
 COPY services/video-conferencing-service/ /build/services/video-conferencing-service/
 
-# Build the service
-WORKDIR /build/services/video-conferencing-service
-RUN cargo build --release
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/root/.cargo/git \
+    --mount=type=cache,target=/build/services/video-conferencing-service/target \
+    cargo build --release && \
+    cp target/release/video-conferencing-service /video-conferencing-service
 
 # Runtime stage
 FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     curl \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy binary and migrations
-COPY --from=builder /build/services/video-conferencing-service/target/release/video-conferencing-service /app/
-COPY --from=builder /build/services/video-conferencing-service/migrations/ /app/migrations/
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
+COPY --from=builder /video-conferencing-service /app/video-conferencing-service
+COPY --from=builder /build/services/video-conferencing-service/migrations/ /app/migrations/
 
 USER appuser
 
-# Expose ports
-# gRPC: 50052
-# WebSocket/HTTP: 8082
-# Metrics: 9092
 EXPOSE 50055 8086 9092
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8086/health || exit 1
 

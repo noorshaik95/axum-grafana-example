@@ -99,8 +99,6 @@ export default function PlanPage() {
   const { data: weeks = WEEKS } = usePlan();
   const [selectedWeek, setSelectedWeek] = useState<number>(8);
 
-  const currentWeek = weeks.find((w) => w.num === selectedWeek);
-
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>

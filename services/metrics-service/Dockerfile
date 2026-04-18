@@ -1,44 +1,44 @@
-# Build stage
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Copy proto files
+# Copy local module deps that go.mod references
 COPY proto/ ./proto/
-
-# Copy shared Go library
-COPY libs/common-go/ ./libs/common-go/
-
-# Copy service files
-COPY services/metrics-service/ ./services/metrics-service/
+COPY libs/common-go /app/libs/common-go
 
 WORKDIR /app/services/metrics-service
 
-# Download dependencies
-RUN go mod download
+# go.mod/go.sum before source — download only reruns when dependencies change
+COPY services/metrics-service/go.mod .
+COPY services/metrics-service/go.sum* .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o /metrics-service ./cmd/server/
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go mod download
+
+COPY services/metrics-service/ .
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -o /metrics-service ./cmd/server/
 
 # Runtime stage
-FROM alpine:latest
+FROM alpine:3.20
 
 RUN apk --no-cache add ca-certificates curl
 
-WORKDIR /root/
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy the binary from builder
+WORKDIR /app
+
 COPY --from=builder /metrics-service .
-
-# Copy migrations
 COPY --from=builder /app/services/metrics-service/migrations ./migrations
 
-# Expose ports: HTTP 8087, gRPC 50057
+USER appuser
+
 EXPOSE 8087 50057
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8087/health || exit 1
 
-# Run the service
 CMD ["./metrics-service"]
