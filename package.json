@@ -5,7 +5,7 @@
     "frontend/*"
   ],
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "lint-staged": {
     "frontend/student/**/*.{ts,tsx}": [
