@@ -24,6 +24,8 @@ jobs:
     defaults:
       run:
         working-directory: "frontend/${{ matrix.app }}"
+    env:
+      HUSKY: "0" # git hooks are irrelevant in CI; prevents 'husky: not found' error
     steps:
       - uses: actions/checkout@v4
 
@@ -57,6 +59,7 @@ jobs:
         working-directory: "frontend/${{ matrix.app }}"
     env:
       NEXT_PUBLIC_API_URL: "http://localhost:8080"
+      HUSKY: "0"
     steps:
       - uses: actions/checkout@v4
 
@@ -78,7 +81,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [user-auth-service, assignment-grading-service]
+        include:
+          - service: user-auth-service
+            proto-files: "../../proto/user.proto ../../proto/auth.proto"
+            proto-mv: |
+              mkdir -p api/proto api/proto/authpb
+              mv -f user.pb.go user_grpc.pb.go api/proto/ 2>/dev/null || true
+              mv -f auth.pb.go auth_grpc.pb.go api/proto/authpb/ 2>/dev/null || true
+          - service: assignment-grading-service
+            proto-files: "../../proto/assignment.proto"
+            proto-mv: |
+              mkdir -p api/proto
+              mv -f assignment.pb.go assignment_grpc.pb.go api/proto/ 2>/dev/null || true
     defaults:
       run:
         working-directory: "services/${{ matrix.service }}"
@@ -91,10 +105,20 @@ jobs:
           cache: true
           cache-dependency-path: "services/${{ matrix.service }}/go.sum"
 
-      - name: Install protoc
+      - name: Install protoc and plugins
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y protobuf-compiler
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.32.0
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      - name: Generate proto files
+        run: |
+          protoc --go_out=. --go_opt=paths=source_relative \
+            --go-grpc_out=. --go-grpc_opt=paths=source_relative \
+            -I ../../proto ${{ matrix.proto-files }}
+          ${{ matrix.proto-mv }}
 
       - run: go build ./...
       - run: go vet ./...
@@ -114,8 +138,10 @@ jobs:
             # build.rs compiles proto files
             apt-deps: protobuf-compiler
           - service: content-management-service
-            # rdkafka cmake-build compiles librdkafka from source
-            apt-deps: protobuf-compiler cmake libssl-dev libsasl2-dev
+            # rdkafka cmake-build compiles librdkafka from source;
+            # rdkafka_conf.c includes curl/curl.h unconditionally even when
+            # -DWITH_CURL=0 is passed, so libcurl dev headers are required
+            apt-deps: protobuf-compiler cmake libssl-dev libsasl2-dev libcurl4-openssl-dev
     defaults:
       run:
         working-directory: "services/${{ matrix.service }}"
@@ -146,6 +172,8 @@ jobs:
     defaults:
       run:
         working-directory: services/course-service
+    env:
+      HUSKY: "0"
     steps:
       - uses: actions/checkout@v4
 

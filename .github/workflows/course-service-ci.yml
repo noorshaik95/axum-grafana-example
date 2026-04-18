@@ -13,6 +13,9 @@ on:
       - 'services/course-service/**'
       - 'proto/course.proto'
 
+env:
+  HUSKY: "0"
+
 jobs:
   test:
     name: Test
