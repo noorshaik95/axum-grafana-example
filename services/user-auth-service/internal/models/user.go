@@ -17,10 +17,13 @@ type User struct {
 	AvatarURL      string    `json:"avatar_url,omitempty"`
 	Bio            string    `json:"bio,omitempty"`
 	OrganizationID string    `json:"organization_id,omitempty"`
-	IsActive       bool      `json:"is_active"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	Roles          []string  `json:"roles,omitempty"`
+	// Username — unique case-insensitive @handle (W14.x). Backfilled by
+	// migration 010 from the email local-part; NOT NULL in the DB.
+	Username  string    `json:"username,omitempty"`
+	IsActive  bool      `json:"is_active"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Roles     []string  `json:"roles,omitempty"`
 }
 
 type Profile struct {

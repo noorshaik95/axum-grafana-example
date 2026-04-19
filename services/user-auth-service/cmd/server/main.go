@@ -231,6 +231,11 @@ func main() {
 	oauthRepo := repository.NewOAuthRepository(db.DB)
 	samlRepo := repository.NewSAMLRepository(db.DB)
 
+	// W14: audit repository + username resolver. Both are additive and safe
+	// when their downstream consumers aren't yet wired.
+	auditRepo := repository.NewAuditRepository(db.DB)
+	usernameResolver := service.NewUsernameResolver(service.NewSQLUsernameLookup(db.DB), 30*time.Second)
+
 	// Initialize authentication strategy manager first (before UserService)
 	log.Info().Str("auth_type", cfg.Auth.Type).Msg("Initializing authentication strategies")
 	strategyManager := initializeAuthStrategiesWithoutNormal(cfg, userRepo, oauthRepo, samlRepo, roleRepo, tokenServiceAdapter, log)
@@ -294,8 +299,19 @@ func main() {
 	if rateLimiter != nil {
 		rateLimiterInterface = rateLimiter
 	}
-	userServiceServer := grpcHandler.NewUserServiceServer(userService, strategyManager, rateLimiterInterface, groupRepo, mfaRepo)
+	userServiceServer := grpcHandler.NewUserServiceServer(userService, strategyManager, rateLimiterInterface, groupRepo, mfaRepo).
+		WithUsernameResolver(usernameResolver)
 	pb.RegisterUserServiceServer(grpcServer, userServiceServer)
+
+	// W14 HTTP handlers (SSO initiate/callback, test-sso, impersonate, MFA
+	// reset). Feature-gated via SSO_ENABLED + PLATFORM_PUBLIC_KEY; returns
+	// nil when no W14 feature is enabled.
+	if w14 := wireW14Handlers(log, auditRepo, userRepo, roleRepo, mfaRepo, tokenService, redisClient); w14 != nil {
+		registerOnMux(healthMux, w14)
+		log.Info().Msg("W14 HTTP routes registered on health mux")
+	} else {
+		log.Info().Msg("W14 HTTP routes skipped (no features enabled)")
+	}
 
 	// Register AuthService (wraps UserServiceServer for API Gateway compatibility)
 	authServiceServer := grpcHandler.NewAuthServiceServer(userServiceServer)

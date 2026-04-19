@@ -1,4 +1,4 @@
-.PHONY: proto build run test clean docker-build
+.PHONY: proto build run test test-integration test-all clean docker-build
 
 # Generate protobuf code
 proto:
@@ -23,9 +23,21 @@ run: build
 	@echo "Running user-auth-service..."
 	./bin/server
 
-# Run tests
+# Run unit tests only. Integration tests under tests/integration/ are
+# gated by `//go:build integration` and require a live Postgres test DB; use
+# `make test-integration` to run them.
 test:
 	go test -v ./...
+
+# Run integration tests only — requires DB_HOST/DB_PORT/DB_USER/DB_PASSWORD
+# (defaults localhost:5432 postgres/postgres). Applies the `integration`
+# build tag so the gated test files are compiled and executed.
+test-integration:
+	go test -v -tags=integration ./tests/integration/...
+
+# Run the full suite (unit + integration). Same DB requirement as above.
+test-all:
+	go test -v -tags=integration ./...
 
 # Clean build artifacts
 clean:

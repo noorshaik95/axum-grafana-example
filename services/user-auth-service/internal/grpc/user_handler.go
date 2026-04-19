@@ -27,12 +27,13 @@ import (
 
 type UserServiceServer struct {
 	pb.UnimplementedUserServiceServer
-	userService     *service.UserService
-	strategyManager *auth.StrategyManager
-	rateLimiter     ratelimit.RateLimiter
-	groupRepo       *repository.GroupRepository
-	mfaRepo         *repository.MFARepository
-	log             *logger.Logger
+	userService      *service.UserService
+	strategyManager  *auth.StrategyManager
+	rateLimiter      ratelimit.RateLimiter
+	groupRepo        *repository.GroupRepository
+	mfaRepo          *repository.MFARepository
+	usernameResolver *service.UsernameResolver
+	log              *logger.Logger
 }
 
 func NewUserServiceServer(
@@ -50,6 +51,38 @@ func NewUserServiceServer(
 		mfaRepo:         mfaRepo,
 		log:             logger.NewLogger("info"),
 	}
+}
+
+// WithUsernameResolver attaches the @mention resolver. Returns the server for
+// chaining. When nil, ResolveUsername returns UNIMPLEMENTED rather than
+// panicking.
+func (s *UserServiceServer) WithUsernameResolver(r *service.UsernameResolver) *UserServiceServer {
+	s.usernameResolver = r
+	return s
+}
+
+// ResolveUsername resolves a batch of @handles to user_ids. Unknown usernames
+// are omitted from the response (not an error) so callers can treat the map
+// as a partial result.
+func (s *UserServiceServer) ResolveUsername(ctx context.Context, req *pb.ResolveUsernameRequest) (*pb.ResolveUsernameResponse, error) {
+	ctx, span := tracing.StartSpan(ctx, "resolve_username_handler",
+		attribute.Int("usernames.count", len(req.GetUsernames())))
+	defer span.End()
+
+	if s.usernameResolver == nil {
+		err := fmt.Errorf("username resolution not configured on this tenant")
+		span.RecordError(err)
+		span.SetStatus(otelcodes.Error, err.Error())
+		return nil, status.Error(codes.Unimplemented, err.Error())
+	}
+	ids, err := s.usernameResolver.Resolve(ctx, req.GetUsernames())
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(otelcodes.Error, "resolve failed")
+		return nil, status.Errorf(codes.Internal, "resolve failed: %v", err)
+	}
+	span.SetStatus(otelcodes.Ok, "")
+	return &pb.ResolveUsernameResponse{UserIdsByUsername: ids}, nil
 }
 
 // getClientIP extracts the client IP from gRPC context
@@ -478,6 +511,7 @@ func userToProto(user *models.User) *pb.User {
 		Phone:     user.Phone,
 		Roles:     user.Roles,
 		IsActive:  user.IsActive,
+		Username:  user.Username,
 		CreatedAt: timestamppb.New(user.CreatedAt),
 		UpdatedAt: timestamppb.New(user.UpdatedAt),
 	}

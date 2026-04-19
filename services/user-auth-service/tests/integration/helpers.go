@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package integration
 
 import (
@@ -21,7 +24,9 @@ type TestDatabase struct {
 	DBName string
 }
 
-// SetupTestDatabase creates a test database and runs migrations
+// SetupTestDatabase creates a test database and runs migrations. Only
+// compiled under `go test -tags=integration` (see build tag at top of file);
+// a live Postgres test server is required at DB_HOST:DB_PORT.
 func SetupTestDatabase(t *testing.T) *TestDatabase {
 	t.Helper()
 

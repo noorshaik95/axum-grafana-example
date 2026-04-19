@@ -75,6 +75,10 @@ service UserService {
   rpc GetChildAccounts(GetChildAccountsRequest) returns (GetChildAccountsResponse);
   rpc GetParentAccounts(GetParentAccountsRequest) returns (GetParentAccountsResponse);
   rpc UpdateParentChildPermissions(UpdateParentChildPermissionsRequest) returns (google.protobuf.Empty);
+
+  // Mention resolution — batched username → user_id lookup for
+  // discussion-service and email-service.
+  rpc ResolveUsername(ResolveUsernameRequest) returns (ResolveUsernameResponse);
 }
 
 // Authentication Messages
@@ -240,6 +244,27 @@ message User {
   bool is_active = 7;
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp updated_at = 9;
+  // Unique per tenant, case-insensitive @handle used for mention resolution.
+  // Set at registration; derived from email local-part when omitted.
+  string username = 10;
+}
+
+// ResolveUsername — batched username → user_id lookup used by
+// discussion-service for @mention materialization and email-service for
+// broadcast targeting. Unknown usernames are omitted from the response, not
+// treated as errors.
+message ResolveUsernameRequest {
+  repeated string usernames = 1;
+  // Optional: scope lookup to a specific tenant. Empty = default tenant
+  // schema (current deployment is single-tenant-per-container).
+  string tenant_id = 2;
+}
+
+message ResolveUsernameResponse {
+  // username (lowercase-normalized) → user_id. Missing keys = not found.
+  // Field name matches the ratified contract in plan/CONTRACTS.md §user.UserService
+  // ResolveUsername extension.
+  map<string, string> user_ids_by_username = 1;
 }
 
 message Profile {
