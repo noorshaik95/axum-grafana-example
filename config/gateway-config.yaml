@@ -73,6 +73,70 @@ services:
     auto_discover: true
     tls_enabled: false
 
+  # Wave 3 platform services (W17.2). Auto-discover disabled until the
+  # services are scaffolded; the gateway returns 503 for routes pointing at
+  # an unreachable upstream, letting portals integrate against the gateway
+  # immediately.
+  admin-auth-service:
+    name: "admin-auth-service"
+    endpoint: "http://admin-auth-service:50060"
+    timeout_ms: 5000
+    connection_pool_size: 10
+    auto_discover: false
+    tls_enabled: false
+
+  incident-service:
+    name: "incident-service"
+    endpoint: "http://incident-service:50061"
+    timeout_ms: 5000
+    connection_pool_size: 10
+    auto_discover: false
+    tls_enabled: false
+
+  feature-flag-service:
+    name: "feature-flag-service"
+    endpoint: "http://feature-flag-service:50062"
+    timeout_ms: 3000
+    connection_pool_size: 10
+    auto_discover: false
+    tls_enabled: false
+
+  onboarding-service:
+    name: "onboarding-service"
+    endpoint: "http://onboarding-service:8084"
+    timeout_ms: 10000
+    connection_pool_size: 10
+    auto_discover: false
+    tls_enabled: false
+
+  # Per-tenant services (W17.4). The default endpoints here are overridden
+  # per-tenant via the tenant routing table; the gateway falls back to these
+  # addresses only when the tenant-routing table is unavailable, at which
+  # point the route returns 503.
+  discussion-service:
+    name: "discussion-service"
+    endpoint: "http://discussion-service:50056"
+    timeout_ms: 5000
+    connection_pool_size: 10
+    auto_discover: false
+    tls_enabled: false
+
+  scheduling-service:
+    name: "scheduling-service"
+    endpoint: "http://scheduling-service:50063"
+    timeout_ms: 5000
+    connection_pool_size: 10
+    auto_discover: false
+    tls_enabled: false
+
+  ai-service:
+    name: "ai-service"
+    endpoint: "http://ai-service:50064"
+    timeout_ms: 30000  # Long-running Claude calls (study-plan, welcome)
+    connection_pool_size: 10
+    auto_discover: false
+    tls_enabled: false
+
 discovery:
   enabled: true
   refresh_interval_seconds: 300
@@ -610,6 +674,49 @@ route_overrides:
     http_method: "GET"
     service: "video-conferencing-service"
 
+  # W11.1 Live lecture mode
+  - grpc_method: "video_conferencing.VideoConferencingService/StartLecture"
+    http_path: "/api/video/lectures/start"
+    http_method: "POST"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/EndLecture"
+    http_path: "/api/video/lectures/:id/end"
+    http_method: "POST"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/JoinLecture"
+    http_path: "/api/video/lectures/:id/join"
+    http_method: "POST"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/GetLecturePulse"
+    http_path: "/api/video/lectures/:id/pulse"
+    http_method: "GET"
+    service: "video-conferencing-service"
+
+  # W11.2 Q&A queue
+  - grpc_method: "video_conferencing.VideoConferencingService/SubmitQuestion"
+    http_path: "/api/video/lectures/:id/qa"
+    http_method: "POST"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/GetQuestions"
+    http_path: "/api/video/lectures/:id/qa"
+    http_method: "GET"
+    service: "video-conferencing-service"
+
+  - grpc_method: "video_conferencing.VideoConferencingService/UpvoteQuestion"
+    http_path: "/api/video/lectures/:id/qa/:question_id/upvote"
+    http_method: "POST"
+    service: "video-conferencing-service"
+
+  # W11.4 Office hours rooms
+  - grpc_method: "video_conferencing.VideoConferencingService/CreateOfficeHoursRoom"
+    http_path: "/api/video/oh-rooms"
+    http_method: "POST"
+    service: "video-conferencing-service"
+
   # Email / Messaging Service
   - grpc_method: "email.MessagingService/SendMessage"
     http_path: "/api/messages"
@@ -734,6 +841,279 @@ route_overrides:
     http_method: "GET"
     service: "tenant-service"
 
+  # -------- W17.2: Wave-3 platform + tenant service routes --------
+
+  # Admin Auth Service (platform, admin.slate.local)
+  - grpc_method: "admin_auth.AdminAuthService/AdminLogin"
+    http_path: "/api/admin/auth/login"
+    http_method: "POST"
+    service: "admin-auth-service"
+
+  - grpc_method: "admin_auth.AdminAuthService/AdminLogout"
+    http_path: "/api/admin/auth/logout"
+    http_method: "POST"
+    service: "admin-auth-service"
+
+  - grpc_method: "admin_auth.AdminAuthService/RefreshAdminToken"
+    http_path: "/api/admin/auth/refresh"
+    http_method: "POST"
+    service: "admin-auth-service"
+
+  - grpc_method: "admin_auth.AdminAuthService/ValidateAdminToken"
+    http_path: "/api/admin/auth/validate"
+    http_method: "POST"
+    service: "admin-auth-service"
+
+  - grpc_method: "admin_auth.AdminAuthService/TestSso"
+    http_path: "/api/admin/auth/test-sso"
+    http_method: "POST"
+    service: "admin-auth-service"
+
+  - grpc_method: "admin_auth.AdminAuthService/ListAdminUsers"
+    http_path: "/api/admin/users"
+    http_method: "GET"
+    service: "admin-auth-service"
+
+  - grpc_method: "admin_auth.AdminAuthService/GetAdminUser"
+    http_path: "/api/admin/users/:id"
+    http_method: "GET"
+    service: "admin-auth-service"
+
+  - grpc_method: "admin_auth.AdminAuthService/ListAdminRoles"
+    http_path: "/api/admin/roles"
+    http_method: "GET"
+    service: "admin-auth-service"
+
+  - grpc_method: "admin_auth.AdminAuthService/GetAuditLog"
+    http_path: "/api/admin/audit"
+    http_method: "GET"
+    service: "admin-auth-service"
+
+  - grpc_method: "admin_auth.AdminAuthService/Impersonate"
+    http_path: "/api/admin/impersonate/:id"
+    http_method: "POST"
+    service: "admin-auth-service"
+
+  - grpc_method: "admin_auth.AdminAuthService/ImpersonateTenantUser"
+    http_path: "/api/admin/impersonate/:tenant_id/:user_id"
+    http_method: "POST"
+    service: "admin-auth-service"
+
+  - grpc_method: "admin_auth.AdminAuthService/HealthCheck"
+    http_path: "/api/health/admin-auth"
+    http_method: "GET"
+    service: "admin-auth-service"
+
+  # Incident Service (platform)
+  - grpc_method: "incident.IncidentService/ListIncidents"
+    http_path: "/api/incidents"
+    http_method: "GET"
+    service: "incident-service"
+
+  - grpc_method: "incident.IncidentService/CreateIncident"
+    http_path: "/api/incidents"
+    http_method: "POST"
+    service: "incident-service"
+
+  - grpc_method: "incident.IncidentService/GetIncident"
+    http_path: "/api/incidents/:id"
+    http_method: "GET"
+    service: "incident-service"
+
+  - grpc_method: "incident.IncidentService/UpdateIncident"
+    http_path: "/api/incidents/:id"
+    http_method: "PUT"
+    service: "incident-service"
+
+  - grpc_method: "incident.IncidentService/PostIncidentEvent"
+    http_path: "/api/incidents/:id/events"
+    http_method: "POST"
+    service: "incident-service"
+
+  - grpc_method: "incident.IncidentService/GetPublicStatus"
+    http_path: "/api/status"
+    http_method: "GET"
+    service: "incident-service"
+
+  - grpc_method: "incident.IncidentService/HealthCheck"
+    http_path: "/api/health/incidents"
+    http_method: "GET"
+    service: "incident-service"
+
+  # Feature Flag Service (platform)
+  - grpc_method: "flag.FlagService/ListFlags"
+    http_path: "/api/flags"
+    http_method: "GET"
+    service: "feature-flag-service"
+
+  - grpc_method: "flag.FlagService/GetFlag"
+    http_path: "/api/flags/:key"
+    http_method: "GET"
+    service: "feature-flag-service"
+
+  - grpc_method: "flag.FlagService/UpdateFlag"
+    http_path: "/api/flags/:key"
+    http_method: "PUT"
+    service: "feature-flag-service"
+
+  - grpc_method: "flag.FlagService/DeleteFlag"
+    http_path: "/api/flags/:key"
+    http_method: "DELETE"
+    service: "feature-flag-service"
+
+  - grpc_method: "flag.FlagService/HealthCheck"
+    http_path: "/api/health/flags"
+    http_method: "GET"
+    service: "feature-flag-service"
+
+  # Onboarding Service (platform)
+  - grpc_method: "onboarding.OnboardingService/StartOnboarding"
+    http_path: "/api/onboarding"
+    http_method: "POST"
+    service: "onboarding-service"
+
+  - grpc_method: "onboarding.OnboardingService/GetOnboardingStatus"
+    http_path: "/api/onboarding/:id"
+    http_method: "GET"
+    service: "onboarding-service"
+
+  - grpc_method: "onboarding.OnboardingService/CanvasImport"
+    http_path: "/api/onboarding/canvas-import"
+    http_method: "POST"
+    service: "onboarding-service"
+
+  - grpc_method: "onboarding.OnboardingService/HealthCheck"
+    http_path: "/api/health/onboarding"
+    http_method: "GET"
+    service: "onboarding-service"
+
+  # Broadcast (platform — routes into email-service)
+  - grpc_method: "email.MessagingService/SendBroadcast"
+    http_path: "/api/broadcast"
+    http_method: "POST"
+    service: "email-service"
+
+  # Discussion Service (per-tenant; tenant routing overrides endpoint)
+  - grpc_method: "discussion.DiscussionService/ListThreads"
+    http_path: "/api/discussions/threads"
+    http_method: "GET"
+    service: "discussion-service"
+
+  - grpc_method: "discussion.DiscussionService/CreateThread"
+    http_path: "/api/discussions/threads"
+    http_method: "POST"
+    service: "discussion-service"
+
+  - grpc_method: "discussion.DiscussionService/GetThread"
+    http_path: "/api/discussions/threads/:id"
+    http_method: "GET"
+    service: "discussion-service"
+
+  - grpc_method: "discussion.DiscussionService/CreatePost"
+    http_path: "/api/discussions/threads/:id/posts"
+    http_method: "POST"
+    service: "discussion-service"
+
+  - grpc_method: "discussion.DiscussionService/GetInbox"
+    http_path: "/api/discussions/inbox"
+    http_method: "GET"
+    service: "discussion-service"
+
+  - grpc_method: "discussion.DiscussionService/MarkInboxRead"
+    http_path: "/api/discussions/inbox/:id/read"
+    http_method: "PATCH"
+    service: "discussion-service"
+
+  - grpc_method: "discussion.DiscussionService/GetThreadsNeedingReply"
+    http_path: "/api/discussions/needing-reply"
+    http_method: "GET"
+    service: "discussion-service"
+
+  - grpc_method: "discussion.DiscussionService/HealthCheck"
+    http_path: "/api/health/discussions"
+    http_method: "GET"
+    service: "discussion-service"
+
+  # Scheduling Service (per-tenant) — method names align with docs/plan.md W6.1
+  # proto spec: ListAvailableSlots, BookSlot, CancelBooking, CreateSchedule,
+  # ListSchedules, GetInstructorDay. Health served via standard grpc.health.v1.
+  - grpc_method: "scheduling.SchedulingService/ListAvailableSlots"
+    http_path: "/api/scheduling/slots"
+    http_method: "GET"
+    service: "scheduling-service"
+
+  - grpc_method: "scheduling.SchedulingService/BookSlot"
+    http_path: "/api/scheduling/bookings"
+    http_method: "POST"
+    service: "scheduling-service"
+
+  - grpc_method: "scheduling.SchedulingService/CancelBooking"
+    http_path: "/api/scheduling/bookings/:id"
+    http_method: "DELETE"
+    service: "scheduling-service"
+
+  - grpc_method: "scheduling.SchedulingService/CreateSchedule"
+    http_path: "/api/scheduling/schedules"
+    http_method: "POST"
+    service: "scheduling-service"
+
+  - grpc_method: "scheduling.SchedulingService/ListSchedules"
+    http_path: "/api/scheduling/schedules"
+    http_method: "GET"
+    service: "scheduling-service"
+
+  - grpc_method: "scheduling.SchedulingService/GetInstructorDay"
+    http_path: "/api/scheduling/instructor-day"
+    http_method: "GET"
+    service: "scheduling-service"
+
+  - grpc_method: "grpc.health.v1.Health/Check"
+    http_path: "/api/health/scheduling"
+    http_method: "GET"
+    service: "scheduling-service"
+
+  # AI Service (per-tenant, long-running Claude)
+  - grpc_method: "ai.AiService/GetWelcomeMessage"
+    http_path: "/api/ai/welcome"
+    http_method: "GET"
+    service: "ai-service"
+
+  - grpc_method: "ai.AiService/GetWelcomeMessage"
+    http_path: "/api/ai/welcome-message"
+    http_method: "GET"
+    service: "ai-service"
+
+  - grpc_method: "ai.AiService/GetCommandPalette"
+    http_path: "/api/ai/cmd-palette"
+    http_method: "POST"
+    service: "ai-service"
+
+  - grpc_method: "ai.AiService/GetGradeProjection"
+    http_path: "/api/ai/grade-projection"
+    http_method: "GET"
+    service: "ai-service"
+
+  - grpc_method: "ai.AiService/GenerateStudyPlan"
+    http_path: "/api/ai/study-plan"
+    http_method: "POST"
+    service: "ai-service"
+
+  - grpc_method: "ai.AiService/HealthCheck"
+    http_path: "/api/health/ai"
+    http_method: "GET"
+    service: "ai-service"
+
+  # Metrics extensions used by new portals
+  - grpc_method: "metrics.MetricsService/GetRosterHealth"
+    http_path: "/api/metrics/roster-health"
+    http_method: "GET"
+    service: "metrics-service"
+
+  - grpc_method: "metrics.MetricsService/GetGradingQueueCount"
+    http_path: "/api/grading/queue/count"
+    http_method: "GET"
+    service: "assignment-grading-service"
+
 auth:
   service_endpoint: "http://user-auth-service:50051"
   timeout_ms: 3000
@@ -766,6 +1146,18 @@ auth:
     - path: "/auth/saml/metadata"
       method: "GET"
 
+    # Admin auth endpoints (public for login flow)
+    - path: "/api/admin/auth/login"
+      method: "POST"
+    - path: "/api/admin/auth/refresh"
+      method: "POST"
+    - path: "/api/admin/auth/validate"
+      method: "POST"
+
+    # Public service status page
+    - path: "/api/status"
+      method: "GET"
+
     # Health check endpoints (public for monitoring)
     - path: "/api/health/auth"
       method: "GET"
@@ -782,6 +1174,20 @@ auth:
     - path: "/api/health/metrics"
       method: "GET"
     - path: "/api/health/tenants"
+      method: "GET"
+    - path: "/api/health/admin-auth"
+      method: "GET"
+    - path: "/api/health/incidents"
+      method: "GET"
+    - path: "/api/health/flags"
+      method: "GET"
+    - path: "/api/health/onboarding"
+      method: "GET"
+    - path: "/api/health/discussions"
+      method: "GET"
+    - path: "/api/health/scheduling"
+      method: "GET"
+    - path: "/api/health/ai"
       method: "GET"
 
 rate_limit:

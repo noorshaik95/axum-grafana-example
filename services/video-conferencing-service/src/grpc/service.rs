@@ -1,22 +1,66 @@
 use crate::config::Config;
 use crate::database::repository::VideoRepository;
+use crate::lecture::{AttendanceStore, InMemoryAttendance, LectureService};
 use crate::models::proto::*;
 use crate::models::{SessionJoinEligibility, VideoQualityHelper};
 use crate::observability::METRICS;
-use chrono::{Duration, Utc};
+use crate::office_hours::{self, CreateOhRoomInput, OhBackend};
+use crate::qa::{InMemoryQaStore, QaService};
+use chrono::{DateTime, Duration, Utc};
+use common_rust::observability::{read_correlation_from_incoming, tag_span_with_correlation};
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
-use tracing::instrument;
+use tracing::{instrument, Span};
 use uuid::Uuid;
 
 pub struct VideoConferencingServiceImpl {
     repo: VideoRepository,
     config: Arc<Config>,
+    lectures: LectureService,
+    qa: QaService,
 }
 
 impl VideoConferencingServiceImpl {
     pub fn new(repo: VideoRepository, config: Arc<Config>) -> Self {
-        Self { repo, config }
+        let attendance: Arc<dyn AttendanceStore> = Arc::new(InMemoryAttendance::new());
+        let qa_store = Arc::new(InMemoryQaStore::new());
+        Self {
+            repo,
+            config,
+            lectures: LectureService::new(attendance),
+            qa: QaService::new(qa_store),
+        }
+    }
+
+    /// Build an instance with injected lecture + Q&A services. Used in
+    /// tests and at startup when a shared Redis-backed store is wired.
+    pub fn with_services(
+        repo: VideoRepository,
+        config: Arc<Config>,
+        lectures: LectureService,
+        qa: QaService,
+    ) -> Self {
+        Self {
+            repo,
+            config,
+            lectures,
+            qa,
+        }
+    }
+
+    pub fn lectures(&self) -> &LectureService {
+        &self.lectures
+    }
+
+    pub fn qa(&self) -> &QaService {
+        &self.qa
+    }
+
+    /// Read `x-request-id` / `x-tenant-slug` off incoming metadata and tag
+    /// the current span per plan/CONTRACTS.md `trace.propagation`.
+    fn tag_correlation<T>(&self, request: &Request<T>) {
+        let (rid, slug) = read_correlation_from_incoming(request);
+        tag_span_with_correlation(&Span::current(), rid.as_deref(), slug.as_deref());
     }
 
     fn generate_join_url(&self, session_id: &str) -> String {
@@ -878,6 +922,206 @@ impl video_conferencing_service_server::VideoConferencingService for VideoConfer
             sent_to: req.recipient_emails.clone(),
             calendar_ics: calendar_ics.clone(),
         }))
+    }
+
+    // ---- W11.1 Live lecture mode ----
+
+    #[instrument(skip(self, request), fields(request_id = tracing::field::Empty, tenant.slug = tracing::field::Empty))]
+    async fn start_lecture(
+        &self,
+        request: Request<StartLectureRequest>,
+    ) -> Result<Response<LectureSession>, Status> {
+        self.tag_correlation(&request);
+        let req = request.into_inner();
+        if req.session_id.is_empty() || req.tenant_slug.is_empty() {
+            return Err(Status::invalid_argument(
+                "session_id and tenant_slug are required",
+            ));
+        }
+        let state = self
+            .lectures
+            .start_lecture(&req.session_id, &req.tenant_slug, req.enrolled_count)
+            .await;
+        tracing::info!(
+            "lecture started: session={} tenant={} enrolled={}",
+            state.session_id,
+            state.tenant_slug,
+            state.enrolled_count
+        );
+        Ok(Response::new(LectureSession {
+            session_id: state.session_id,
+            tenant_slug: state.tenant_slug,
+            enrolled_count: state.enrolled_count,
+            started_at_unix: state.started_at_unix,
+            active: state.active,
+        }))
+    }
+
+    #[instrument(skip(self, request), fields(request_id = tracing::field::Empty, tenant.slug = tracing::field::Empty))]
+    async fn end_lecture(
+        &self,
+        request: Request<EndLectureRequest>,
+    ) -> Result<Response<()>, Status> {
+        self.tag_correlation(&request);
+        let req = request.into_inner();
+        if req.session_id.is_empty() || req.tenant_slug.is_empty() {
+            return Err(Status::invalid_argument(
+                "session_id and tenant_slug are required",
+            ));
+        }
+        self.lectures
+            .end_lecture(&req.session_id, &req.tenant_slug)
+            .await;
+        Ok(Response::new(()))
+    }
+
+    #[instrument(skip(self, request), fields(request_id = tracing::field::Empty, tenant.slug = tracing::field::Empty))]
+    async fn join_lecture(
+        &self,
+        request: Request<JoinLectureRequest>,
+    ) -> Result<Response<JoinLectureResponse>, Status> {
+        self.tag_correlation(&request);
+        let req = request.into_inner();
+        if req.session_id.is_empty() || req.tenant_slug.is_empty() || req.user_id.is_empty() {
+            return Err(Status::invalid_argument(
+                "session_id, tenant_slug and user_id are required",
+            ));
+        }
+        let outcome = self
+            .lectures
+            .join_lecture(&req.session_id, &req.tenant_slug, &req.user_id)
+            .await;
+        if !outcome.accepted {
+            return Err(Status::failed_precondition(
+                "lecture has not been started for this session",
+            ));
+        }
+        Ok(Response::new(JoinLectureResponse {
+            accepted: outcome.accepted,
+            join_timestamp_unix: outcome.join_timestamp_unix,
+            attendee_count: outcome.attendee_count,
+        }))
+    }
+
+    #[instrument(skip(self, request), fields(request_id = tracing::field::Empty, tenant.slug = tracing::field::Empty))]
+    async fn get_lecture_pulse(
+        &self,
+        request: Request<GetLecturePulseRequest>,
+    ) -> Result<Response<LecturePulse>, Status> {
+        self.tag_correlation(&request);
+        let req = request.into_inner();
+        let snap = self
+            .lectures
+            .pulse(&req.session_id, &req.tenant_slug)
+            .await
+            .ok_or_else(|| Status::not_found("lecture not found"))?;
+        Ok(Response::new(LecturePulse {
+            session_id: snap.session_id,
+            attendee_count: snap.attendee_count,
+            enrolled_count: snap.enrolled_count,
+            pulse: snap.pulse,
+        }))
+    }
+
+    // ---- W11.2 Q&A queue ----
+
+    #[instrument(skip(self, request), fields(request_id = tracing::field::Empty, tenant.slug = tracing::field::Empty))]
+    async fn submit_question(
+        &self,
+        request: Request<SubmitQuestionRequest>,
+    ) -> Result<Response<QuestionItem>, Status> {
+        self.tag_correlation(&request);
+        let req = request.into_inner();
+        if req.text.trim().is_empty() {
+            return Err(Status::invalid_argument("text is required"));
+        }
+        let q = self
+            .qa
+            .submit(&req.tenant_slug, &req.session_id, &req.user_id, &req.text)
+            .await;
+        Ok(Response::new(question_to_proto(&q)))
+    }
+
+    #[instrument(skip(self, request), fields(request_id = tracing::field::Empty, tenant.slug = tracing::field::Empty))]
+    async fn upvote_question(
+        &self,
+        request: Request<UpvoteQuestionRequest>,
+    ) -> Result<Response<QuestionItem>, Status> {
+        self.tag_correlation(&request);
+        let req = request.into_inner();
+        let q = self
+            .qa
+            .upvote(&req.tenant_slug, &req.session_id, &req.question_id)
+            .await
+            .ok_or_else(|| Status::not_found("question not found"))?;
+        Ok(Response::new(question_to_proto(&q)))
+    }
+
+    #[instrument(skip(self, request), fields(request_id = tracing::field::Empty, tenant.slug = tracing::field::Empty))]
+    async fn get_questions(
+        &self,
+        request: Request<GetQuestionsRequest>,
+    ) -> Result<Response<GetQuestionsResponse>, Status> {
+        self.tag_correlation(&request);
+        let req = request.into_inner();
+        let limit = if req.limit <= 0 { 0 } else { req.limit as usize };
+        let items = self.qa.list(&req.tenant_slug, &req.session_id, limit).await;
+        Ok(Response::new(GetQuestionsResponse {
+            questions: items.iter().map(question_to_proto).collect(),
+        }))
+    }
+
+    // ---- W11.4 Office hours rooms ----
+
+    #[instrument(skip(self, request), fields(request_id = tracing::field::Empty, tenant.slug = tracing::field::Empty))]
+    async fn create_office_hours_room(
+        &self,
+        request: Request<CreateOfficeHoursRoomRequest>,
+    ) -> Result<Response<OfficeHoursRoom>, Status> {
+        self.tag_correlation(&request);
+        let req = request.into_inner();
+        if req.booking_id.is_empty() {
+            return Err(Status::invalid_argument("booking_id is required"));
+        }
+        let starts_at = DateTime::<Utc>::from_timestamp(req.starts_at_unix, 0)
+            .ok_or_else(|| Status::invalid_argument("invalid starts_at_unix"))?;
+        let backend = match OfficeHoursBackend::try_from(req.backend) {
+            Ok(OfficeHoursBackend::OhBackendZoom) => OhBackend::Zoom,
+            _ => OhBackend::Native,
+        };
+        let room = office_hours::create_room(
+            &self.config.server.host,
+            CreateOhRoomInput {
+                booking_id: &req.booking_id,
+                tenant_slug: &req.tenant_slug,
+                instructor_id: &req.instructor_id,
+                student_id: &req.student_id,
+                starts_at,
+                duration_minutes: req.duration_minutes,
+                backend,
+            },
+        );
+        let backend_proto = match room.backend {
+            OhBackend::Native => OfficeHoursBackend::OhBackendNative,
+            OhBackend::Zoom => OfficeHoursBackend::OhBackendZoom,
+        } as i32;
+        Ok(Response::new(OfficeHoursRoom {
+            room_id: room.room_id,
+            booking_id: room.booking_id,
+            join_url: room.join_url,
+            backend: backend_proto,
+            expires_at_unix: room.expires_at.timestamp(),
+        }))
+    }
+}
+
+fn question_to_proto(q: &crate::qa::Question) -> QuestionItem {
+    QuestionItem {
+        id: q.id.clone(),
+        user_id: q.user_id.clone(),
+        text: q.text.clone(),
+        upvotes: q.upvotes,
+        submitted_at_unix: q.submitted_at_unix,
     }
 }
 

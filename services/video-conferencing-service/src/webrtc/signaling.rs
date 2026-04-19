@@ -518,5 +518,3 @@ impl Default for SignalingServer {
     }
 }
 
-#[cfg(test)]
-mod tests;

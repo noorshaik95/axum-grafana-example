@@ -41,6 +41,123 @@ service VideoConferencingService {
 
   // Calendar Integration (AC2)
   rpc SendCalendarInvitation(CalendarInvitationRequest) returns (CalendarInvitationResponse);
+
+  // W11.1 Live Lecture Mode
+  rpc StartLecture(StartLectureRequest) returns (LectureSession);
+  rpc EndLecture(EndLectureRequest) returns (google.protobuf.Empty);
+  rpc JoinLecture(JoinLectureRequest) returns (JoinLectureResponse);
+  rpc GetLecturePulse(GetLecturePulseRequest) returns (LecturePulse);
+
+  // W11.2 Q&A Queue
+  rpc SubmitQuestion(SubmitQuestionRequest) returns (QuestionItem);
+  rpc UpvoteQuestion(UpvoteQuestionRequest) returns (QuestionItem);
+  rpc GetQuestions(GetQuestionsRequest) returns (GetQuestionsResponse);
+
+  // W11.4 Office Hours Rooms
+  rpc CreateOfficeHoursRoom(CreateOfficeHoursRoomRequest) returns (OfficeHoursRoom);
+}
+
+// ---- W11.1 Live Lecture ----
+message StartLectureRequest {
+  string session_id = 1;
+  string tenant_slug = 2;
+  string instructor_id = 3;
+  int32 enrolled_count = 4;
+  string course_id = 5;
+}
+
+message EndLectureRequest {
+  string session_id = 1;
+  string tenant_slug = 2;
+}
+
+message JoinLectureRequest {
+  string session_id = 1;
+  string tenant_slug = 2;
+  string user_id = 3;
+}
+
+message JoinLectureResponse {
+  bool accepted = 1;
+  int64 join_timestamp_unix = 2;
+  int32 attendee_count = 3;
+}
+
+message GetLecturePulseRequest {
+  string session_id = 1;
+  string tenant_slug = 2;
+}
+
+message LectureSession {
+  string session_id = 1;
+  string tenant_slug = 2;
+  int32 enrolled_count = 3;
+  int64 started_at_unix = 4;
+  bool active = 5;
+}
+
+message LecturePulse {
+  string session_id = 1;
+  int32 attendee_count = 2;
+  int32 enrolled_count = 3;
+  double pulse = 4;          // attendee_count / enrolled_count (0..1)
+}
+
+// ---- W11.2 Q&A Queue ----
+message SubmitQuestionRequest {
+  string session_id = 1;
+  string tenant_slug = 2;
+  string user_id = 3;
+  string text = 4;
+}
+
+message UpvoteQuestionRequest {
+  string session_id = 1;
+  string tenant_slug = 2;
+  string question_id = 3;
+}
+
+message GetQuestionsRequest {
+  string session_id = 1;
+  string tenant_slug = 2;
+  int32 limit = 3;
+}
+
+message GetQuestionsResponse {
+  repeated QuestionItem questions = 1;
+}
+
+message QuestionItem {
+  string id = 1;
+  string user_id = 2;
+  string text = 3;
+  int32 upvotes = 4;
+  int64 submitted_at_unix = 5;
+}
+
+// ---- W11.4 Office Hours Room ----
+message CreateOfficeHoursRoomRequest {
+  string booking_id = 1;
+  string tenant_slug = 2;
+  string instructor_id = 3;
+  string student_id = 4;
+  int64 starts_at_unix = 5;
+  int32 duration_minutes = 6;
+  OfficeHoursBackend backend = 7;
+}
+
+enum OfficeHoursBackend {
+  OH_BACKEND_UNSPECIFIED = 0;
+  OH_BACKEND_NATIVE = 1;
+  OH_BACKEND_ZOOM = 2;
+}
+
+message OfficeHoursRoom {
+  string room_id = 1;
+  string booking_id = 2;
+  string join_url = 3;
+  OfficeHoursBackend backend = 4;
+  int64 expires_at_unix = 5;
 }
 
 // Messages for Session Management
