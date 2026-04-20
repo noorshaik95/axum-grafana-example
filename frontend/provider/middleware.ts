@@ -10,7 +10,7 @@ export function middleware(request: NextRequest) {
   }
 
   if (token && isAuthPage) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return NextResponse.redirect(new URL('/teach', request.url))
   }
 }
 
