@@ -1109,7 +1109,7 @@ route_overrides:
     http_method: "GET"
     service: "metrics-service"
 
-  - grpc_method: "metrics.MetricsService/GetGradingQueueCount"
+  - grpc_method: "assignment.GradingService/GetGradingQueueCount"
     http_path: "/api/grading/queue/count"
     http_method: "GET"
     service: "assignment-grading-service"
