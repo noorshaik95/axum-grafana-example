@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getModelToken } from '@nestjs/mongoose';
 import { CourseController } from './course.controller';
 import { CourseService } from './course.service';
 import { EnrollmentService } from '../enrollment/enrollment.service';
+import { ProgressService } from '../progress/progress.service';
+import { AnalyticsService } from '../analytics/analytics.service';
+import { Course } from './schemas/course.schema';
 import { MetricsService } from '../observability/metrics.service';
 import { EnrollmentType, EnrollmentStatus } from '../enrollment/schemas/enrollment.schema';
 
@@ -9,6 +13,9 @@ describe('CourseController', () => {
   let controller: CourseController;
   let courseService: jest.Mocked<CourseService>;
   let enrollmentService: jest.Mocked<EnrollmentService>;
+  let progressService: { getCompletedLessonIds: jest.Mock };
+  let analyticsService: { getCourseAnalytics: jest.Mock };
+  let courseModel: { findOne: jest.Mock };
 
   const mockCourse = {
     _id: { toString: () => 'course-1' },
@@ -80,11 +87,22 @@ describe('CourseController', () => {
       observeGrpcRequestDuration: jest.fn(),
     };
 
+    progressService = { getCompletedLessonIds: jest.fn().mockResolvedValue([]) };
+    analyticsService = { getCourseAnalytics: jest.fn() };
+    courseModel = {
+      findOne: jest.fn().mockReturnValue({
+        lean: () => ({ exec: () => Promise.resolve(null) }),
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CourseController],
       providers: [
         { provide: CourseService, useValue: mockCourseService },
         { provide: EnrollmentService, useValue: mockEnrollmentService },
+        { provide: ProgressService, useValue: progressService },
+        { provide: AnalyticsService, useValue: analyticsService },
+        { provide: getModelToken(Course.name), useValue: courseModel },
         { provide: MetricsService, useValue: mockMetricsService },
       ],
     }).compile();
@@ -282,6 +300,144 @@ describe('CourseController', () => {
 
       expect(courseService.addCoInstructor).toHaveBeenCalledWith('course-1', 'co-instructor-1');
       expect(result.course.co_instructor_ids).toContain('co-instructor-1');
+    });
+  });
+
+  // W8 gRPC wrappers
+  describe('listModules', () => {
+    it('returns ordered modules for course+tenant', async () => {
+      const course = {
+        _id: 'course-1',
+        tenantId: 'tenant-a',
+        modules: [
+          { id: 'm2', title: 'Second', order: 2, isVisible: true, lessons: [] },
+          { id: 'm1', title: 'First', order: 1, isVisible: true, lessons: [] },
+        ],
+      };
+      courseModel.findOne.mockReturnValueOnce({
+        lean: () => ({ exec: () => Promise.resolve(course) }),
+      });
+
+      const result = await controller.listModules({
+        course_id: 'course-1',
+        tenant_id: 'tenant-a',
+      });
+
+      expect(courseModel.findOne).toHaveBeenCalledWith({ _id: 'course-1', tenantId: 'tenant-a' });
+      expect(result.modules).toHaveLength(2);
+      expect(result.modules[0].id).toBe('m1');
+      expect(result.modules[1].id).toBe('m2');
+    });
+
+    it('returns empty modules when course not found', async () => {
+      const result = await controller.listModules({
+        course_id: 'nope',
+        tenant_id: 'tenant-a',
+      });
+      expect(result.modules).toEqual([]);
+    });
+  });
+
+  describe('getNextUp', () => {
+    it('returns first uncompleted lesson', async () => {
+      const course = {
+        _id: 'course-1',
+        tenantId: 'tenant-a',
+        modules: [
+          {
+            id: 'm1',
+            order: 1,
+            lessons: [
+              {
+                id: 'l1',
+                title: 'L1',
+                order: 1,
+                contentType: 'video',
+                contentUrl: '',
+                isVisible: true,
+              },
+              {
+                id: 'l2',
+                title: 'L2',
+                order: 2,
+                contentType: 'video',
+                contentUrl: '',
+                isVisible: true,
+              },
+            ],
+          },
+        ],
+      };
+      courseModel.findOne.mockReturnValueOnce({
+        lean: () => ({ exec: () => Promise.resolve(course) }),
+      });
+      progressService.getCompletedLessonIds.mockResolvedValueOnce(['l1']);
+
+      const result = await controller.getNextUp({
+        course_id: 'course-1',
+        user_id: 'user-1',
+        tenant_id: 'tenant-a',
+      });
+
+      expect(result.has_next).toBe(true);
+      expect(result.module_id).toBe('m1');
+      expect(result.lesson.id).toBe('l2');
+    });
+
+    it('returns has_next=false when all lessons complete', async () => {
+      const course = {
+        _id: 'course-1',
+        tenantId: 'tenant-a',
+        modules: [{ id: 'm1', order: 1, lessons: [{ id: 'l1', order: 1, title: 'L1' }] }],
+      };
+      courseModel.findOne.mockReturnValueOnce({
+        lean: () => ({ exec: () => Promise.resolve(course) }),
+      });
+      progressService.getCompletedLessonIds.mockResolvedValueOnce(['l1']);
+
+      const result = await controller.getNextUp({
+        course_id: 'course-1',
+        user_id: 'user-1',
+        tenant_id: 'tenant-a',
+      });
+
+      expect(result.has_next).toBe(false);
+    });
+  });
+
+  describe('getCourseAnalytics', () => {
+    it('returns analytics shape mapped to proto field names', async () => {
+      analyticsService.getCourseAnalytics.mockResolvedValueOnce({
+        courseId: 'course-1',
+        engagementPct: 72,
+        completionPct: 45,
+        medianGrade: 82.5,
+        atRiskCount: 3,
+        updatedAt: '2026-04-22T00:00:00Z',
+      });
+
+      const result = await controller.getCourseAnalytics({
+        course_id: 'course-1',
+        tenant_id: 'tenant-a',
+      });
+
+      expect(analyticsService.getCourseAnalytics).toHaveBeenCalledWith('tenant-a', 'course-1');
+      expect(result.course_id).toBe('course-1');
+      expect(result.engagement_pct).toBe(72);
+      expect(result.completion_pct).toBe(45);
+      expect(result.median_grade).toBe(82.5);
+      expect(result.at_risk_count).toBe(3);
+      expect(result.updated_at).toBe('2026-04-22T00:00:00Z');
+    });
+  });
+
+  describe('getNextLecture', () => {
+    it('returns has_next=false default (schedule not yet modeled)', async () => {
+      const result = await controller.getNextLecture({
+        user_id: 'user-1',
+        tenant_id: 'tenant-a',
+      });
+      expect(result.has_next).toBe(false);
     });
   });
 });
