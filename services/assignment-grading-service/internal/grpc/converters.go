@@ -186,6 +186,29 @@ func courseGradebookToProto(cg *service.CourseGradebook) *pb.GetCourseGradebookR
 	}
 }
 
+// Grading queue conversions (W9.4)
+
+func patternGroupToProto(g *service.PatternGroup) *pb.PatternGroup {
+	if g == nil {
+		return nil
+	}
+	subs := make([]*pb.PatternSubmission, 0, len(g.Submissions))
+	for _, ps := range g.Submissions {
+		subs = append(subs, &pb.PatternSubmission{
+			SubmissionId: ps.SubmissionID,
+			StudentId:    ps.StudentID,
+			Status:       ps.Status,
+		})
+	}
+	return &pb.PatternGroup{
+		PatternId:           g.PatternID,
+		Description:         g.Description,
+		Count:               int32(g.Count),
+		AutoScoreSuggestion: g.AutoScoreSuggestion,
+		Submissions:         subs,
+	}
+}
+
 // GradeStatistics conversions
 
 func gradeStatisticsToProto(gs *repository.GradeStatistics, assignmentID string) *pb.GradeStatistics {

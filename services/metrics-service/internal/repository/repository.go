@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"slate/services/metrics-service/internal/models"
@@ -372,4 +373,238 @@ func (r *Repository) InsertEventWithTime(ctx context.Context, t time.Time, tenan
 		metaJSON,
 	)
 	return err
+}
+
+// --- Extensions for W12 (roster health, export, platform stats) ---
+
+// RosterSignalRow is the raw per-student input used to classify roster risk.
+type RosterSignalRow struct {
+	UserID            string
+	DisplayName       string
+	MissedAssignments int
+	DaysSinceActive   int
+	GradeTrend        []float64
+}
+
+// GetRosterSignals returns the per-student signals needed to compute risk for
+// every student enrolled in a course. Fields that the schema does not yet
+// track (display name) fall back to the student ID.
+func (r *Repository) GetRosterSignals(ctx context.Context, tenantID, courseID string) ([]RosterSignalRow, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT
+			sp.student_id::text,
+			sp.student_id::text AS display_name,
+			(EXTRACT(EPOCH FROM (NOW() - COALESCE(sp.last_activity_at, NOW()))) / 86400)::int AS days_since_active
+		 FROM student_progress sp
+		 WHERE sp.tenant_id = $1 AND sp.course_id = $2`,
+		tenantID, courseID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []RosterSignalRow
+	for rows.Next() {
+		var row RosterSignalRow
+		if err := rows.Scan(&row.UserID, &row.DisplayName, &row.DaysSinceActive); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for i := range out {
+		missed, trend, err := r.studentRiskSignals(ctx, tenantID, courseID, out[i].UserID)
+		if err != nil {
+			return nil, err
+		}
+		out[i].MissedAssignments = missed
+		out[i].GradeTrend = trend
+	}
+	return out, nil
+}
+
+func (r *Repository) studentRiskSignals(ctx context.Context, tenantID, courseID, studentID string) (int, []float64, error) {
+	var missed int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM event_log
+		 WHERE tenant_id = $1 AND course_id = $2 AND user_id = $3
+		   AND event_type = 'assignment.missed'`,
+		tenantID, courseID, studentID,
+	).Scan(&missed)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT (metadata->>'score')::float8
+		 FROM event_log
+		 WHERE tenant_id = $1 AND course_id = $2 AND user_id = $3
+		   AND event_type = 'submission.graded'
+		   AND metadata->>'score' IS NOT NULL
+		 ORDER BY time DESC
+		 LIMIT 5`,
+		tenantID, courseID, studentID,
+	)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+
+	var desc []float64
+	for rows.Next() {
+		var s float64
+		if err := rows.Scan(&s); err != nil {
+			return 0, nil, err
+		}
+		desc = append(desc, s)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, nil, err
+	}
+	trend := make([]float64, len(desc))
+	for i, v := range desc {
+		trend[len(desc)-1-i] = v
+	}
+	return missed, trend, nil
+}
+
+// TenantMAURow captures monthly-active-user counts per tenant.
+type TenantMAURow struct {
+	TenantID string
+	MAU      int
+}
+
+// GetTenantMAU returns monthly-active-user counts grouped by tenant.
+func (r *Repository) GetTenantMAU(ctx context.Context) ([]TenantMAURow, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT tenant_id::text, COUNT(DISTINCT user_id) AS mau
+		 FROM event_log
+		 WHERE time > NOW() - INTERVAL '30 days' AND user_id IS NOT NULL
+		 GROUP BY tenant_id
+		 ORDER BY mau DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []TenantMAURow
+	for rows.Next() {
+		var t TenantMAURow
+		if err := rows.Scan(&t.TenantID, &t.MAU); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// GetSignupsLast30d counts user-creation events in the last 30 days.
+func (r *Repository) GetSignupsLast30d(ctx context.Context) (int, error) {
+	var n int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM event_log
+		 WHERE event_type = 'user.created' AND time > NOW() - INTERVAL '30 days'`,
+	).Scan(&n)
+	return n, err
+}
+
+// GetUptimePct derives an uptime percent from `health.ok` / `health.fail`
+// events in the last 24 hours. Returns 100.0 when there is no data — an
+// empty window should not be reported as 0% uptime.
+func (r *Repository) GetUptimePct(ctx context.Context) (float64, error) {
+	var total, failures int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT
+			COUNT(*) FILTER (WHERE event_type IN ('health.ok','health.fail')),
+			COUNT(*) FILTER (WHERE event_type = 'health.fail')
+		 FROM event_log
+		 WHERE time > NOW() - INTERVAL '24 hours'`,
+	).Scan(&total, &failures)
+	if err != nil {
+		return 0, err
+	}
+	if total == 0 {
+		return 100.0, nil
+	}
+	return float64(total-failures) / float64(total) * 100.0, nil
+}
+
+// GradebookRows returns CSV-ready rows for a course gradebook export.
+func (r *Repository) GradebookRows(ctx context.Context, tenantID, courseID string) ([][]string, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT DISTINCT ON (user_id)
+			user_id::text,
+			COALESCE((metadata->>'score'), ''),
+			COALESCE(assignment_id::text, ''),
+			time::text
+		 FROM event_log
+		 WHERE tenant_id = $1 AND course_id = $2
+		   AND event_type = 'submission.graded'
+		 ORDER BY user_id, time DESC`,
+		tenantID, courseID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := [][]string{{"student_id", "score", "assignment_id", "graded_at"}}
+	for rows.Next() {
+		var studentID, score, assignmentID, gradedAt string
+		if err := rows.Scan(&studentID, &score, &assignmentID, &gradedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, []string{studentID, score, assignmentID, gradedAt})
+	}
+	return out, rows.Err()
+}
+
+// RosterRows returns CSV-ready rows for a roster export.
+func (r *Repository) RosterRows(ctx context.Context, tenantID, courseID string) ([][]string, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT
+			student_id::text,
+			COALESCE(completion_pct::text, '0'),
+			COALESCE(time_on_task_minutes::text, '0'),
+			COALESCE(last_activity_at::text, '')
+		 FROM student_progress
+		 WHERE tenant_id = $1 AND course_id = $2
+		 ORDER BY student_id`,
+		tenantID, courseID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := [][]string{{"student_id", "completion_pct", "time_on_task_minutes", "last_activity_at"}}
+	for rows.Next() {
+		var studentID, completion, tot, last string
+		if err := rows.Scan(&studentID, &completion, &tot, &last); err != nil {
+			return nil, err
+		}
+		out = append(out, []string{studentID, completion, tot, last})
+	}
+	return out, rows.Err()
+}
+
+// PlatformRows returns CSV-ready rows for a platform export.
+func (r *Repository) PlatformRows(ctx context.Context) ([][]string, error) {
+	m, err := r.GetPlatformMetrics(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return [][]string{
+		{"metric", "value"},
+		{"dau", fmt.Sprintf("%d", m.DAU)},
+		{"mau", fmt.Sprintf("%d", m.MAU)},
+		{"active_tenants", fmt.Sprintf("%d", m.ActiveTenants)},
+		{"total_courses", fmt.Sprintf("%d", m.TotalCourses)},
+		{"total_students", fmt.Sprintf("%d", m.TotalStudents)},
+	}, nil
 }

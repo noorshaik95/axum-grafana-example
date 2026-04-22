@@ -22,6 +22,8 @@ service SubmissionService {
   rpc GetSubmission(GetSubmissionRequest) returns (GetSubmissionResponse);
   rpc ListSubmissions(ListSubmissionsRequest) returns (ListSubmissionsResponse);
   rpc ListStudentSubmissions(ListStudentSubmissionsRequest) returns (ListStudentSubmissionsResponse);
+  rpc SaveDraft(SaveDraftRequest) returns (SaveDraftResponse);
+  rpc GetDraft(GetDraftRequest) returns (GetDraftResponse);
 }
 
 // Grading Service - manages grade creation and publishing
@@ -30,6 +32,9 @@ service GradingService {
   rpc UpdateGrade(UpdateGradeRequest) returns (UpdateGradeResponse);
   rpc PublishGrade(PublishGradeRequest) returns (PublishGradeResponse);
   rpc GetGrade(GetGradeRequest) returns (GetGradeResponse);
+  rpc GetGradingQueue(GetGradingQueueRequest) returns (GetGradingQueueResponse);
+  rpc GetGradingQueueCount(GetGradingQueueCountRequest) returns (GetGradingQueueCountResponse);
+  rpc BatchPublishGrades(BatchPublishGradesRequest) returns (BatchPublishGradesResponse);
 }
 
 // Gradebook Service - provides gradebook views and statistics
@@ -298,6 +303,69 @@ message ExportGradesRequest {
 message ExportGradesResponse {
   bytes data = 1;
   string format = 2;
+}
+
+// Draft Submission Messages (W9.2)
+message SaveDraftRequest {
+  string tenant_id = 1;
+  string assignment_id = 2;
+  string student_id = 3;
+  repeated string file_urls = 4;
+}
+
+message SaveDraftResponse {
+  Submission submission = 1;
+}
+
+message GetDraftRequest {
+  string assignment_id = 1;
+  string student_id = 2;
+}
+
+message GetDraftResponse {
+  Submission submission = 1;
+}
+
+// Grading Queue Messages (W9.4)
+message PatternSubmission {
+  string submission_id = 1;
+  string student_id = 2;
+  string status = 3;
+}
+
+message PatternGroup {
+  string pattern_id = 1;
+  string description = 2;
+  int32 count = 3;
+  double auto_score_suggestion = 4;
+  repeated PatternSubmission submissions = 5;
+}
+
+message GetGradingQueueRequest {
+  string assignment_id = 1;
+  string instructor_id = 2;
+}
+
+message GetGradingQueueResponse {
+  repeated PatternGroup groups = 1;
+}
+
+message GetGradingQueueCountRequest {
+  string assignment_id = 1;
+  string instructor_id = 2;
+}
+
+message GetGradingQueueCountResponse {
+  int32 count = 1;
+}
+
+message BatchPublishGradesRequest {
+  repeated string grade_ids = 1;
+}
+
+message BatchPublishGradesResponse {
+  int32 published_count = 1;
+  repeated string failed_ids = 2;
 }
 
 // Health Check

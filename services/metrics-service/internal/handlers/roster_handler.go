@@ -1,142 +1,96 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"time"
 
+	"slate/services/metrics-service/internal/repository"
+	"slate/services/metrics-service/internal/service"
+
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog/log"
 )
 
-// RosterStudent holds per-student health/risk data.
-type RosterStudent struct {
-	StudentID       string    `json:"studentId"`
-	Name            string    `json:"name"`
-	Email           string    `json:"email"`
-	RiskScore       float64   `json:"riskScore"`       // 0.0 - 1.0
-	RiskLevel       string    `json:"riskLevel"`       // low | medium | high
-	Attendance      float64   `json:"attendance"`      // percent
-	AssignmentsLate int       `json:"assignmentsLate"`
-	LastActive      time.Time `json:"lastActive"`
-	GradeEstimate   float64   `json:"gradeEstimate"`
+// RosterHandler handles the W12.1 roster health endpoints.
+type RosterHandler struct {
+	repo *repository.Repository
+	svc  *service.RosterService
 }
 
-// StudentDetail combines RosterStudent with more granular signals.
-type StudentDetail struct {
-	RosterStudent
-	Signals []StudentSignal `json:"signals"`
+// NewRosterHandler constructs a RosterHandler.
+func NewRosterHandler(repo *repository.Repository, svc *service.RosterService) *RosterHandler {
+	return &RosterHandler{repo: repo, svc: svc}
 }
 
-// StudentSignal is a specific behavioral/academic signal.
-type StudentSignal struct {
-	Type      string    `json:"type"` // login_gap | late_submission | grade_drop | etc.
-	Message   string    `json:"message"`
-	Severity  string    `json:"severity"` // info | warning | critical
-	DetectedAt time.Time `json:"detectedAt"`
+// RegisterRosterRoutes attaches roster routes to the Chi router.
+func (rh *RosterHandler) RegisterRosterRoutes(r chi.Router) {
+	r.Get("/roster/{courseId}/health", rh.GetRosterHealth)
+	r.Post("/roster/{courseId}/invalidate", rh.InvalidateRoster)
+	r.Post("/roster/nudge", rh.SendNudge)
 }
 
-// RegisterRosterRoutes attaches roster health routes to the Chi router.
-func (h *Handler) RegisterRosterRoutes(r chi.Router) {
-	r.Get("/roster/{courseId}/health", h.GetRosterHealth)
-	r.Get("/roster/{courseId}/students/{studentId}", h.GetRosterStudentDetail)
-	r.Post("/roster/nudge", h.SendNudge)
-}
-
-// GetRosterHealth handles GET /roster/:courseId/health
-// Returns students sorted by risk score (highest first).
-func (h *Handler) GetRosterHealth(w http.ResponseWriter, r *http.Request) {
+// GetRosterHealth handles GET /roster/{courseId}/health.
+// Inputs: tenant_slug (query) or X-Tenant-Slug header, instructor_id via X-User-ID.
+func (rh *RosterHandler) GetRosterHealth(w http.ResponseWriter, r *http.Request) {
 	courseID := chi.URLParam(r, "courseId")
+	tenantSlug := tenantSlugFrom(r)
+	instructorID := r.Header.Get("X-User-ID")
 
-	// Stub: return mock students sorted by risk
-	students := []RosterStudent{
-		{
-			StudentID:       "student-002",
-			Name:            "Bob Smith",
-			Email:           "bob@example.edu",
-			RiskScore:       0.85,
-			RiskLevel:       "high",
-			Attendance:      62.0,
-			AssignmentsLate: 3,
-			LastActive:      time.Now().Add(-72 * time.Hour),
-			GradeEstimate:   61.0,
-		},
-		{
-			StudentID:       "student-001",
-			Name:            "Alice Jones",
-			Email:           "alice@example.edu",
-			RiskScore:       0.42,
-			RiskLevel:       "medium",
-			Attendance:      78.0,
-			AssignmentsLate: 1,
-			LastActive:      time.Now().Add(-12 * time.Hour),
-			GradeEstimate:   74.0,
-		},
-		{
-			StudentID:       "student-003",
-			Name:            "Carol White",
-			Email:           "carol@example.edu",
-			RiskScore:       0.10,
-			RiskLevel:       "low",
-			Attendance:      95.0,
-			AssignmentsLate: 0,
-			LastActive:      time.Now().Add(-2 * time.Hour),
-			GradeEstimate:   91.0,
-		},
+	tenantID, err := rh.repo.GetTenantIDForCourse(r.Context(), courseID)
+	if err != nil {
+		tenantID = tenantSlug
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"courseId": courseID,
-		"students": students,
-		"total":    len(students),
-		"atRisk":   1,
+	fetch := func(ctx context.Context, slug, cid, iid string) ([]service.RosterSignals, error) {
+		rows, err := rh.repo.GetRosterSignals(ctx, tenantID, cid)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]service.RosterSignals, len(rows))
+		for i, row := range rows {
+			out[i] = service.RosterSignals{
+				UserID:            row.UserID,
+				DisplayName:       row.DisplayName,
+				MissedAssignments: row.MissedAssignments,
+				DaysSinceActive:   row.DaysSinceActive,
+				GradeTrend:        row.GradeTrend,
+			}
+		}
+		return out, nil
+	}
+
+	entries, err := rh.svc.GetRosterHealth(r.Context(), tenantSlug, courseID, instructorID, fetch)
+	if err != nil {
+		log.Error().Err(err).Str("courseId", courseID).Msg("failed to compute roster health")
+		writeError(w, http.StatusInternalServerError, "failed to compute roster health")
+		return
+	}
+
+	atRisk := 0
+	for _, e := range entries {
+		if e.RiskLevel == service.RiskAtRisk {
+			atRisk++
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"course_id": courseID,
+		"students":  entries,
+		"total":     len(entries),
+		"at_risk":   atRisk,
 	})
 }
 
-// GetRosterStudentDetail handles GET /roster/:courseId/students/:studentId
-func (h *Handler) GetRosterStudentDetail(w http.ResponseWriter, r *http.Request) {
+// InvalidateRoster handles POST /roster/{courseId}/invalidate — manual cache
+// bust for admins/debugging.
+func (rh *RosterHandler) InvalidateRoster(w http.ResponseWriter, r *http.Request) {
 	courseID := chi.URLParam(r, "courseId")
-	studentID := chi.URLParam(r, "studentId")
-
-	detail := StudentDetail{
-		RosterStudent: RosterStudent{
-			StudentID:       studentID,
-			Name:            "Bob Smith",
-			Email:           "bob@example.edu",
-			RiskScore:       0.85,
-			RiskLevel:       "high",
-			Attendance:      62.0,
-			AssignmentsLate: 3,
-			LastActive:      time.Now().Add(-72 * time.Hour),
-			GradeEstimate:   61.0,
-		},
-		Signals: []StudentSignal{
-			{
-				Type:       "login_gap",
-				Message:    "Student has not logged in for 3+ days",
-				Severity:   "warning",
-				DetectedAt: time.Now().Add(-72 * time.Hour),
-			},
-			{
-				Type:       "late_submission",
-				Message:    "3 consecutive late submissions",
-				Severity:   "warning",
-				DetectedAt: time.Now().Add(-48 * time.Hour),
-			},
-			{
-				Type:       "grade_drop",
-				Message:    "Grade dropped from 74% to 61% over 2 weeks",
-				Severity:   "critical",
-				DetectedAt: time.Now().Add(-24 * time.Hour),
-			},
-		},
-	}
-
-	_ = courseID
-	writeJSON(w, http.StatusOK, detail)
+	rh.svc.InvalidateRoster(tenantSlugFrom(r), courseID)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "invalidated"})
 }
 
-// SendNudge handles POST /roster/nudge
-// Sends a check-in message to a student.
-func (h *Handler) SendNudge(w http.ResponseWriter, r *http.Request) {
+// SendNudge handles POST /roster/nudge.
+func (rh *RosterHandler) SendNudge(w http.ResponseWriter, r *http.Request) {
 	instructorID := r.Header.Get("X-User-ID")
 	if instructorID == "" {
 		writeError(w, http.StatusUnauthorized, "missing user ID")
@@ -157,11 +111,21 @@ func (h *Handler) SendNudge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"status":      "nudge_sent",
-		"studentId":   req.StudentID,
-		"courseId":    req.CourseID,
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":       "nudge_sent",
+		"studentId":    req.StudentID,
+		"courseId":     req.CourseID,
 		"instructorId": instructorID,
-		"sentAt":      time.Now(),
+		"sentAt":       time.Now(),
 	})
+}
+
+func tenantSlugFrom(r *http.Request) string {
+	if v := r.Header.Get("X-Tenant-Slug"); v != "" {
+		return v
+	}
+	if v := r.URL.Query().Get("tenant_slug"); v != "" {
+		return v
+	}
+	return "default"
 }

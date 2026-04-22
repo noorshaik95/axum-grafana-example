@@ -147,6 +147,9 @@ func main() {
 	submissionRepo := repository.NewSubmissionRepository(db.DB)
 	gradeRepo := repository.NewGradeRepository(db.DB)
 	gradingRuleRepo := repository.NewGradingRuleRepository(db.DB)
+	rubricRowRepo := repository.NewRubricRowRepository(db.DB)
+	testResultRepo := repository.NewTestResultRepository(db.DB)
+	attachmentRepo := repository.NewAttachmentRepository(db.DB)
 
 	// Initialize services
 	assignmentService := service.NewAssignmentService(assignmentRepo, kafkaProducer)
@@ -154,6 +157,12 @@ func main() {
 	gradingService := service.NewGradingServiceWithDB(assignmentRepo, submissionRepo, gradeRepo, kafkaProducer, db.DB)
 	gradebookService := service.NewGradebookServiceFull(assignmentRepo, submissionRepo, gradeRepo, gradingRuleRepo)
 	gradingRuleService := service.NewGradingRuleService(gradingRuleRepo)
+	rubricRowService := service.NewRubricRowService(rubricRowRepo)
+	attachmentService := service.NewAttachmentService(attachmentRepo, nil)
+	queueService := service.NewGradingQueueService(assignmentRepo, submissionRepo, gradeRepo, testResultRepo)
+	batchGradingService := service.NewBatchGradingService(assignmentRepo, submissionRepo, gradeRepo, kafkaProducer)
+	autoTester := service.NewAutoTester(assignmentRepo, submissionRepo, testResultRepo)
+	_ = autoTester
 
 	log.Info().Msg("Services initialized")
 
@@ -210,7 +219,7 @@ func main() {
 	// Initialize gRPC handlers
 	assignmentHandler := grpchandler.NewAssignmentServiceServer(assignmentService)
 	submissionHandler := grpchandler.NewSubmissionServiceServer(submissionService)
-	gradingHandler := grpchandler.NewGradingServiceServer(gradingService)
+	gradingHandler := grpchandler.NewGradingServiceServerFull(gradingService, queueService)
 	gradebookHandler := grpchandler.NewGradebookServiceServer(gradebookService)
 
 	log.Info().Msg("gRPC handlers initialized")
@@ -249,7 +258,17 @@ func main() {
 	}()
 
 	// Start REST API server
-	restRouter := handlers.NewRouter(assignmentService, submissionService, gradingService, gradebookService, gradingRuleService)
+	restRouter := handlers.NewRouterWithDeps(handlers.RouterDeps{
+		Assignments: assignmentService,
+		Submissions: submissionService,
+		Grading:     gradingService,
+		Gradebook:   gradebookService,
+		GradingRule: gradingRuleService,
+		RubricRows:  rubricRowService,
+		Attachments: attachmentService,
+		Batch:       batchGradingService,
+		Queue:       queueService,
+	})
 	restAddr := cfg.Server.Address()
 	restServer := &http.Server{
 		Addr:              restAddr,

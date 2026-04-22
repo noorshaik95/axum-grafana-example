@@ -40,6 +40,21 @@ service MetricsService {
 
   // Student comparison against class
   rpc GetStudentComparison(StudentComparisonRequest) returns (StudentComparisonResponse);
+
+  // W12.1 roster health — students classified healthy/slipping/at_risk.
+  // Additive per PO ratification (plan/CONTRACTS.md metrics.MetricsService W12).
+  rpc GetRosterHealth(GetRosterHealthRequest) returns (GetRosterHealthResponse);
+
+  // W12.3 export reports — create async export job.
+  // Additive per PO ratification.
+  rpc CreateExport(CreateExportRequest) returns (ExportJob);
+
+  // W12.3 export reports — poll job status.
+  rpc GetExport(GetExportRequest) returns (ExportJob);
+
+  // W12.4 extended platform stats — adds tenant MAU, 30d signups,
+  // uptime, active incident count. Sibling of GetPlatformMetrics.
+  rpc GetPlatformMetricsExtended(PlatformMetricsRequest) returns (PlatformMetricsExtendedResponse);
 }
 
 // Alert type enumeration
@@ -349,4 +364,75 @@ message StudentComparisonResponse {
   double student_score = 2;
   double student_percentile = 3;
   string letter_grade = 4;
+}
+
+// --- W12.1 roster health ---
+// Field names + nesting isomorphic to GET /roster/{courseId}/health JSON.
+
+message GetRosterHealthRequest {
+  string course_id = 1;
+  string tenant_slug = 2;    // optional; falls through to default tenant
+  string instructor_id = 3;  // optional; used for audit only
+}
+
+message RosterEntry {
+  string user_id = 1;
+  string display_name = 2;
+  string risk_level = 3;         // "healthy" | "slipping" | "at_risk"
+  int32 missed_assignments = 4;
+  int32 days_since_active = 5;
+  repeated double grade_trend = 6;
+  string suggested_action = 7;
+}
+
+message GetRosterHealthResponse {
+  string course_id = 1;
+  repeated RosterEntry students = 2;
+  int32 total = 3;
+  int32 at_risk = 4;
+}
+
+// --- W12.3 export ---
+
+message CreateExportRequest {
+  string type = 1;        // "gradebook" | "roster" | "platform"
+  string course_id = 2;   // required for gradebook/roster
+  string tenant_id = 3;
+  string format = 4;      // "csv" | "xlsx"
+}
+
+message GetExportRequest {
+  string job_id = 1;
+}
+
+message ExportJob {
+  string id = 1;
+  CreateExportRequest request = 2;
+  string status = 3;             // pending | running | completed | failed
+  string signed_url = 4;
+  string error = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+// --- W12.4 extended platform metrics ---
+
+message TenantMAU {
+  string tenant_id = 1;
+  int32 mau = 2;
+}
+
+message PlatformMetricsExtendedResponse {
+  // Mirrors PlatformMetricsResponse + additive fields.
+  int32 active_tenants = 1;
+  int32 dau = 2;
+  int32 mau = 3;
+  int32 total_courses = 4;
+  int32 total_students = 5;
+
+  repeated TenantMAU tenant_mau = 6;
+  int32 signups_last_30d = 7;
+  double uptime_pct = 8;
+  int32 active_incidents = 9;
+  google.protobuf.Timestamp generated_at = 10;
 }

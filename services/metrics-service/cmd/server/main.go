@@ -15,10 +15,15 @@ import (
 	commongrpc "slate/libs/common-go/grpc"
 	"slate/libs/common-go/logging"
 	"slate/libs/common-go/tracing"
+	pb "slate/services/metrics-service/api/proto"
+	"slate/services/metrics-service/internal/cache"
 	"slate/services/metrics-service/internal/config"
+	metricsgrpc "slate/services/metrics-service/internal/grpc"
 	"slate/services/metrics-service/internal/handlers"
+	"slate/services/metrics-service/internal/incident"
 	kafkapkg "slate/services/metrics-service/internal/kafka"
 	"slate/services/metrics-service/internal/repository"
+	"slate/services/metrics-service/internal/service"
 	"slate/services/metrics-service/migrations"
 
 	"github.com/go-chi/chi/v5"
@@ -75,11 +80,26 @@ func main() {
 	// Initialize repository
 	repo := repository.New(db)
 
+	// W12 services: in-memory cache + export worker + roster/platform svc
+	appCache := cache.NewMemory()
+	rosterSvc := service.NewRosterService(appCache)
+	platformSvc := service.NewPlatformService(handlers.NewRepoPlatformSource(repo), incident.NewStub(), appCache)
+
+	exportProducer := kafkapkg.NewProducer(cfg.Kafka.Brokers)
+	exportUploader := service.NewStubUploader()
+	exportSvc := service.NewExportService(exportUploader, exportProducer, handlers.NewRepoDataSource(repo))
+
 	// Start Kafka consumer
 	consumerCtx, consumerCancel := context.WithCancel(context.Background())
 	defer consumerCancel()
 
+	exportSvc.Start(consumerCtx)
+
 	kafkaConsumer := kafkapkg.NewConsumer(cfg.Kafka.Brokers, cfg.Kafka.GroupID, repo)
+	kafkaConsumer.OnGradeUpdated = func(tenantSlug, courseID string) {
+		rosterSvc.InvalidateRoster(tenantSlug, courseID)
+		platformSvc.Invalidate()
+	}
 	go func() {
 		if err := kafkaConsumer.Run(consumerCtx); err != nil {
 			log.Error().Err(err).Msg("Kafka consumer exited with error")
@@ -92,6 +112,9 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
+	// plan/CONTRACTS.md trace.propagation: extract traceparent + X-Request-ID,
+	// tag span with request_id + tenant.slug, echo id on response.
+	r.Use(handlers.TracingMiddleware)
 
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -107,8 +130,17 @@ func main() {
 	handler := handlers.New(repo)
 	handler.RegisterRoutes(r)
 
-	// Register roster health routes
-	handler.RegisterRosterRoutes(r)
+	// W12.1 roster health routes
+	rosterHandler := handlers.NewRosterHandler(repo, rosterSvc)
+	rosterHandler.RegisterRosterRoutes(r)
+
+	// W12.3 export routes
+	exportHandler := handlers.NewExportHandler(exportSvc)
+	exportHandler.RegisterExportRoutes(r)
+
+	// W12.4 extended platform stats
+	platformHandler := handlers.NewPlatformHandler(platformSvc)
+	platformHandler.RegisterPlatformRoutes(r)
 
 	// Start HTTP server
 	httpServer := &http.Server{
@@ -136,6 +168,12 @@ func main() {
 	healthpb.RegisterHealthServer(grpcServer, healthServer)
 	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 	reflection.Register(grpcServer)
+
+	// Register the MetricsService gRPC wrapper so api-gateway routes (which
+	// all declare `metrics.MetricsService/*`) actually bind. The wrapper
+	// delegates to the same repo + service layer the REST handlers use.
+	metricsServer := metricsgrpc.NewServer(repo, rosterSvc, exportSvc, platformSvc)
+	pb.RegisterMetricsServiceServer(grpcServer, metricsServer)
 
 	lis, err := net.Listen("tcp", cfg.GRPC.Address())
 	if err != nil {

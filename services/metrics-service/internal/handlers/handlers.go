@@ -8,6 +8,7 @@ import (
 
 	"slate/services/metrics-service/internal/analytics"
 	"slate/services/metrics-service/internal/repository"
+	"slate/services/metrics-service/internal/service"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
@@ -23,6 +24,18 @@ func New(repo *repository.Repository) *Handler {
 	return &Handler{repo: repo}
 }
 
+// NewRepoPlatformSource adapts the repository to service.PlatformSource.
+// Exposed so main.go can wire the PlatformService without touching the
+// internal adapter types.
+func NewRepoPlatformSource(r *repository.Repository) service.PlatformSource {
+	return newRepoPlatformSource(r)
+}
+
+// NewRepoDataSource adapts the repository to service.DataSource.
+func NewRepoDataSource(r *repository.Repository) service.DataSource {
+	return newRepoDataSource(r)
+}
+
 // RegisterRoutes registers all metrics routes on the given Chi router.
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Get("/metrics/platform", h.GetPlatformMetrics)
@@ -32,6 +45,28 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Get("/metrics/students/{id}/time-on-task", h.GetStudentTimeOnTask)
 	r.Get("/metrics/grades/distribution/{courseId}", h.GetGradeDistribution)
 	r.Get("/metrics/grades/comparison/{studentId}/{courseId}", h.GetStudentComparison)
+	r.Get("/metrics/grades/histogram/{assignmentId}", h.GetAssignmentLetterHistogram)
+}
+
+// GetAssignmentLetterHistogram handles GET /metrics/grades/histogram/{assignmentId}.
+// Implements W12.2 letter-grade histogram for a single assignment. The
+// tenant/course are supplied via X-Tenant-ID header and ?course_id=… query.
+func (h *Handler) GetAssignmentLetterHistogram(w http.ResponseWriter, r *http.Request) {
+	assignmentID := chi.URLParam(r, "assignmentId")
+	tenantID := r.Header.Get("X-Tenant-ID")
+	courseID := r.URL.Query().Get("course_id")
+
+	var scores []float64
+	var err error
+	if tenantID != "" && courseID != "" {
+		scores, err = h.repo.GetScoresForAssignment(r.Context(), tenantID, courseID, assignmentID)
+		if err != nil && err != sql.ErrNoRows {
+			log.Error().Err(err).Msg("failed to load assignment scores")
+			writeError(w, http.StatusInternalServerError, "failed to compute histogram")
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, service.BuildLetterHistogram(assignmentID, scores))
 }
 
 func (h *Handler) GetPlatformMetrics(w http.ResponseWriter, r *http.Request) {

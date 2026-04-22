@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"slate/libs/common-go/tracing"
 	"slate/services/metrics-service/internal/analytics"
 	"slate/services/metrics-service/internal/models"
 	"slate/services/metrics-service/internal/repository"
@@ -19,6 +20,10 @@ type Consumer struct {
 	brokers []string
 	groupID string
 	repo    *repository.Repository
+
+	// OnGradeUpdated is invoked when a `grade.updated` event is received so
+	// the owner of cached roster/platform state can invalidate it.
+	OnGradeUpdated func(tenantSlug, courseID string)
 }
 
 // NewConsumer creates a new Kafka consumer.
@@ -32,13 +37,14 @@ func NewConsumer(brokers []string, groupID string, repo *repository.Repository) 
 
 // Run starts consuming from all relevant topics. Blocks until ctx is cancelled.
 func (c *Consumer) Run(ctx context.Context) error {
-	errCh := make(chan error, 5)
+	errCh := make(chan error, 6)
 
 	go func() { errCh <- c.consumeTopic(ctx, "lesson.completed", c.handleLessonCompleted) }()
 	go func() { errCh <- c.consumeTopic(ctx, "submission.uploaded", c.handleSubmissionUploaded) }()
 	go func() { errCh <- c.consumeTopic(ctx, "submission.graded", c.handleSubmissionGraded) }()
 	go func() { errCh <- c.consumeTopic(ctx, "room.ended", c.handleRoomEnded) }()
 	go func() { errCh <- c.consumeTopic(ctx, "message.sent", c.handleMessageSent) }()
+	go func() { errCh <- c.consumeTopic(ctx, "grade.updated", c.handleGradeUpdated) }()
 
 	select {
 	case err := <-errCh:
@@ -46,6 +52,35 @@ func (c *Consumer) Run(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+// HandleGradeUpdatedEvent exposes the grade.updated handler for in-process
+// testing without spinning up a Kafka broker.
+func (c *Consumer) HandleGradeUpdatedEvent(data []byte) error {
+	return c.handleGradeUpdated(context.Background(), data)
+}
+
+// gradeUpdatedEvent is the payload emitted by the assignment-grading service.
+type gradeUpdatedEvent struct {
+	TenantSlug string `json:"tenant_slug"`
+	TenantID   string `json:"tenant_id"`
+	CourseID   string `json:"course_id"`
+}
+
+func (c *Consumer) handleGradeUpdated(_ context.Context, data []byte) error {
+	var ev gradeUpdatedEvent
+	if err := json.Unmarshal(data, &ev); err != nil {
+		return fmt.Errorf("unmarshal grade.updated: %w", err)
+	}
+	slug := ev.TenantSlug
+	if slug == "" {
+		slug = ev.TenantID
+	}
+	if c.OnGradeUpdated != nil {
+		c.OnGradeUpdated(slug, ev.CourseID)
+	}
+	log.Debug().Str("tenant", slug).Str("course", ev.CourseID).Msg("processed grade.updated")
+	return nil
 }
 
 func (c *Consumer) consumeTopic(ctx context.Context, topic string, handler func(ctx context.Context, msg []byte) error) error {
@@ -68,7 +103,14 @@ func (c *Consumer) consumeTopic(ctx context.Context, topic string, handler func(
 			continue
 		}
 
-		if err := handler(ctx, msg.Value); err != nil {
+		// Link consumer span to the producer span via kafka header traceparent.
+		hs := make([]tracing.KafkaHeader, len(msg.Headers))
+		for i, h := range msg.Headers {
+			hs[i] = tracing.KafkaHeader{Key: h.Key, Value: h.Value}
+		}
+		msgCtx := tracing.ContextFromKafkaHeaders(ctx, hs)
+
+		if err := handler(msgCtx, msg.Value); err != nil {
 			log.Error().Err(err).Str("topic", topic).Msg("error handling message")
 		}
 	}

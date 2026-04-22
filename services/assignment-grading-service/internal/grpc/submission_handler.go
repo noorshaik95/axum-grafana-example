@@ -186,3 +186,40 @@ func (s *SubmissionServiceServer) ListStudentSubmissions(ctx context.Context, re
 		Submissions: protoSubmissions,
 	}, nil
 }
+
+// SaveDraft stores or replaces a student's draft submission (W9.2).
+func (s *SubmissionServiceServer) SaveDraft(ctx context.Context, req *pb.SaveDraftRequest) (*pb.SaveDraftResponse, error) {
+	log.WithContext(ctx).
+		Str("assignment_id", req.AssignmentId).
+		Str("student_id", req.StudentId).
+		Int("file_urls", len(req.FileUrls)).
+		Msg("SaveDraft called")
+
+	draft, err := s.service.UpsertDraft(ctx, req.TenantId, req.AssignmentId, req.StudentId, req.FileUrls)
+	if err != nil {
+		log.ErrorWithContext(ctx).Err(err).Str("assignment_id", req.AssignmentId).Msg("Failed to save draft")
+		return nil, mapError(err)
+	}
+
+	return &pb.SaveDraftResponse{
+		Submission: submissionToProto(draft),
+	}, nil
+}
+
+// GetDraft fetches the current draft submission for (assignment, student).
+func (s *SubmissionServiceServer) GetDraft(ctx context.Context, req *pb.GetDraftRequest) (*pb.GetDraftResponse, error) {
+	log.WithContext(ctx).
+		Str("assignment_id", req.AssignmentId).
+		Str("student_id", req.StudentId).
+		Msg("GetDraft called")
+
+	draft, err := s.service.GetDraft(ctx, req.AssignmentId, req.StudentId)
+	if err != nil {
+		log.ErrorWithContext(ctx).Err(err).Str("assignment_id", req.AssignmentId).Msg("Failed to get draft")
+		return nil, mapError(err)
+	}
+
+	return &pb.GetDraftResponse{
+		Submission: submissionToProto(draft),
+	}, nil
+}
