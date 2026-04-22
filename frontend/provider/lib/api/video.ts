@@ -57,3 +57,37 @@ export async function updateSession(id: string, data: UpdateSessionDto): Promise
 export async function cancelSession(id: string): Promise<void> {
   return apiClient.patch(`/api/video/sessions/${id}/cancel`)
 }
+
+// W11.2 Lecture Q&A
+
+export interface LectureQuestion {
+  id: string
+  user_id: string
+  text: string
+  upvotes: number
+  submitted_at_unix: number
+}
+
+export interface GetLectureQuestionsResponse {
+  questions: LectureQuestion[]
+}
+
+export async function listLectureQuestions(
+  lectureId: string,
+  limit?: number
+): Promise<GetLectureQuestionsResponse> {
+  const q = new URLSearchParams()
+  if (limit) q.set('limit', String(limit))
+  const suffix = q.toString() ? `?${q.toString()}` : ''
+  return apiClient.get<GetLectureQuestionsResponse>(`/api/video/lectures/${lectureId}/qa${suffix}`)
+}
+
+export async function upvoteLectureQuestion(
+  lectureId: string,
+  questionId: string
+): Promise<LectureQuestion> {
+  return apiClient.post<LectureQuestion>(
+    `/api/video/lectures/${lectureId}/qa/${questionId}/upvote`,
+    {}
+  )
+}

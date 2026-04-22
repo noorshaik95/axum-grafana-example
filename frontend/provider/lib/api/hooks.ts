@@ -6,6 +6,7 @@ import * as gradingApi from './grading'
 import * as videoApi from './video'
 import * as announcementsApi from './announcements'
 import * as messagesApi from './messages'
+import * as discussionApi from './discussion'
 import type { Course, CourseFilters } from '../../../shared/lib/api/types'
 
 // -- Courses --
@@ -339,5 +340,61 @@ export function useSendMessage() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['messages', 'thread', vars.threadId] })
     },
+  })
+}
+
+// -- Course analytics & roster --
+
+export function useCourseAnalytics(courseId: string) {
+  return useQuery({
+    queryKey: ['course-analytics', courseId],
+    queryFn: () => coursesApi.getCourseAnalytics(courseId),
+    enabled: !!courseId,
+  })
+}
+
+export function useCourseRoster(courseId: string) {
+  return useQuery({
+    queryKey: ['course-roster', courseId],
+    queryFn: () => coursesApi.getCourseRoster(courseId),
+    enabled: !!courseId,
+  })
+}
+
+// -- Discussion threads --
+
+export function useDiscussionThreads(courseId?: string) {
+  return useQuery({
+    queryKey: ['discussion-threads', courseId],
+    queryFn: () => discussionApi.listThreads({ courseId, limit: 50 }),
+  })
+}
+
+export function useCreateDiscussionThread() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: discussionApi.CreateThreadDto) => discussionApi.createThread(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['discussion-threads'] }),
+  })
+}
+
+// -- Lecture Q&A --
+
+export function useLectureQuestions(lectureId: string) {
+  return useQuery({
+    queryKey: ['lecture-questions', lectureId],
+    queryFn: () => videoApi.listLectureQuestions(lectureId),
+    enabled: !!lectureId,
+    refetchInterval: 5000,
+  })
+}
+
+export function useUpvoteQuestion() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ lectureId, questionId }: { lectureId: string; questionId: string }) =>
+      videoApi.upvoteLectureQuestion(lectureId, questionId),
+    onSuccess: (_, vars) =>
+      qc.invalidateQueries({ queryKey: ['lecture-questions', vars.lectureId] }),
   })
 }

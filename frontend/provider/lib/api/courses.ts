@@ -32,6 +32,32 @@ export interface CreateLessonDto {
   description?: string
 }
 
+export interface CourseAnalytics {
+  course_id: string
+  engagement_pct: number
+  completion_pct: number
+  median_grade?: number | null
+  at_risk_count: number
+  updated_at: string
+}
+
+export type EnrollmentStatus = 'active' | 'dropped' | 'completed' | 'waitlisted'
+
+export interface RosterEnrollment {
+  id: string
+  course_id: string
+  student_id: string
+  student_name?: string
+  status: EnrollmentStatus
+  enrolled_at: string
+  section_id?: string
+}
+
+export interface CourseRosterResponse {
+  enrollments: RosterEnrollment[]
+  total_count: number
+}
+
 export interface UpdateLessonDto {
   name?: string
   description?: string
@@ -137,4 +163,12 @@ export async function reorderLessons(
   order: LessonOrder[]
 ): Promise<void> {
   return apiClient.patch(`/api/courses/${courseId}/modules/${moduleId}/lessons/reorder`, order)
+}
+
+export async function getCourseAnalytics(courseId: string): Promise<CourseAnalytics> {
+  return apiClient.get<CourseAnalytics>(`/api/courses/${courseId}/analytics`)
+}
+
+export async function getCourseRoster(courseId: string): Promise<CourseRosterResponse> {
+  return apiClient.get<CourseRosterResponse>(`/api/courses/${courseId}/roster`)
 }

@@ -1,24 +1,25 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '../../../../shared/components/ui/card'
+import { Button } from '../../../../shared/components/ui/button'
+import { Badge } from '../../../../shared/components/ui/badge'
 import { Loader2, Users, BookOpen } from 'lucide-react'
 import Link from 'next/link'
-import { useCourses, useProfile } from '../../../../shared/lib/api/hooks'
-import type { Course } from '../../../../shared/lib/api/types'
+import { useInstructorCourses, useCourseRoster } from '@/lib/api/hooks'
+import { useProfile } from '../../../../shared/lib/api/hooks'
 
 export default function StudentsPage() {
   const { data: profile } = useProfile()
-  const {
-    data: coursesData,
-    isLoading,
-    error,
-  } = useCourses(profile ? { instructorId: profile.id } : undefined)
+  const coursesQuery = useInstructorCourses(profile ? { instructorId: profile.id } : undefined)
+  const courses = coursesQuery.data?.data ?? []
 
-  const courses: readonly Course[] = coursesData?.data ?? []
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('')
+  const effectiveCourseId = selectedCourseId || courses[0]?.id || ''
 
-  if (isLoading) {
+  const rosterQuery = useCourseRoster(effectiveCourseId)
+
+  if (coursesQuery.isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
@@ -26,13 +27,15 @@ export default function StudentsPage() {
     )
   }
 
-  if (error) {
+  if (coursesQuery.error) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
         Failed to load data. Please try again later.
       </div>
     )
   }
+
+  const roster = rosterQuery.data?.enrollments ?? []
 
   return (
     <div className="space-y-6">
@@ -57,17 +60,26 @@ export default function StudentsPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Total Students</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-500">
+              Students in selected course
+            </CardTitle>
             <Users className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">--</div>
-            <p className="text-xs text-slate-500 mt-1">Enrollment data coming soon</p>
+            <div className="text-3xl font-bold">
+              {rosterQuery.isLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin inline" />
+              ) : (
+                (rosterQuery.data?.total_count ?? roster.length)
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              {courses.find((c) => c.id === effectiveCourseId)?.title ?? '—'}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Course list */}
       {courses.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -81,42 +93,67 @@ export default function StudentsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-slate-900">Students by Course</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {courses.map((course) => (
-              <Card key={course.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="min-w-0 flex-1">
-                      <CardTitle className="text-base truncate">{course.title}</CardTitle>
-                      <p className="text-sm text-slate-500 mt-1">{course.term}</p>
-                    </div>
-                    <Badge
-                      variant={course.isPublished ? 'default' : 'secondary'}
-                      className="ml-2 shrink-0"
-                    >
-                      {course.isPublished ? 'Published' : 'Draft'}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-slate-600 line-clamp-2 mb-4">
-                    {course.description || 'No description.'}
-                  </p>
-                  {course.metadata?.maxStudents && (
-                    <p className="text-xs text-slate-400 mb-3">
-                      Max capacity: {course.metadata.maxStudents}
-                    </p>
-                  )}
-                  <Button size="sm" variant="outline" className="w-full" asChild>
-                    <Link href={`/courses/${course.id}`}>View Course & Students</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+        <>
+          {/* Course selector */}
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-slate-700">Course:</label>
+            <select
+              value={effectiveCourseId}
+              onChange={(e) => setSelectedCourseId(e.target.value)}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white"
+            >
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Enrolled students</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {rosterQuery.isLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                </div>
+              ) : rosterQuery.error ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  Failed to load roster.
+                </div>
+              ) : roster.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-8">
+                  No students enrolled in this course yet.
+                </p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {roster.map((e) => (
+                    <div key={e.id} className="flex items-center justify-between py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+                          {(e.student_name ?? e.student_id).slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">
+                            {e.student_name ?? e.student_id}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Enrolled {new Date(e.enrolled_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant={e.status === 'active' ? 'default' : 'secondary'}>
+                        {e.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
       )}
     </div>
   )

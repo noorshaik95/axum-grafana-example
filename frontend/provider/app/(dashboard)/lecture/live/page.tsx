@@ -1,57 +1,39 @@
 'use client'
 
 import { useState } from 'react'
-import { ThumbsUp, Send } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { ThumbsUp, Send, Loader2 } from 'lucide-react'
+import { useLectureQuestions, useUpvoteQuestion } from '@/lib/api/hooks'
 
-const mockQuestions = [
-  {
-    id: 1,
-    student: 'Alex M.',
-    question: 'Why does tail recursion matter in Haskell specifically?',
-    upvotes: 12,
-    time: '2m ago',
-    answered: false,
-  },
-  {
-    id: 2,
-    student: 'Jordan K.',
-    question: 'Is the accumulator pattern always more efficient?',
-    upvotes: 8,
-    time: '5m ago',
-    answered: false,
-  },
-  {
-    id: 3,
-    student: 'Sam T.',
-    question: 'Can you show the difference in memory usage?',
-    upvotes: 6,
-    time: '7m ago',
-    answered: false,
-  },
-  {
-    id: 4,
-    student: 'Riley P.',
-    question: 'Does GHC automatically optimize non-tail recursive calls?',
-    upvotes: 4,
-    time: '11m ago',
-    answered: true,
-  },
-]
+function formatAge(unixSec: number): string {
+  const diffMs = Date.now() - unixSec * 1000
+  if (diffMs < 60_000) return 'just now'
+  const mins = Math.floor(diffMs / 60_000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  return `${hrs}h ago`
+}
+
+function shortName(userId: string): string {
+  return userId.slice(0, 8)
+}
 
 export default function LectureLivePage() {
-  const [questions, setQuestions] = useState(mockQuestions)
+  const search = useSearchParams()
+  const lectureId = search?.get('lectureId') ?? search?.get('id') ?? ''
+
+  const questionsQuery = useLectureQuestions(lectureId)
+  const upvote = useUpvoteQuestion()
+
   const [newQuestion, setNewQuestion] = useState('')
 
-  const handleUpvote = (id: number) => {
-    setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, upvotes: q.upvotes + 1 } : q)))
-  }
+  const questions = questionsQuery.data?.questions ?? []
+  const sorted = [...questions].sort((a, b) => b.upvotes - a.upvotes)
 
-  const handleMarkAnswered = (id: number) => {
-    setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, answered: !q.answered } : q)))
+  const handleUpvote = (questionId: string) => {
+    if (!lectureId) return
+    upvote.mutate({ lectureId, questionId })
   }
-
-  const unanswered = questions.filter((q) => !q.answered).sort((a, b) => b.upvotes - a.upvotes)
-  const answered = questions.filter((q) => q.answered)
 
   return (
     <div
@@ -60,12 +42,10 @@ export default function LectureLivePage() {
     >
       {/* Left: Video area — 2/3 */}
       <div className="lg:col-span-2 flex flex-col gap-4">
-        {/* Video container */}
         <div
           className="relative rounded-2xl overflow-hidden flex items-center justify-center"
           style={{ background: '#0f2617', aspectRatio: '16/9' }}
         >
-          {/* Live indicator */}
           <div className="absolute top-4 left-4 flex items-center gap-2">
             <span
               className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-mono font-medium"
@@ -75,18 +55,6 @@ export default function LectureLivePage() {
               LIVE
             </span>
           </div>
-
-          {/* Student count */}
-          <div className="absolute top-4 right-4">
-            <span
-              className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-mono"
-              style={{ background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)' }}
-            >
-              34/47 here
-            </span>
-          </div>
-
-          {/* Center placeholder */}
           <div className="text-center">
             <div className="text-6xl mb-3" style={{ opacity: 0.15 }}>
               🎥
@@ -95,8 +63,6 @@ export default function LectureLivePage() {
               Camera feed
             </p>
           </div>
-
-          {/* Controls */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
             {['Mute', 'Video off', 'Share screen', 'End'].map((ctrl) => (
               <button
@@ -114,39 +80,23 @@ export default function LectureLivePage() {
           </div>
         </div>
 
-        {/* Current slide card */}
         <div
           className="rounded-xl border px-5 py-4"
           style={{ background: '#ffffff', borderColor: '#e4e0d4' }}
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-mono font-medium" style={{ color: '#6a6e62' }}>
-              CURRENT SLIDE
+              LECTURE
             </span>
             <span className="text-xs font-mono" style={{ color: '#6a6e62' }}>
-              Slide 14 / 32
+              {lectureId ? lectureId : 'no lecture id'}
             </span>
           </div>
-          <h3 className="font-serif text-lg text-[#12170f]">
-            Tail Recursion & Accumulator Pattern
-          </h3>
           <p className="text-sm mt-1" style={{ color: '#6a6e62' }}>
-            CS 3110 · Lecture 7 · Functional Programming
+            {lectureId
+              ? 'Live session in progress.'
+              : 'Pass ?lectureId=... to open a live lecture feed.'}
           </p>
-          <div className="flex gap-2 mt-3">
-            <button
-              className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-[#f6f3ec]"
-              style={{ borderColor: '#e4e0d4', color: '#12170f' }}
-            >
-              ← Prev
-            </button>
-            <button
-              className="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors hover:opacity-80"
-              style={{ background: '#234e32', color: '#ffffff' }}
-            >
-              Next →
-            </button>
-          </div>
         </div>
       </div>
 
@@ -155,7 +105,6 @@ export default function LectureLivePage() {
         className="flex flex-col rounded-xl border overflow-hidden"
         style={{ background: '#ffffff', borderColor: '#e4e0d4' }}
       >
-        {/* Questions header */}
         <div
           className="flex items-center justify-between px-4 py-3 border-b"
           style={{ background: '#f6f3ec', borderColor: '#e4e0d4' }}
@@ -166,60 +115,56 @@ export default function LectureLivePage() {
               className="rounded-full px-2 py-0.5 text-xs font-mono"
               style={{ background: '#dde9df', color: '#234e32' }}
             >
-              {unanswered.length} up
+              {sorted.length} total
             </span>
           </div>
         </div>
 
-        {/* Unanswered questions */}
         <div className="flex-1 overflow-y-auto divide-y" style={{ borderColor: '#e4e0d4' }}>
-          {unanswered.map((q) => (
-            <div key={q.id} className="px-4 py-3">
-              <div className="flex items-start justify-between gap-2 mb-1.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium text-[#12170f]">{q.student}</span>
-                  <span className="text-xs" style={{ color: '#6a6e62' }}>
-                    {q.time}
-                  </span>
+          {!lectureId ? (
+            <div className="px-4 py-6 text-sm text-center" style={{ color: '#6a6e62' }}>
+              No lecture selected.
+            </div>
+          ) : questionsQuery.isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+            </div>
+          ) : questionsQuery.error ? (
+            <div className="px-4 py-6 text-sm text-center text-red-700">
+              Failed to load questions.
+            </div>
+          ) : sorted.length === 0 ? (
+            <div className="px-4 py-6 text-sm text-center" style={{ color: '#6a6e62' }}>
+              No questions yet.
+            </div>
+          ) : (
+            sorted.map((q) => (
+              <div key={q.id} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-medium text-[#12170f]">
+                      {shortName(q.user_id)}
+                    </span>
+                    <span className="text-xs" style={{ color: '#6a6e62' }}>
+                      {formatAge(q.submitted_at_unix)}
+                    </span>
+                  </div>
                 </div>
+                <p className="text-sm text-[#12170f] leading-snug mb-2">{q.text}</p>
                 <button
-                  onClick={() => handleMarkAnswered(q.id)}
-                  className="text-xs px-2 py-0.5 rounded-full border transition-colors hover:bg-[#f2f7f3]"
-                  style={{ borderColor: '#e4e0d4', color: '#6a6e62' }}
+                  onClick={() => handleUpvote(q.id)}
+                  disabled={upvote.isPending}
+                  className="flex items-center gap-1 text-xs transition-colors hover:text-[#234e32] disabled:opacity-50"
+                  style={{ color: '#6a6e62' }}
                 >
-                  Mark done
+                  <ThumbsUp className="h-3 w-3" />
+                  {q.upvotes}
                 </button>
               </div>
-              <p className="text-sm text-[#12170f] leading-snug mb-2">{q.question}</p>
-              <button
-                onClick={() => handleUpvote(q.id)}
-                className="flex items-center gap-1 text-xs transition-colors hover:text-[#234e32]"
-                style={{ color: '#6a6e62' }}
-              >
-                <ThumbsUp className="h-3 w-3" />
-                {q.upvotes}
-              </button>
-            </div>
-          ))}
-
-          {answered.length > 0 && (
-            <>
-              <div
-                className="px-4 py-2 text-xs font-mono font-medium"
-                style={{ background: '#f6f3ec', color: '#6a6e62' }}
-              >
-                ANSWERED
-              </div>
-              {answered.map((q) => (
-                <div key={q.id} className="px-4 py-3 opacity-50">
-                  <p className="text-sm text-[#12170f] line-through">{q.question}</p>
-                </div>
-              ))}
-            </>
+            ))
           )}
         </div>
 
-        {/* Submit question (instructor use) */}
         <div className="border-t p-3" style={{ borderColor: '#e4e0d4' }}>
           <div
             className="flex items-center gap-2 rounded-lg border px-3 py-2"
