@@ -83,12 +83,14 @@ fn create_matcher_test_routes() -> Vec<RouteConfig> {
             method: "GET".to_string(),
             service: "user-service".to_string(),
             grpc_method: "user.UserService/ListUsers".to_string(),
+            ..Default::default()
         },
         RouteConfig {
             path: "/api/users/:id".to_string(),
             method: "GET".to_string(),
             service: "user-service".to_string(),
             grpc_method: "user.UserService/GetUser".to_string(),
+            ..Default::default()
         },
     ]
 }
@@ -144,24 +146,28 @@ fn create_test_routes() -> Vec<RouteConfig> {
             method: "GET".to_string(),
             service: "user-service".to_string(),
             grpc_method: "user.UserService/ListUsers".to_string(),
+            ..Default::default()
         },
         RouteConfig {
             path: "/api/users/:id".to_string(),
             method: "GET".to_string(),
             service: "user-service".to_string(),
             grpc_method: "user.UserService/GetUser".to_string(),
+            ..Default::default()
         },
         RouteConfig {
             path: "/api/users/:id".to_string(),
             method: "DELETE".to_string(),
             service: "user-service".to_string(),
             grpc_method: "user.UserService/DeleteUser".to_string(),
+            ..Default::default()
         },
         RouteConfig {
             path: "/api/posts/:post_id/comments/:comment_id".to_string(),
             method: "GET".to_string(),
             service: "post-service".to_string(),
             grpc_method: "post.PostService/GetComment".to_string(),
+            ..Default::default()
         },
     ]
 }
@@ -278,6 +284,7 @@ fn test_update_routes() {
         method: "GET".to_string(),
         service: "product-service".to_string(),
         grpc_method: "product.ProductService/ListProducts".to_string(),
+        ..Default::default()
     }];
 
     router.update_routes(new_routes);
@@ -341,18 +348,21 @@ fn test_service_route_map_tracking() {
             method: "GET".to_string(),
             service: "user-service".to_string(),
             grpc_method: "user.UserService/ListUsers".to_string(),
+            ..Default::default()
         },
         RouteConfig {
             path: "/api/users/:id".to_string(),
             method: "GET".to_string(),
             service: "user-service".to_string(),
             grpc_method: "user.UserService/GetUser".to_string(),
+            ..Default::default()
         },
         RouteConfig {
             path: "/api/products".to_string(),
             method: "GET".to_string(),
             service: "product-service".to_string(),
             grpc_method: "product.ProductService/ListProducts".to_string(),
+            ..Default::default()
         },
     ];
 

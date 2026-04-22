@@ -18,9 +18,10 @@ mod backend;
 mod circuit_breaker;
 pub(crate) mod conversion;
 mod metrics;
+pub(crate) mod proxy;
 mod rate_limiting;
 mod response;
-mod routing;
+pub mod routing;
 mod timeout;
 
 

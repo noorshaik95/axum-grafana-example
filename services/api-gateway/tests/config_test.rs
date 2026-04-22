@@ -31,20 +31,20 @@ fn test_load_config_from_yaml() {
     assert!(config.discovery.enabled);
     assert_eq!(config.discovery.refresh_interval_seconds, 300);
 
-    // Verify route overrides
+    // Verify route overrides — look up the Login override by grpc_method
+    // so index-based ordering (which shifts when new overrides land at the
+    // top of the list, e.g. §1a HTTP-proxy routes) does not break this test.
     assert!(!config.route_overrides.is_empty());
+    let login_override = config
+        .route_overrides
+        .iter()
+        .find(|o| o.grpc_method == "user.UserService/Login")
+        .expect("expected Login override to be present");
     assert_eq!(
-        config.route_overrides[0].grpc_method,
-        "user.UserService/Login"
-    );
-    assert_eq!(
-        config.route_overrides[0].http_path,
+        login_override.http_path,
         Some("/api/auth/login".to_string())
     );
-    assert_eq!(
-        config.route_overrides[0].http_method,
-        Some("POST".to_string())
-    );
+    assert_eq!(login_override.http_method, Some("POST".to_string()));
 
     // Verify auth config
     assert_eq!(config.auth.service_endpoint, "http://user-auth-service:50051");

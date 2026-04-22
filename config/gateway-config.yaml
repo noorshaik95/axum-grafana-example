@@ -143,6 +143,39 @@ discovery:
 
 # Optional: Override specific routes when convention doesn't fit
 route_overrides:
+  # §1a HTTP-passthrough routes — user-auth-service HTTP handlers on :8081
+  # These endpoints are NOT implemented as gRPC methods; the gateway
+  # reverse-proxies them directly to the user-auth-service HTTP server.
+  - http_path: "/api/auth/sso/initiate"
+    http_method: "GET"
+    service: "user-auth-service"
+    http_proxy_target: "http://user-auth-service:8081"
+
+  - http_path: "/api/auth/sso/callback"
+    http_method: "GET"
+    service: "user-auth-service"
+    http_proxy_target: "http://user-auth-service:8081"
+
+  - http_path: "/api/auth/impersonate"
+    http_method: "POST"
+    service: "user-auth-service"
+    http_proxy_target: "http://user-auth-service:8081"
+
+  - http_path: "/api/auth/impersonate/:impersonation_id"
+    http_method: "DELETE"
+    service: "user-auth-service"
+    http_proxy_target: "http://user-auth-service:8081"
+
+  - http_path: "/api/admin/auth/mfa/reset"
+    http_method: "POST"
+    service: "user-auth-service"
+    http_proxy_target: "http://user-auth-service:8081"
+
+  - http_path: "/api/admin/auth/test-sso"
+    http_method: "POST"
+    service: "user-auth-service"
+    http_proxy_target: "http://user-auth-service:8081"
+
   # Authentication
   - grpc_method: "user.UserService/Login"
     http_path: "/api/auth/login"
@@ -247,6 +280,12 @@ route_overrides:
   - grpc_method: "user.UserService/GetUser"
     http_path: "/api/users/:user_id"
     http_method: "GET"
+    service: "user-auth-service"
+
+  # Batched @mention resolver (W14 follow-up; used by discussion + email services)
+  - grpc_method: "user.UserService/ResolveUsername"
+    http_path: "/api/users/resolve-username"
+    http_method: "POST"
     service: "user-auth-service"
 
   # User Profile
@@ -428,6 +467,29 @@ route_overrides:
     http_path: "/api/courses/:id/cross-listed"
     http_method: "GET"
     service: "course-service"
+
+  # Course REST passthroughs (W8 course-expert) — student/provider portals
+  # expect these directly on course-service. Gateway maps to gRPC methods
+  # the course-expert exposes on port :50052.
+  - grpc_method: "course.CourseService/ListModules"
+    http_path: "/api/courses/:id/modules"
+    http_method: "GET"
+    service: "course-service"
+
+  - grpc_method: "course.CourseService/GetNextUp"
+    http_path: "/api/courses/:id/next-up/:user_id"
+    http_method: "GET"
+    service: "course-service"
+
+  - grpc_method: "course.CourseService/GetCourseAnalytics"
+    http_path: "/api/courses/:id/analytics"
+    http_method: "GET"
+    service: "course-service"
+
+  - grpc_method: "course.CourseService/GetNextLecture"
+    http_path: "/api/courses/next-lecture"
+    http_method: "GET"
+    service: "course-service"
   # Assignment-Grading Service - CRUD operations
   - grpc_method: "assignment.AssignmentService/CreateAssignment"
     http_path: "/api/assignments"
@@ -485,6 +547,27 @@ route_overrides:
   # Custom: ExportGrades is a special action
   - grpc_method: "assignment.GradebookService/ExportGrades"
     http_path: "/api/courses/:course_id/gradebook/export"
+    http_method: "GET"
+    service: "assignment-grading-service"
+
+  # W5 FE overrides — provider /grade flows + student draft autosave
+  - grpc_method: "assignment.GradingService/GetGradingQueue"
+    http_path: "/api/grading/queue/:assignment_id"
+    http_method: "GET"
+    service: "assignment-grading-service"
+
+  - grpc_method: "assignment.GradingService/BatchPublishGrades"
+    http_path: "/api/grades/batch"
+    http_method: "POST"
+    service: "assignment-grading-service"
+
+  - grpc_method: "assignment.SubmissionService/SaveDraft"
+    http_path: "/api/assignments/:id/submissions/draft"
+    http_method: "PATCH"
+    service: "assignment-grading-service"
+
+  - grpc_method: "assignment.SubmissionService/GetDraft"
+    http_path: "/api/assignments/:id/submissions/draft"
     http_method: "GET"
     service: "assignment-grading-service"
 
@@ -821,22 +904,25 @@ route_overrides:
     service: "tenant-service"
 
   # Health checks for new services
-  - grpc_method: "video_conferencing.VideoConferencingService/HealthCheck"
+  # Service protos don't declare a `HealthCheck` RPC — the gRPC servers
+  # register the standard `grpc.health.v1.Health` service instead. Fixed in
+  # proto-audit #29.
+  - grpc_method: "grpc.health.v1.Health/Check"
     http_path: "/api/health/video"
     http_method: "GET"
     service: "video-conferencing-service"
 
-  - grpc_method: "email.MessagingService/HealthCheck"
+  - grpc_method: "grpc.health.v1.Health/Check"
     http_path: "/api/health/messages"
     http_method: "GET"
     service: "email-service"
 
-  - grpc_method: "metrics.MetricsService/HealthCheck"
+  - grpc_method: "grpc.health.v1.Health/Check"
     http_path: "/api/health/metrics"
     http_method: "GET"
     service: "metrics-service"
 
-  - grpc_method: "tenant.TenantService/HealthCheck"
+  - grpc_method: "grpc.health.v1.Health/Check"
     http_path: "/api/health/tenants"
     http_method: "GET"
     service: "tenant-service"
@@ -864,18 +950,8 @@ route_overrides:
     http_method: "POST"
     service: "admin-auth-service"
 
-  - grpc_method: "admin_auth.AdminAuthService/TestSso"
-    http_path: "/api/admin/auth/test-sso"
-    http_method: "POST"
-    service: "admin-auth-service"
-
   - grpc_method: "admin_auth.AdminAuthService/ListAdminUsers"
     http_path: "/api/admin/users"
-    http_method: "GET"
-    service: "admin-auth-service"
-
-  - grpc_method: "admin_auth.AdminAuthService/GetAdminUser"
-    http_path: "/api/admin/users/:id"
     http_method: "GET"
     service: "admin-auth-service"
 
@@ -894,12 +970,7 @@ route_overrides:
     http_method: "POST"
     service: "admin-auth-service"
 
-  - grpc_method: "admin_auth.AdminAuthService/ImpersonateTenantUser"
-    http_path: "/api/admin/impersonate/:tenant_id/:user_id"
-    http_method: "POST"
-    service: "admin-auth-service"
-
-  - grpc_method: "admin_auth.AdminAuthService/HealthCheck"
+  - grpc_method: "grpc.health.v1.Health/Check"
     http_path: "/api/health/admin-auth"
     http_method: "GET"
     service: "admin-auth-service"
@@ -935,7 +1006,7 @@ route_overrides:
     http_method: "GET"
     service: "incident-service"
 
-  - grpc_method: "incident.IncidentService/HealthCheck"
+  - grpc_method: "grpc.health.v1.Health/Check"
     http_path: "/api/health/incidents"
     http_method: "GET"
     service: "incident-service"
@@ -961,7 +1032,7 @@ route_overrides:
     http_method: "DELETE"
     service: "feature-flag-service"
 
-  - grpc_method: "flag.FlagService/HealthCheck"
+  - grpc_method: "grpc.health.v1.Health/Check"
     http_path: "/api/health/flags"
     http_method: "GET"
     service: "feature-flag-service"
@@ -982,7 +1053,9 @@ route_overrides:
     http_method: "POST"
     service: "onboarding-service"
 
-  - grpc_method: "onboarding.OnboardingService/HealthCheck"
+  # Proto declares `rpc Health(HealthRequest) returns (HealthResponse)`
+  # (see proto/onboarding.proto:40). Fixed in proto-audit #29.
+  - grpc_method: "onboarding.OnboardingService/Health"
     http_path: "/api/health/onboarding"
     http_method: "GET"
     service: "onboarding-service"
@@ -1073,32 +1146,39 @@ route_overrides:
     service: "scheduling-service"
 
   # AI Service (per-tenant, long-running Claude)
-  - grpc_method: "ai.AiService/GetWelcomeMessage"
+  # Proto package is `slate.ai.v1` (see proto/ai.proto); generated gRPC
+  # registers `slate.ai.v1.AiService/*`. Fixed in proto-audit #29.
+  - grpc_method: "slate.ai.v1.AiService/GetWelcomeMessage"
     http_path: "/api/ai/welcome"
     http_method: "GET"
     service: "ai-service"
 
-  - grpc_method: "ai.AiService/GetWelcomeMessage"
+  - grpc_method: "slate.ai.v1.AiService/GetWelcomeMessage"
     http_path: "/api/ai/welcome-message"
     http_method: "GET"
     service: "ai-service"
 
-  - grpc_method: "ai.AiService/GetCommandPalette"
+  - grpc_method: "slate.ai.v1.AiService/GetCommandPaletteResults"
     http_path: "/api/ai/cmd-palette"
     http_method: "POST"
     service: "ai-service"
 
-  - grpc_method: "ai.AiService/GetGradeProjection"
+  - grpc_method: "slate.ai.v1.AiService/GetGradeProjection"
     http_path: "/api/ai/grade-projection"
     http_method: "GET"
     service: "ai-service"
 
-  - grpc_method: "ai.AiService/GenerateStudyPlan"
+  - grpc_method: "slate.ai.v1.AiService/GenerateStudyPlan"
     http_path: "/api/ai/study-plan"
     http_method: "POST"
     service: "ai-service"
 
-  - grpc_method: "ai.AiService/HealthCheck"
+  - grpc_method: "slate.ai.v1.AiService/GetDraftFeedback"
+    http_path: "/api/ai/draft-feedback"
+    http_method: "POST"
+    service: "ai-service"
+
+  - grpc_method: "grpc.health.v1.Health/Check"
     http_path: "/api/health/ai"
     http_method: "GET"
     service: "ai-service"
@@ -1106,6 +1186,17 @@ route_overrides:
   # Metrics extensions used by new portals
   - grpc_method: "metrics.MetricsService/GetRosterHealth"
     http_path: "/api/metrics/roster-health"
+    http_method: "GET"
+    service: "metrics-service"
+
+  # Admin /ops + provider /roster portal aliases (W12 metrics-expert).
+  - grpc_method: "metrics.MetricsService/GetGradeDistribution"
+    http_path: "/api/metrics/grade-dist"
+    http_method: "GET"
+    service: "metrics-service"
+
+  - grpc_method: "metrics.MetricsService/ExportMetrics"
+    http_path: "/api/metrics/export"
     http_method: "GET"
     service: "metrics-service"
 
@@ -1227,6 +1318,8 @@ cors:
     - "x-trace-id"
   expose_headers:
     - "x-trace-id"
+    - "x-request-id"
+    - "traceparent"
   max_age_seconds: 3600
   allow_credentials: false
 

@@ -51,8 +51,18 @@ impl GatewayConfig {
             }
         }
 
-        // Validate route overrides
+        // Validate route overrides. HTTP-proxy passthrough routes (§1a) do
+        // not require a grpc_method; everything else does.
         for override_config in &self.route_overrides {
+            if override_config.http_proxy_target.is_some() {
+                if override_config.http_path.is_none() || override_config.http_method.is_none() {
+                    return Err(ConfigError::Message(
+                        "HTTP-proxy route override must specify http_path and http_method"
+                            .to_string(),
+                    ));
+                }
+                continue;
+            }
             if override_config.grpc_method.is_empty() {
                 return Err(ConfigError::Message(
                     "Route override must specify a grpc_method".to_string(),

@@ -31,12 +31,16 @@ fn default_request_timeout_ms() -> u64 {
     30000 // 30 seconds
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct RouteConfig {
     pub path: String,
     pub method: String,
     pub service: String,
     pub grpc_method: String,
+    /// If set, this route bypasses the gRPC transcoding pipeline and is
+    /// forwarded as a plain HTTP request to the given base URL (§1a).
+    #[serde(default)]
+    pub http_proxy_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -111,13 +115,18 @@ fn default_refresh_interval() -> u64 {
     300 // 5 minutes
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct RouteOverride {
+    #[serde(default)]
     pub grpc_method: String,
     pub http_path: Option<String>,
     pub http_method: Option<String>,
     #[serde(default)]
     pub service: Option<String>,
+    /// Base URL to reverse-proxy this route to (§1a). When set, the route
+    /// is treated as HTTP passthrough and `grpc_method` may be empty.
+    #[serde(default)]
+    pub http_proxy_target: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

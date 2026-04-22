@@ -115,9 +115,14 @@ impl RouteMatcher {
                 method = %method,
                 service = %route.service,
                 grpc_method = %route.grpc_method,
+                http_proxy_url = ?route.http_proxy_url,
                 "✅ ROUTER: Matched static route"
             );
-            RoutingDecision::new(&route.service, &route.grpc_method)
+            let mut decision = RoutingDecision::new(&route.service, &route.grpc_method);
+            if let Some(proxy) = &route.http_proxy_url {
+                decision = decision.with_http_proxy(proxy);
+            }
+            decision
         })
     }
 
@@ -134,14 +139,19 @@ impl RouteMatcher {
                     method = %method,
                     service = %route.service,
                     grpc_method = %route.grpc_method,
+                    http_proxy_url = ?route.http_proxy_url,
                     params = ?params,
                     "✅ ROUTER: Matched dynamic route"
                 );
-                return Some(RoutingDecision::with_params(
+                let mut decision = RoutingDecision::with_params(
                     &route.service,
                     &route.grpc_method,
                     params,
-                ));
+                );
+                if let Some(proxy) = &route.http_proxy_url {
+                    decision = decision.with_http_proxy(proxy);
+                }
+                return Some(decision);
             }
         }
 

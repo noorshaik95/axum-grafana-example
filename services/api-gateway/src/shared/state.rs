@@ -1,13 +1,16 @@
 use prometheus::{
     HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge, Opts, Registry,
 };
+use redis::aio::ConnectionManager;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use crate::auth::flag_middleware::FlagProvider;
 use crate::auth::AuthService;
 use crate::config::GatewayConfig;
 use crate::discovery::RouteDiscoveryService;
 use crate::grpc::client::GrpcClientPool;
+use crate::handlers::gateway::routing::TenantRoutingTable;
 use crate::middleware::ClientIpExtractor;
 use crate::router::RequestRouter;
 use common_rust::rate_limit::IpRateLimiter;
@@ -24,6 +27,23 @@ pub struct AppState {
     pub metrics: GatewayMetrics,
     // For dynamic route updates (used by admin endpoint and periodic refresh)
     pub discovery_service: Option<Arc<RouteDiscoveryService>>,
+    /// Shared Redis connection (W17.1 token cache, W17.3 flag cache).
+    /// `None` when Redis is unconfigured or unreachable at startup — the
+    /// gateway still functions, just without caching.
+    pub redis_conn: Option<ConnectionManager>,
+    /// Optional feature-flag provider. `None` falls back to
+    /// `UnavailableProvider` (empty flag maps) in the middleware wiring.
+    pub flag_provider: Option<Arc<dyn FlagProvider>>,
+    /// Per-tenant service routing table (W17.4). Layered lookup: a request
+    /// with `X-Tenant-Slug: eastfield` targeting the `discussion` service
+    /// resolves to `http://discussion-eastfield:50056` via this table.
+    /// Read by handlers/gateway/routing once tenant-service (W16) ships
+    /// the provisioning path that populates it.
+    #[allow(dead_code)]
+    pub tenant_routing: Arc<TenantRoutingTable>,
+    /// Shared reqwest client used by the §1a HTTP reverse-proxy handler.
+    /// Built once with connection pooling + 10s request timeout.
+    pub http_client: reqwest::Client,
 }
 
 #[derive(Clone)]
@@ -187,6 +207,15 @@ impl AppState {
         let registry = Registry::new();
         let metrics = GatewayMetrics::new(&registry);
 
+        // Build a reqwest client with a 10s request timeout. If the builder
+        // ever fails (it currently can't — reqwest::Client::new() is infallible
+        // in the versions we use), fall back to the default client so we
+        // never panic on startup.
+        let http_client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+
         AppState {
             config,
             grpc_pool: Arc::new(grpc_pool),
@@ -197,6 +226,31 @@ impl AppState {
             registry,
             metrics,
             discovery_service: discovery_service.map(Arc::new),
+            redis_conn: None,
+            flag_provider: None,
+            tenant_routing: Arc::new(TenantRoutingTable::empty()),
+            http_client,
         }
+    }
+
+    /// Attach a shared Redis connection for use by token cache + flag cache.
+    pub fn with_redis(mut self, redis_conn: ConnectionManager) -> Self {
+        self.redis_conn = Some(redis_conn);
+        self
+    }
+
+    /// Install a feature-flag provider. When unset the router falls back
+    /// to `UnavailableProvider` and returns empty flag maps.
+    #[allow(dead_code)]
+    pub fn with_flag_provider(mut self, provider: Arc<dyn FlagProvider>) -> Self {
+        self.flag_provider = Some(provider);
+        self
+    }
+
+    /// Replace the per-tenant service routing table.
+    #[allow(dead_code)]
+    pub fn with_tenant_routing(mut self, table: Arc<TenantRoutingTable>) -> Self {
+        self.tenant_routing = table;
+        self
     }
 }

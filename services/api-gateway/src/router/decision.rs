@@ -23,6 +23,10 @@ pub struct RoutingDecision {
     pub service: Arc<str>,
     pub grpc_method: Arc<str>,
     pub path_params: HashMap<String, String>,
+    /// When `Some`, the request is forwarded as a plain HTTP reverse-proxy
+    /// call to this base URL (§1a). The gRPC transcoding pipeline is
+    /// bypassed entirely for these routes.
+    pub http_proxy_url: Option<Arc<str>>,
 }
 
 impl RoutingDecision {
@@ -32,6 +36,7 @@ impl RoutingDecision {
             service: Arc::from(service.as_ref()),
             grpc_method: Arc::from(grpc_method.as_ref()),
             path_params: HashMap::new(),
+            http_proxy_url: None,
         }
     }
 
@@ -45,6 +50,15 @@ impl RoutingDecision {
             service: Arc::from(service.as_ref()),
             grpc_method: Arc::from(grpc_method.as_ref()),
             path_params,
+            http_proxy_url: None,
         }
+    }
+
+    /// Attach an HTTP reverse-proxy target URL to this decision. When set,
+    /// the gateway bypasses the gRPC pipeline and forwards the raw request
+    /// to the configured URL.
+    pub fn with_http_proxy(mut self, proxy_url: impl AsRef<str>) -> Self {
+        self.http_proxy_url = Some(Arc::from(proxy_url.as_ref()));
+        self
     }
 }

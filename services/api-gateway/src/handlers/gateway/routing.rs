@@ -2,6 +2,11 @@
 //!
 //! Handles the main request processing pipeline including routing decisions,
 //! rate limiting, and coordination of backend service calls.
+//!
+//! Also hosts the per-tenant routing table (W17.4): given an
+//! `X-Tenant-Slug` header and a service key (one of `user-auth`, `course`,
+//! `assignment`, `content`, `video`, `discussion`, `scheduling`, `ai`),
+//! return the target endpoint URL for that tenant's service container.
 
 use axum::{
     body::Body,
@@ -9,8 +14,10 @@ use axum::{
     http::HeaderMap,
     response::Response,
 };
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::sync::RwLock;
 use std::time::Instant;
 use tracing::{debug, error, info};
 
@@ -61,6 +68,49 @@ pub async fn process_request(
     // Get routing decision
     let routing_decision = get_routing_decision(&request, &path, &method, &state, start_time)?;
     log_routing_decision(&routing_decision, &trace_id);
+
+    // §1a HTTP reverse-proxy short-circuit. When a route is marked as
+    // HTTP passthrough (user-auth SSO / impersonation / MFA-reset), bypass
+    // the gRPC transcoding pipeline entirely.
+    if let Some(proxy_url) = routing_decision.http_proxy_url.clone() {
+        let result = super::proxy::forward_http_request(
+            &state.http_client,
+            &proxy_url,
+            request,
+            &routing_decision.path_params,
+            &path,
+        )
+        .await;
+        match result {
+            Ok(resp) => {
+                record_success_metrics(&state, &routing_decision, &path, &method, start_time);
+                log_request_completion(
+                    &path,
+                    &method,
+                    &routing_decision,
+                    start_time,
+                    &trace_id,
+                );
+                return Ok(resp);
+            }
+            Err(e) => {
+                error!(
+                    path = %path,
+                    method = %method,
+                    service = %routing_decision.service,
+                    error = %e,
+                    trace_id = %trace_id,
+                    "HTTP-proxy forward failed"
+                );
+                state
+                    .metrics
+                    .request_counter
+                    .with_label_values(&[&path, &method, &"502".to_string()])
+                    .inc();
+                return Err(e);
+            }
+        }
+    }
 
     // Get auth context and service channel
     let auth_context = request.extensions().get::<AuthContext>().cloned();
@@ -282,4 +332,294 @@ fn get_service_channel(
                 &*routing_decision.service, e
             ))
         })
+}
+
+// ---------------------------------------------------------------------------
+// W17.4 — Per-tenant service routing table
+// ---------------------------------------------------------------------------
+
+/// Canonical service keys understood by the tenant routing table. New
+/// Wave-3 services (`discussion`, `scheduling`, `ai`) have been added
+/// alongside the original five.
+#[allow(dead_code)]
+pub const TENANT_SERVICE_KEYS: &[&str] = &[
+    "user-auth",
+    "course",
+    "assignment",
+    "content",
+    "video",
+    "discussion",
+    "scheduling",
+    "ai",
+];
+
+/// Per-tenant service endpoint map, loaded from tenant YAML files (one per
+/// tenant, keyed by slug) and hot-reloadable via the admin refresh route.
+///
+/// Expected tenant yaml (e.g. `config/tenants/eastfield.yaml`):
+/// ```yaml
+/// services:
+///   user-auth:  "http://user-auth-eastfield:50051"
+///   course:     "http://course-eastfield:50052"
+///   assignment: "http://assignment-eastfield:50053"
+///   content:    "http://content-eastfield:50054"
+///   video:      "http://video-eastfield:50055"
+///   discussion: "http://discussion-eastfield:50056"
+///   scheduling: "http://scheduling-eastfield:50063"
+///   ai:         "http://ai-eastfield:50064"
+/// ```
+///
+/// Backward compatibility: tenants that omit new keys (`discussion`,
+/// `scheduling`, `ai`) are still accepted — requests to those services
+/// return 503 rather than panicking, letting us roll out the new services
+/// tenant-by-tenant.
+#[derive(Debug, Default)]
+#[allow(dead_code)]
+pub struct TenantRoutingTable {
+    // Inner RwLock so the table can be hot-reloaded without swapping the
+    // Arc<TenantRoutingTable> in AppState.
+    inner: RwLock<HashMap<String, TenantServiceMap>>,
+}
+
+/// Per-tenant `{service-key -> endpoint URL}` map. Endpoint URLs are
+/// stored as `String` (not `Arc<str>`) so the table can be rebuilt
+/// cheaply on tenant provisioning.
+#[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
+pub struct TenantServiceMap {
+    pub endpoints: HashMap<String, String>,
+}
+
+#[allow(dead_code)]
+impl TenantServiceMap {
+    pub fn new(endpoints: HashMap<String, String>) -> Self {
+        Self { endpoints }
+    }
+
+    /// Lookup a service's endpoint for this tenant. Returns `None` if the
+    /// tenant config omits that key — callers map this to a 503 response.
+    pub fn endpoint(&self, service_key: &str) -> Option<&str> {
+        self.endpoints.get(service_key).map(|s| s.as_str())
+    }
+
+    /// Return the set of service keys this tenant has configured.
+    pub fn configured_keys(&self) -> Vec<&str> {
+        self.endpoints.keys().map(|k| k.as_str()).collect()
+    }
+}
+
+#[allow(dead_code)]
+impl TenantRoutingTable {
+    /// Build an empty routing table — the gateway boots cleanly even when
+    /// no tenants are provisioned yet.
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// Build a table seeded from a map of `{slug -> TenantServiceMap}`.
+    pub fn new(tenants: HashMap<String, TenantServiceMap>) -> Self {
+        Self {
+            inner: RwLock::new(tenants),
+        }
+    }
+
+    /// Install or replace a single tenant's service map. Called by the
+    /// tenant-service (W16) over the admin refresh endpoint when a new
+    /// tenant is provisioned.
+    pub fn upsert(&self, slug: impl Into<String>, map: TenantServiceMap) {
+        if let Ok(mut guard) = self.inner.write() {
+            guard.insert(slug.into(), map);
+        }
+    }
+
+    /// Drop a tenant from the table (called on deprovision).
+    pub fn remove(&self, slug: &str) -> Option<TenantServiceMap> {
+        self.inner.write().ok().and_then(|mut g| g.remove(slug))
+    }
+
+    /// Clone out a tenant's service map, if present.
+    pub fn tenant(&self, slug: &str) -> Option<TenantServiceMap> {
+        self.inner.read().ok().and_then(|g| g.get(slug).cloned())
+    }
+
+    /// Resolve a (tenant_slug, service_key) pair to an endpoint URL.
+    ///
+    /// Returns `None` if the tenant is unknown OR the tenant's yaml does
+    /// not declare that service — upstream code converts both into the
+    /// same 503 response so callers don't leak which case occurred.
+    pub fn resolve(&self, tenant_slug: &str, service_key: &str) -> Option<String> {
+        self.inner
+            .read()
+            .ok()?
+            .get(tenant_slug)?
+            .endpoint(service_key)
+            .map(|s| s.to_string())
+    }
+
+    /// Number of tenants currently in the table (for metrics / admin UI).
+    pub fn tenant_count(&self) -> usize {
+        self.inner.read().map(|g| g.len()).unwrap_or(0)
+    }
+
+    /// Snapshot of all tenant slugs (sorted for stable output).
+    pub fn tenant_slugs(&self) -> Vec<String> {
+        let mut slugs: Vec<String> = self
+            .inner
+            .read()
+            .map(|g| g.keys().cloned().collect())
+            .unwrap_or_default();
+        slugs.sort();
+        slugs
+    }
+}
+
+/// Map a canonical service key to the logical gateway service name used
+/// by `GrpcClientPool::get_channel`. When the per-tenant routing table
+/// has an entry, that override takes precedence; otherwise the gateway
+/// falls back to the shared (non-tenant) service name.
+#[allow(dead_code)]
+pub fn gateway_service_name_for_key(service_key: &str) -> &'static str {
+    match service_key {
+        "user-auth" => "user-auth-service",
+        "course" => "course-service",
+        "assignment" => "assignment-grading-service",
+        "content" => "content-management-service",
+        "video" => "video-conferencing-service",
+        "discussion" => "discussion-service",
+        "scheduling" => "scheduling-service",
+        "ai" => "ai-service",
+        other => {
+            // Unknown keys are passed through so the router's 404 path can
+            // handle them uniformly; no panic.
+            debug!(service_key = %other, "Unknown tenant service key");
+            ""
+        }
+    }
+}
+
+#[cfg(test)]
+mod tenant_routing_tests {
+    use super::*;
+
+    fn sample_tenant(slug: &str, include_new: bool) -> TenantServiceMap {
+        let mut m = HashMap::new();
+        m.insert("user-auth".into(), format!("http://user-auth-{slug}:50051"));
+        m.insert("course".into(), format!("http://course-{slug}:50052"));
+        m.insert(
+            "assignment".into(),
+            format!("http://assignment-{slug}:50053"),
+        );
+        m.insert("content".into(), format!("http://content-{slug}:50054"));
+        m.insert("video".into(), format!("http://video-{slug}:50055"));
+        if include_new {
+            m.insert(
+                "discussion".into(),
+                format!("http://discussion-{slug}:50056"),
+            );
+            m.insert(
+                "scheduling".into(),
+                format!("http://scheduling-{slug}:50063"),
+            );
+            m.insert("ai".into(), format!("http://ai-{slug}:50064"));
+        }
+        TenantServiceMap::new(m)
+    }
+
+    #[test]
+    fn empty_table_is_safe() {
+        let t = TenantRoutingTable::empty();
+        assert!(t.resolve("eastfield", "course").is_none());
+        assert_eq!(t.tenant_count(), 0);
+    }
+
+    #[test]
+    fn upsert_then_resolve() {
+        let t = TenantRoutingTable::empty();
+        t.upsert("eastfield", sample_tenant("eastfield", true));
+        assert_eq!(
+            t.resolve("eastfield", "discussion"),
+            Some("http://discussion-eastfield:50056".to_string())
+        );
+        assert_eq!(
+            t.resolve("eastfield", "scheduling"),
+            Some("http://scheduling-eastfield:50063".to_string())
+        );
+        assert_eq!(
+            t.resolve("eastfield", "ai"),
+            Some("http://ai-eastfield:50064".to_string())
+        );
+    }
+
+    #[test]
+    fn legacy_tenant_without_new_keys_returns_none_no_panic() {
+        let t = TenantRoutingTable::empty();
+        t.upsert("northridge", sample_tenant("northridge", false));
+        // Old services still resolve.
+        assert!(t.resolve("northridge", "course").is_some());
+        // New services return None rather than panicking — upstream maps
+        // that to a 503 so the tenant can be rolled forward independently.
+        assert!(t.resolve("northridge", "discussion").is_none());
+        assert!(t.resolve("northridge", "scheduling").is_none());
+        assert!(t.resolve("northridge", "ai").is_none());
+    }
+
+    #[test]
+    fn unknown_tenant_returns_none() {
+        let t = TenantRoutingTable::empty();
+        t.upsert("eastfield", sample_tenant("eastfield", true));
+        assert!(t.resolve("unknown-school", "course").is_none());
+    }
+
+    #[test]
+    fn remove_drops_tenant() {
+        let t = TenantRoutingTable::empty();
+        t.upsert("eastfield", sample_tenant("eastfield", true));
+        assert!(t.remove("eastfield").is_some());
+        assert!(t.resolve("eastfield", "course").is_none());
+    }
+
+    #[test]
+    fn tenant_slugs_is_sorted() {
+        let t = TenantRoutingTable::empty();
+        t.upsert("zephyr", sample_tenant("zephyr", true));
+        t.upsert("alpha", sample_tenant("alpha", true));
+        t.upsert("meridian", sample_tenant("meridian", true));
+        assert_eq!(
+            t.tenant_slugs(),
+            vec!["alpha".to_string(), "meridian".into(), "zephyr".into()]
+        );
+    }
+
+    #[test]
+    fn service_name_mapping_covers_all_eight_keys() {
+        for key in TENANT_SERVICE_KEYS {
+            let name = gateway_service_name_for_key(key);
+            assert!(!name.is_empty(), "missing mapping for {key}");
+        }
+    }
+
+    #[test]
+    fn unknown_service_key_returns_empty_sentinel() {
+        assert_eq!(gateway_service_name_for_key("nonsense"), "");
+    }
+
+    #[test]
+    fn configured_keys_reflect_yaml_shape() {
+        let m = sample_tenant("eastfield", true);
+        let mut keys = m.configured_keys();
+        keys.sort();
+        assert_eq!(
+            keys,
+            vec![
+                "ai",
+                "assignment",
+                "content",
+                "course",
+                "discussion",
+                "scheduling",
+                "user-auth",
+                "video"
+            ]
+        );
+    }
 }

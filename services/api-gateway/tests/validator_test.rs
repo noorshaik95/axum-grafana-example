@@ -7,6 +7,7 @@ fn create_test_route(path: &str, method: &str, grpc_method: &str) -> RouteConfig
         method: method.to_string(),
         service: "test-service".to_string(),
         grpc_method: grpc_method.to_string(),
+        ..Default::default()
     }
 }
 

@@ -30,7 +30,7 @@ tonic-reflection = "0.12"
 prost = "0.13"
 prost-types = "0.13"
 prost-reflect = { version = "0.14", features = ["serde"] }
-tower = "0.5"
+tower = { version = "0.5", features = ["util"] }
 thiserror = "1.0"
 futures-util = "0.3"
 tokio-stream = "0.1"
@@ -52,12 +52,22 @@ lazy_static = "1.4"
 # LRU cache for rate limiter
 lru = "0.12"
 
+# Redis for token + feature-flag caching (W17.1, W17.3)
+redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+sha2 = "0.10"
+sha1 = "0.10"
+hex = "0.4"
+async-trait = "0.1"
+
+# HTTP reverse-proxy client for §1a (SSO, impersonation, MFA-reset routes
+# that bypass gRPC transcoding).
+reqwest = { version = "0.11", features = ["json"] }
+
 [build-dependencies]
 tonic-build = "0.12"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
-reqwest = { version = "0.11", features = ["json"] }
 proptest = "1.4"
 
 [[bench]]

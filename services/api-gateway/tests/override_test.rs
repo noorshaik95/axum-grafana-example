@@ -7,6 +7,7 @@ fn create_test_route(path: &str, method: &str, grpc_method: &str) -> RouteConfig
         method: method.to_string(),
         service: "test-service".to_string(),
         grpc_method: grpc_method.to_string(),
+        ..Default::default()
     }
 }
 
@@ -38,6 +39,7 @@ fn test_path_override() {
         http_path: Some("/v1/users".to_string()),
         http_method: None,
         service: None,
+        ..Default::default()
     }];
 
     let result = OverrideHandler::apply_overrides(routes, &overrides);
@@ -60,6 +62,7 @@ fn test_method_override() {
         http_path: None,
         http_method: Some("POST".to_string()),
         service: None,
+        ..Default::default()
     }];
 
     let result = OverrideHandler::apply_overrides(routes, &overrides);
@@ -82,6 +85,7 @@ fn test_full_override() {
         http_path: Some("/v1/all-users".to_string()),
         http_method: Some("POST".to_string()),
         service: None,
+        ..Default::default()
     }];
 
     let result = OverrideHandler::apply_overrides(routes, &overrides);
@@ -103,6 +107,7 @@ fn test_partial_override() {
         http_path: Some("/v1/users".to_string()),
         http_method: None,
         service: None,
+        ..Default::default()
     }];
 
     let result = OverrideHandler::apply_overrides(routes, &overrides);
@@ -137,12 +142,14 @@ fn test_multiple_overrides() {
             http_path: Some("/v1/users".to_string()),
             http_method: None,
             service: None,
+            ..Default::default()
         },
         RouteOverride {
             grpc_method: "post.PostService/ListPosts".to_string(),
             http_path: None,
             http_method: Some("POST".to_string()),
             service: None,
+            ..Default::default()
         },
     ];
 
@@ -175,6 +182,7 @@ fn test_override_nonexistent_route() {
         http_path: Some("/v1/posts".to_string()),
         http_method: None,
         service: None,
+        ..Default::default()
     }];
 
     let result = OverrideHandler::apply_overrides(routes, &overrides);
@@ -193,6 +201,7 @@ fn test_empty_routes_with_overrides() {
         http_path: Some("/v1/users".to_string()),
         http_method: None,
         service: None,
+        ..Default::default()
     }];
 
     let result = OverrideHandler::apply_overrides(routes, &overrides);
@@ -212,6 +221,7 @@ fn test_preserve_service_name() {
         http_path: Some("/v1/users".to_string()),
         http_method: Some("POST".to_string()),
         service: None,
+        ..Default::default()
     }];
 
     let result = OverrideHandler::apply_overrides(routes, &overrides);

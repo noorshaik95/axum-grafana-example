@@ -30,9 +30,12 @@ impl OverrideHandler {
             "Applying route overrides"
         );
 
-        // Build a map of overrides by grpc_method for quick lookup
+        // Build a map of overrides by grpc_method for quick lookup. HTTP-proxy
+        // overrides (§1a) have no grpc_method, so they are always treated as
+        // new routes and skipped here.
         let override_map: HashMap<String, &RouteOverride> = overrides
             .iter()
+            .filter(|o| o.http_proxy_target.is_none() && !o.grpc_method.is_empty())
             .map(|o| (o.grpc_method.clone(), o))
             .collect();
 
@@ -56,6 +59,7 @@ impl OverrideHandler {
                         .unwrap_or_else(|| route.method.clone()),
                     service: route.service.clone(),
                     grpc_method: route.grpc_method.clone(),
+                    http_proxy_url: None,
                 };
 
                 info!(
@@ -77,6 +81,40 @@ impl OverrideHandler {
 
         // Second pass: add new routes for overrides that weren't applied
         for override_config in overrides {
+            // HTTP-proxy passthrough routes (§1a): no grpc_method, just
+            // forward the HTTP request as-is to the configured target.
+            if let Some(proxy_target) = &override_config.http_proxy_target {
+                if let (Some(http_path), Some(http_method), Some(service)) = (
+                    &override_config.http_path,
+                    &override_config.http_method,
+                    &override_config.service,
+                ) {
+                    let new_route = RouteConfig {
+                        path: http_path.clone(),
+                        method: http_method.clone(),
+                        service: service.clone(),
+                        grpc_method: String::new(),
+                        http_proxy_url: Some(proxy_target.clone()),
+                    };
+
+                    info!(
+                        http_path = %http_path,
+                        http_method = %http_method,
+                        service = %service,
+                        proxy_target = %proxy_target,
+                        "Added new HTTP-proxy route from override"
+                    );
+
+                    result.push(new_route);
+                } else {
+                    warn!(
+                        proxy_target = %proxy_target,
+                        "HTTP-proxy override skipped: missing http_path, http_method, or service"
+                    );
+                }
+                continue;
+            }
+
             if !applied_overrides.contains(&override_config.grpc_method) {
                 // This override doesn't match any discovered route, so add it as a new route
                 if let (Some(http_path), Some(http_method), Some(service)) = (
@@ -89,6 +127,7 @@ impl OverrideHandler {
                         method: http_method.clone(),
                         service: service.clone(),
                         grpc_method: override_config.grpc_method.clone(),
+                        http_proxy_url: None,
                     };
 
                     info!(
