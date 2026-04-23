@@ -41,7 +41,8 @@ export async function getInbox(): Promise<Thread[]> {
 }
 
 export async function getSentThreads(): Promise<Thread[]> {
-  return apiClient.get<Thread[]>('/api/messages/sent')
+  // TODO: no /api/messages/sent gateway route in email-service
+  return []
 }
 
 export async function getThread(
@@ -51,13 +52,20 @@ export async function getThread(
 }
 
 export async function createThread(data: CreateThreadDto): Promise<Thread> {
-  return apiClient.post<Thread>('/api/messages/threads', data)
+  return apiClient.post<Thread>('/api/messages', {
+    subject: data.subject,
+    recipient_ids: data.recipientIds,
+    content: data.content,
+  }) as Promise<Thread>
 }
 
 export async function sendMessage(threadId: string, data: SendMessageDto): Promise<Message> {
-  return apiClient.post<Message>(`/api/messages/threads/${threadId}/messages`, data)
+  return apiClient.post<Message>('/api/messages', {
+    thread_id: threadId,
+    content: data.content,
+  }) as Promise<Message>
 }
 
 export async function markThreadRead(threadId: string): Promise<void> {
-  return apiClient.patch(`/api/messages/threads/${threadId}/read`)
+  return apiClient.post(`/api/messages/${threadId}/read`)
 }
