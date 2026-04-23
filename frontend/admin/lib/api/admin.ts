@@ -89,24 +89,24 @@ export const adminService = {
     return response.data
   },
 
-  async upgradePlan(planId: string): Promise<{ success: boolean; message: string }> {
-    const response = await apiClient.post('/admin/billing/upgrade', { plan_id: planId })
-    return response.data
+  // Admin billing + cost-optimization write ops have no backend RPCs yet
+  // (#52). Reject with a clear message so existing mutation .catch()
+  // handlers surface red toasts instead of 404s in devtools.
+  async upgradePlan(_planId: string): Promise<{ success: boolean; message: string }> {
+    return Promise.reject(new Error('Not available in MVP — backend endpoint not yet implemented'))
   },
 
   async purchaseResources(
-    purchase: ResourcePurchase
+    _purchase: ResourcePurchase
   ): Promise<{ success: boolean; message: string }> {
-    const response = await apiClient.post('/admin/billing/purchase-resources', purchase)
-    return response.data
+    return Promise.reject(new Error('Not available in MVP — backend endpoint not yet implemented'))
   },
 
-  async updatePaymentMethod(paymentMethod: {
+  async updatePaymentMethod(_paymentMethod: {
     type: string
     token: string
   }): Promise<{ success: boolean; message: string }> {
-    const response = await apiClient.post('/admin/billing/payment-method', paymentMethod)
-    return response.data
+    return Promise.reject(new Error('Not available in MVP — backend endpoint not yet implemented'))
   },
 
   async getCostOptimization(): Promise<CostOptimization> {
@@ -115,10 +115,9 @@ export const adminService = {
   },
 
   async applyOptimization(
-    recommendationId: string
+    _recommendationId: string
   ): Promise<{ success: boolean; message: string }> {
-    const response = await apiClient.post(`/admin/cost-optimization/${recommendationId}/apply`)
-    return response.data
+    return Promise.reject(new Error('Not available in MVP — backend endpoint not yet implemented'))
   },
 
   async getAnalytics(params: {

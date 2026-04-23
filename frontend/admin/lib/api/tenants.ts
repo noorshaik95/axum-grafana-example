@@ -13,6 +13,8 @@ export interface ListTenantsParams extends ListParams {
   status?: TenantStatus
 }
 
+const NOT_IMPLEMENTED = 'Not available in MVP — backend endpoint not yet implemented'
+
 export const tenantsApi = {
   async list(params?: ListTenantsParams): Promise<PaginatedResponse<Tenant>> {
     const response = await apiClient.get('/tenants', { params })
@@ -24,14 +26,20 @@ export const tenantsApi = {
     return response.data
   },
 
-  async toggleAccess(id: string, enabled: boolean, reason: string): Promise<{ success: boolean }> {
-    const response = await apiClient.patch(`/tenants/${id}/access`, {
-      enabled,
-      reason,
-    })
-    return response.data
+  // No backend RPC for toggling tenant access yet (#52). Reject so the
+  // mutation .catch() surfaces a red toast instead of a 404 in devtools.
+  async toggleAccess(
+    _id: string,
+    _enabled: boolean,
+    _reason: string
+  ): Promise<{ success: boolean }> {
+    return Promise.reject(new Error(NOT_IMPLEMENTED))
   },
 
+  // #52 note: updatePlan stays network-bound because tenant-expert (#54)
+  // is wiring the existing REST handler through the gateway. Once #54
+  // lands the PUT succeeds; until then the user gets a 404/503 toast
+  // from the apiClient interceptor. Do NOT toast-reject here.
   async updatePlan(id: string, plan: ResourcePlan): Promise<Tenant> {
     const response = await apiClient.put(`/tenants/${id}/plan`, plan)
     return response.data

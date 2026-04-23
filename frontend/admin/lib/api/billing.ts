@@ -12,6 +12,8 @@ export interface ListInvoicesParams extends ListParams {
   tenantId?: string
 }
 
+const NOT_IMPLEMENTED = 'Not available in MVP — backend endpoint not yet implemented'
+
 export const billingApi = {
   async getOverview(): Promise<BillingOverview> {
     const response = await apiClient.get('/billing/overview')
@@ -23,12 +25,15 @@ export const billingApi = {
     return response.data
   },
 
-  async issueCredit(tenantId: string, amount: number, reason: string): Promise<CreditAdjustment> {
-    const response = await apiClient.post(`/billing/tenants/${tenantId}/credits`, {
-      amount,
-      reason,
-    })
-    return response.data
+  // No backend RPC for admin credit grants yet (#52). Reject with a clear
+  // message so the existing mutation .catch() surfaces a red toast instead
+  // of a 404 in devtools.
+  async issueCredit(
+    _tenantId: string,
+    _amount: number,
+    _reason: string
+  ): Promise<CreditAdjustment> {
+    return Promise.reject(new Error(NOT_IMPLEMENTED))
   },
 }
 
