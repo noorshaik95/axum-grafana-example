@@ -86,6 +86,7 @@ async fn test_convert_http_to_grpc_with_auth_context() {
 
     let auth_context = AuthContext {
         user_id: Some("user123".to_string()),
+        tenant_id: None,
         roles: vec!["admin".to_string()],
         authenticated: true,
     };
