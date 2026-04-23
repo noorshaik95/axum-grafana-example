@@ -176,6 +176,98 @@ route_overrides:
     service: "user-auth-service"
     http_proxy_target: "http://user-auth-service:8081"
 
+  # §1b HTTP-passthrough routes — onboarding-service Restate Virtual Objects.
+  # Restate's ingress owns the wire format `/<ServiceName>/<key>/<handler>`,
+  # so we rewrite the admin-friendly gateway paths to Restate paths via
+  # `http_proxy_path_template`. Upstream is the Restate ingress on :9080
+  # (not the service's SDK endpoint) per plan/onboarding-service.md:173.
+  #
+  # OnboardingWorkflow Virtual Object handlers
+  - http_path: "/api/onboarding/:id/start"
+    http_method: "POST"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/OnboardingWorkflow/:id/start"
+
+  - http_path: "/api/onboarding/:id/save-step"
+    http_method: "POST"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/OnboardingWorkflow/:id/save_step"
+
+  - http_path: "/api/onboarding/:id/submit"
+    http_method: "POST"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/OnboardingWorkflow/:id/submit_for_review"
+
+  - http_path: "/api/onboarding/:id/approve"
+    http_method: "POST"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/OnboardingWorkflow/:id/approve"
+
+  - http_path: "/api/onboarding/:id/complete-sso"
+    http_method: "POST"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/OnboardingWorkflow/:id/complete_sso"
+
+  - http_path: "/api/onboarding/:id/reject"
+    http_method: "POST"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/OnboardingWorkflow/:id/reject"
+
+  - http_path: "/api/onboarding/:id/reopen"
+    http_method: "POST"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/OnboardingWorkflow/:id/reopen"
+
+  - http_path: "/api/onboarding/:id/status"
+    http_method: "GET"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/OnboardingWorkflow/:id/get_status"
+
+  # CanvasMigration Virtual Object handlers
+  - http_path: "/api/onboarding/:id/canvas/connect"
+    http_method: "POST"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/CanvasMigration/:id/connect_canvas"
+
+  - http_path: "/api/onboarding/:id/canvas/import-courses"
+    http_method: "POST"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/CanvasMigration/:id/import_courses"
+
+  - http_path: "/api/onboarding/:id/canvas/reconcile-rosters"
+    http_method: "POST"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/CanvasMigration/:id/reconcile_rosters"
+
+  - http_path: "/api/onboarding/:id/canvas/verify"
+    http_method: "POST"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/CanvasMigration/:id/verify_and_go_live"
+
+  - http_path: "/api/onboarding/:id/canvas/sign-off"
+    http_method: "POST"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/CanvasMigration/:id/admin_sign_off"
+
+  - http_path: "/api/onboarding/:id/canvas/status"
+    http_method: "GET"
+    service: "onboarding-service"
+    http_proxy_target: "http://restate-server:9080"
+    http_proxy_path_template: "/CanvasMigration/:id/get_status"
+
   # Authentication
   - grpc_method: "user.UserService/Login"
     http_path: "/api/auth/login"

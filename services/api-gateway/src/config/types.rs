@@ -41,6 +41,16 @@ pub struct RouteConfig {
     /// forwarded as a plain HTTP request to the given base URL (§1a).
     #[serde(default)]
     pub http_proxy_url: Option<String>,
+    /// Optional upstream path template for HTTP-proxy routes (§1b). When
+    /// set, the proxy handler substitutes `:param` placeholders with the
+    /// router-matched path params and uses the result as the upstream
+    /// path (instead of forwarding the original request path verbatim).
+    ///
+    /// Example: gateway-visible `/api/onboarding/:id/approve` with
+    /// template `/OnboardingWorkflow/:id/approve` rewrites to
+    /// `/OnboardingWorkflow/<matched-id>/approve` upstream.
+    #[serde(default)]
+    pub http_proxy_path_template: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -127,6 +137,10 @@ pub struct RouteOverride {
     /// is treated as HTTP passthrough and `grpc_method` may be empty.
     #[serde(default)]
     pub http_proxy_target: Option<String>,
+    /// Optional upstream path template (§1b). See
+    /// `RouteConfig::http_proxy_path_template` for semantics.
+    #[serde(default)]
+    pub http_proxy_path_template: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

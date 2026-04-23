@@ -27,6 +27,11 @@ pub struct RoutingDecision {
     /// call to this base URL (§1a). The gRPC transcoding pipeline is
     /// bypassed entirely for these routes.
     pub http_proxy_url: Option<Arc<str>>,
+    /// Optional upstream path template (§1b). When `Some`, the proxy
+    /// handler substitutes `:param` placeholders with `path_params` before
+    /// calling the upstream. When `None`, the original request path is
+    /// forwarded verbatim (§1a behavior).
+    pub http_proxy_path_template: Option<Arc<str>>,
 }
 
 impl RoutingDecision {
@@ -37,6 +42,7 @@ impl RoutingDecision {
             grpc_method: Arc::from(grpc_method.as_ref()),
             path_params: HashMap::new(),
             http_proxy_url: None,
+            http_proxy_path_template: None,
         }
     }
 
@@ -51,6 +57,7 @@ impl RoutingDecision {
             grpc_method: Arc::from(grpc_method.as_ref()),
             path_params,
             http_proxy_url: None,
+            http_proxy_path_template: None,
         }
     }
 
@@ -59,6 +66,14 @@ impl RoutingDecision {
     /// to the configured URL.
     pub fn with_http_proxy(mut self, proxy_url: impl AsRef<str>) -> Self {
         self.http_proxy_url = Some(Arc::from(proxy_url.as_ref()));
+        self
+    }
+
+    /// Attach an upstream path template (§1b). Must only be combined with
+    /// `with_http_proxy`. Placeholders like `:id` in the template are
+    /// substituted from `path_params` at forward time.
+    pub fn with_path_template(mut self, template: impl AsRef<str>) -> Self {
+        self.http_proxy_path_template = Some(Arc::from(template.as_ref()));
         self
     }
 }

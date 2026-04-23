@@ -60,6 +60,7 @@ impl OverrideHandler {
                     service: route.service.clone(),
                     grpc_method: route.grpc_method.clone(),
                     http_proxy_url: None,
+                    http_proxy_path_template: None,
                 };
 
                 info!(
@@ -95,13 +96,21 @@ impl OverrideHandler {
                         service: service.clone(),
                         grpc_method: String::new(),
                         http_proxy_url: Some(proxy_target.clone()),
+                        http_proxy_path_template: override_config
+                            .http_proxy_path_template
+                            .clone(),
                     };
 
+                    let path_template_display = override_config
+                        .http_proxy_path_template
+                        .as_deref()
+                        .unwrap_or("(verbatim)");
                     info!(
                         http_path = %http_path,
                         http_method = %http_method,
                         service = %service,
                         proxy_target = %proxy_target,
+                        path_template = %path_template_display,
                         "Added new HTTP-proxy route from override"
                     );
 
@@ -128,6 +137,7 @@ impl OverrideHandler {
                         service: service.clone(),
                         grpc_method: override_config.grpc_method.clone(),
                         http_proxy_url: None,
+                        http_proxy_path_template: None,
                     };
 
                     info!(

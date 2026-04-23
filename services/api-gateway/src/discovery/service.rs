@@ -203,6 +203,7 @@ impl RouteDiscoveryService {
                             service: service_name.to_string(),
                             grpc_method: mapping.grpc_method.clone(),
                             http_proxy_url: None,
+                            http_proxy_path_template: None,
                         };
 
                         tracing::info!(

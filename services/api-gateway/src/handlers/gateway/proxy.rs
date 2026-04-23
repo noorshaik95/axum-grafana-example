@@ -54,6 +54,42 @@ pub(crate) fn build_upstream_url(base_url: &str, path: &str, query: Option<&str>
     }
 }
 
+/// Substitute `:param` placeholders in a path template with values from
+/// `path_params` (§1b). Each `:name` segment is replaced by the value
+/// matched by the router for that same name. Segments without a matching
+/// param are left as-is so the caller can catch the misconfiguration (the
+/// upstream will 404 on a literal `:name` segment).
+///
+/// Examples:
+///   template = "/OnboardingWorkflow/:id/approve"
+///   params   = { "id" -> "tenant-42" }
+///   result   = "/OnboardingWorkflow/tenant-42/approve"
+pub(crate) fn substitute_path_template(
+    template: &str,
+    path_params: &HashMap<String, String>,
+) -> String {
+    let mut out = String::with_capacity(template.len());
+    let mut first = true;
+    for segment in template.split('/') {
+        if !first {
+            out.push('/');
+        }
+        first = false;
+        if let Some(param_name) = segment.strip_prefix(':') {
+            if let Some(value) = path_params.get(param_name) {
+                out.push_str(value);
+            } else {
+                // Preserve literal — makes misconfiguration visible instead
+                // of silently dropping the placeholder.
+                out.push_str(segment);
+            }
+        } else {
+            out.push_str(segment);
+        }
+    }
+    out
+}
+
 /// Copy forwarded request headers from an Axum `HeaderMap` into a
 /// `reqwest::header::HeaderMap`, dropping hop-by-hop headers.
 pub(crate) fn copy_forwardable_headers(
@@ -84,14 +120,23 @@ fn to_reqwest_method(method: &Method) -> reqwest::Method {
 
 /// Forward an incoming Axum request to a plain HTTP upstream.
 ///
-/// Preserves the method, path, query string, body, and all non-hop-by-hop
+/// Preserves the method, query string, body, and all non-hop-by-hop
 /// headers. Always echoes `X-Request-ID` on the response.
+///
+/// Path handling:
+/// * If `path_template` is `Some`, the upstream path is
+///   `substitute_path_template(template, path_params)` — used for §1b
+///   routes that rewrite gateway-visible paths (e.g. `/api/onboarding/:id/approve`)
+///   to upstream paths (e.g. `/OnboardingWorkflow/:id/approve`).
+/// * If `path_template` is `None`, the original request path is
+///   forwarded verbatim (§1a behavior).
 pub async fn forward_http_request(
     client: &reqwest::Client,
     proxy_base_url: &str,
     request: Request<Body>,
-    _path_params: &HashMap<String, String>,
+    path_params: &HashMap<String, String>,
     original_path: &str,
+    path_template: Option<&str>,
 ) -> Result<Response, GatewayError> {
     let method = request.method().clone();
     let query = request.uri().query().map(|q| q.to_string());
@@ -120,10 +165,18 @@ pub async fn forward_http_request(
         }
     };
 
-    let upstream_url = build_upstream_url(proxy_base_url, original_path, query.as_deref());
+    // §1b: if a path template is provided, substitute `:param` placeholders
+    // from the router-matched params. Otherwise forward the original path.
+    let upstream_path = match path_template {
+        Some(template) => substitute_path_template(template, path_params),
+        None => original_path.to_string(),
+    };
+    let upstream_url = build_upstream_url(proxy_base_url, &upstream_path, query.as_deref());
 
     debug!(
         upstream = %upstream_url,
+        original_path = %original_path,
+        rewritten = path_template.is_some(),
         method = %method,
         body_bytes = body_bytes.len(),
         "HTTP-proxy: forwarding request to upstream"
@@ -285,6 +338,62 @@ mod tests {
         assert!(!dst.contains_key("upgrade"));
         assert!(!dst.contains_key("proxy-authorization"));
         assert!(!dst.contains_key("te"));
+    }
+
+    // §1b path-template substitution tests
+
+    #[test]
+    fn substitute_path_template_replaces_single_param() {
+        let mut params = HashMap::new();
+        params.insert("id".to_string(), "tenant-42".to_string());
+        let rewritten =
+            substitute_path_template("/OnboardingWorkflow/:id/approve", &params);
+        assert_eq!(rewritten, "/OnboardingWorkflow/tenant-42/approve");
+    }
+
+    #[test]
+    fn substitute_path_template_replaces_multiple_params() {
+        let mut params = HashMap::new();
+        params.insert("org".to_string(), "eastfield".to_string());
+        params.insert("id".to_string(), "42".to_string());
+        let rewritten =
+            substitute_path_template("/orgs/:org/onboarding/:id/approve", &params);
+        assert_eq!(rewritten, "/orgs/eastfield/onboarding/42/approve");
+    }
+
+    #[test]
+    fn substitute_path_template_preserves_literal_when_param_missing() {
+        let params = HashMap::new();
+        let rewritten =
+            substitute_path_template("/OnboardingWorkflow/:id/approve", &params);
+        assert_eq!(rewritten, "/OnboardingWorkflow/:id/approve");
+    }
+
+    #[test]
+    fn substitute_path_template_passes_through_static_templates() {
+        let mut params = HashMap::new();
+        params.insert("id".to_string(), "ignored".to_string());
+        let rewritten =
+            substitute_path_template("/CanvasMigration/static/path", &params);
+        assert_eq!(rewritten, "/CanvasMigration/static/path");
+    }
+
+    #[test]
+    fn substitute_path_template_preserves_leading_slash() {
+        let mut params = HashMap::new();
+        params.insert("id".to_string(), "abc".to_string());
+        // Leading slash means first segment is empty — make sure the
+        // implementation keeps it.
+        let rewritten = substitute_path_template("/:id", &params);
+        assert_eq!(rewritten, "/abc");
+    }
+
+    #[test]
+    fn substitute_path_template_handles_no_leading_slash() {
+        let mut params = HashMap::new();
+        params.insert("id".to_string(), "abc".to_string());
+        let rewritten = substitute_path_template(":id/approve", &params);
+        assert_eq!(rewritten, "abc/approve");
     }
 
     #[test]

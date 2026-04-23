@@ -73,12 +73,17 @@ pub async fn process_request(
     // HTTP passthrough (user-auth SSO / impersonation / MFA-reset), bypass
     // the gRPC transcoding pipeline entirely.
     if let Some(proxy_url) = routing_decision.http_proxy_url.clone() {
+        let template = routing_decision
+            .http_proxy_path_template
+            .as_ref()
+            .map(|t| t.to_string());
         let result = super::proxy::forward_http_request(
             &state.http_client,
             &proxy_url,
             request,
             &routing_decision.path_params,
             &path,
+            template.as_deref(),
         )
         .await;
         match result {
