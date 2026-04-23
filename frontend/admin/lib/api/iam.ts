@@ -39,53 +39,50 @@ export const ADMIN_PERMISSIONS = [
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number]
 
+const NOT_IMPLEMENTED = 'Admin write operations are not yet implemented'
+
 export const iamApi = {
   // Users
   async listUsers(params?: ListParams): Promise<PaginatedResponse<IAMUser>> {
-    const response = await apiClient.get('/iam/users', { params })
+    const response = await apiClient.get('/admin/users', { params })
     return response.data
   },
 
-  async inviteUser(data: InviteUserRequest): Promise<IAMUser> {
-    const response = await apiClient.post('/iam/users/invite', data)
-    return response.data
+  async inviteUser(_data: InviteUserRequest): Promise<IAMUser> {
+    return Promise.reject(new Error(NOT_IMPLEMENTED))
   },
 
-  async updateUserStatus(userId: string, status: IAMUser['status']): Promise<void> {
-    await apiClient.patch(`/iam/users/${userId}/status`, { status })
+  async updateUserStatus(_userId: string, _status: IAMUser['status']): Promise<void> {
+    return Promise.reject(new Error(NOT_IMPLEMENTED))
   },
 
-  async deleteUser(id: string): Promise<void> {
-    await apiClient.delete(`/iam/users/${id}`)
+  async deleteUser(_id: string): Promise<void> {
+    return Promise.reject(new Error(NOT_IMPLEMENTED))
   },
 
   // Roles
   async listRoles(): Promise<AdminRole[]> {
-    const response = await apiClient.get('/iam/roles')
+    const response = await apiClient.get('/admin/roles')
     return response.data
   },
 
   async createRole(
-    data: Pick<AdminRole, 'name' | 'description' | 'permissions'>
+    _data: Pick<AdminRole, 'name' | 'description' | 'permissions'>
   ): Promise<AdminRole> {
-    const response = await apiClient.post('/iam/roles', data)
-    return response.data
+    return Promise.reject(new Error(NOT_IMPLEMENTED))
   },
 
-  async updateRolePermissions(roleId: string, permissions: string[]): Promise<AdminRole> {
-    const response = await apiClient.patch(`/iam/roles/${roleId}/permissions`, {
-      permissions,
-    })
-    return response.data
+  async updateRolePermissions(_roleId: string, _permissions: string[]): Promise<AdminRole> {
+    return Promise.reject(new Error(NOT_IMPLEMENTED))
   },
 
-  async deleteRole(id: string): Promise<void> {
-    await apiClient.delete(`/iam/roles/${id}`)
+  async deleteRole(_id: string): Promise<void> {
+    return Promise.reject(new Error(NOT_IMPLEMENTED))
   },
 
   // Audit
   async listAuditLogs(params?: ListAuditParams): Promise<PaginatedResponse<AuditLogEntry>> {
-    const response = await apiClient.get('/iam/audit', { params })
+    const response = await apiClient.get('/admin/audit', { params })
     return response.data
   },
 }
