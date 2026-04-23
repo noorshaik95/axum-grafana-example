@@ -90,15 +90,15 @@ export class CourseController {
   // Enrollment
   @GrpcMethod('CourseService', 'SelfEnroll')
   async selfEnroll(data: any) {
-    // Gateway path is `/api/courses/:id/enroll`.  The `:id` segment arrives
-    // as `data.id` (path-param injection in conversion.rs).  The authenticated
-    // student's identity is injected as `data.user_id` by the auth context.
-    // Legacy callers that send explicit `courseId` / `studentId` fields are
-    // still supported as fallbacks.
+    // The gateway populates the path-param via proto-field name matching:
+    // a yaml path of `/api/courses/:course_id/enroll` writes `data.course_id`.
+    // Accept both snake and camel variants so gRPC clients using the generated
+    // TS stubs (camelCase) also work.  `data.id` is a legacy fallback kept
+    // for clients that keyed on the yaml template segment.
     const enrollment = await this.enrollmentService.selfEnroll(
-      data.courseId || data.id,
-      data.studentId || data.user_id,
-      data.sectionId,
+      data.courseId || data.course_id || data.id,
+      data.studentId || data.student_id || data.user_id,
+      data.sectionId || data.section_id,
     );
     return { enrollment: this.toEnrollmentProto(enrollment) };
   }

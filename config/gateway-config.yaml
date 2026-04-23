@@ -489,8 +489,11 @@ route_overrides:
     service: "course-service"
 
   # Course Service - Enrollment
+  # NOTE: path-param name must match the proto request field (`course_id`) so
+  # gateway populates `data.course_id` from the URL.  Keying on `:id` left
+  # the proto field empty (see #68 follow-up on SelfEnroll).
   - grpc_method: "course.CourseService/SelfEnroll"
-    http_path: "/api/courses/:id/enroll"
+    http_path: "/api/courses/:course_id/enroll"
     http_method: "POST"
     service: "course-service"
 
