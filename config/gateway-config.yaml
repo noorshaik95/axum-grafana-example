@@ -166,6 +166,15 @@ route_overrides:
     service: "user-auth-service"
     http_proxy_target: "http://user-auth-service:8081"
 
+  # Bug 1 (#40): browser follows redirect from admin-auth to
+  # {slug}.slate.local/auth/impersonate?token=<jwt> (no /api/ prefix).
+  # user-auth validates the RS256 impersonation token; with option-A wiring
+  # it will return 302 → teach.slate.local/auth/impersonate-landing#token=...
+  - http_path: "/auth/impersonate"
+    http_method: "GET"
+    service: "user-auth-service"
+    http_proxy_target: "http://user-auth-service:8081"
+
   - http_path: "/api/admin/auth/mfa/reset"
     http_method: "POST"
     service: "user-auth-service"
@@ -1058,7 +1067,7 @@ route_overrides:
     service: "admin-auth-service"
 
   - grpc_method: "admin_auth.AdminAuthService/Impersonate"
-    http_path: "/api/admin/impersonate/:id"
+    http_path: "/api/admin/impersonate/:tenant_id/:target_user_id"
     http_method: "POST"
     service: "admin-auth-service"
 
@@ -1330,6 +1339,11 @@ auth:
       method: "POST"
     - path: "/api/admin/auth/validate"
       method: "POST"
+
+    # Impersonation landing: browser navigates here carrying RS256 impersonation
+    # token as ?token= query param (no gateway JWT required).
+    - path: "/auth/impersonate"
+      method: "GET"
 
     # Public service status page
     - path: "/api/status"

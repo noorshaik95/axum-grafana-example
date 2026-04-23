@@ -211,8 +211,14 @@ impl AppState {
         // ever fails (it currently can't — reqwest::Client::new() is infallible
         // in the versions we use), fall back to the default client so we
         // never panic on startup.
+        // Disable automatic redirect following so 302/301 responses from
+        // upstream services (e.g. user-auth impersonation flow) are returned
+        // verbatim to the caller. The browser — not the proxy — should follow
+        // cross-origin redirects; silently consuming them here would break the
+        // option-A fragment-redirect landing (#40 impersonation).
         let http_client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
 
