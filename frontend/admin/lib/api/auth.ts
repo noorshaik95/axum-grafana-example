@@ -25,7 +25,7 @@ export interface User {
 
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const response = await apiClient.post('/auth/login', credentials)
+    const response = await apiClient.post('/admin/auth/login', credentials)
     if (response.data.access_token) {
       localStorage.setItem('admin_auth_token', response.data.access_token)
     }
@@ -34,20 +34,20 @@ export const authService = {
 
   async logout(): Promise<void> {
     try {
-      await apiClient.post('/auth/logout')
+      await apiClient.post('/admin/auth/logout')
     } finally {
       localStorage.removeItem('admin_auth_token')
     }
   },
 
   async getProfile(): Promise<User> {
-    const response = await apiClient.get('/auth/profile')
+    const response = await apiClient.get('/admin/auth/profile')
     return response.data
   },
 
   async validateToken(): Promise<boolean> {
     try {
-      const response = await apiClient.post('/auth/validate')
+      const response = await apiClient.post('/admin/auth/validate')
       return response.data.valid
     } catch {
       return false
