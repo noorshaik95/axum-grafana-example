@@ -26,7 +26,12 @@ fn default_success_threshold() -> u32 {
 }
 
 fn default_timeout_seconds() -> u64 {
-    30 // Wait 30 seconds before transitioning from open to half-open
+    // R2: reduced from 30s → 10s; overridable per-service in gateway yaml
+    // circuit_breaker.timeout_seconds or via GATEWAY_SERVICES__<NAME>__CIRCUIT_BREAKER__TIMEOUT_SECONDS
+    std::env::var("CIRCUIT_BREAKER_TIMEOUT_SECONDS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10)
 }
 
 impl Default for CircuitBreakerConfig {
