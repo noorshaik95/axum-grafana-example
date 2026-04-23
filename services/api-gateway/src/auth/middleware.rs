@@ -19,6 +19,10 @@ use tokio::sync::RwLock;
 #[derive(Debug, Clone)]
 pub struct AuthContext {
     pub user_id: Option<String>,
+    /// Optional tenant scope. Platform-scope admin tokens leave this None;
+    /// tenant-scope tokens set it so downstream services can read the
+    /// authenticated caller's tenant without re-parsing the JWT.
+    pub tenant_id: Option<String>,
     pub roles: Vec<String>,
     pub authenticated: bool,
 }
@@ -28,6 +32,7 @@ impl AuthContext {
     pub fn unauthenticated() -> Self {
         Self {
             user_id: None,
+            tenant_id: None,
             roles: vec![],
             authenticated: false,
         }
@@ -38,6 +43,10 @@ impl AuthContext {
         if let Some(claims) = &result.claims {
             Self {
                 user_id: Some(claims.user_id.clone()),
+                // TokenClaims doesn't carry tenant_id yet; left None until
+                // the tenant-aware claim parsing lands. flag_middleware and
+                // conversion.rs treat None as "platform scope".
+                tenant_id: None,
                 roles: claims.roles.clone(),
                 authenticated: true,
             }

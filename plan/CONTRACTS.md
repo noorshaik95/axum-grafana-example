@@ -63,6 +63,28 @@ Three gates must all pass before a task is closed:
 
 If the service fails to become healthy within 60s, run `docker compose logs <service> --tail 50` and diagnose before declaring completion. Do not close the task with a restartng container.
 
+### Gate 3.1 — Commit on HEAD (mandatory, every task)
+
+Defined: 2026-04-23 by po-analyst (three uncommitted-work incidents in one session)
+Applies to: **every agent** on every task — FE, backend, infra, config
+
+Before reporting a task complete, run:
+
+```
+git log --oneline | head -3
+```
+
+Confirm your commit SHA appears at the top. Paste the SHA in your completion report.
+
+A working-tree change that is not committed to HEAD is **not complete**. The next `docker compose build`
+from HEAD will not include it, and the next agent to touch the same files will not see it. Three incidents
+in April 2026 slipped through because agents verified the running container (which had the fix) but never
+committed — leaving the repo in a broken state for everyone downstream.
+
+**Required completion report line:**
+
+> Committed: `<sha>` — verified on HEAD via `git log --oneline | head -1`
+
 ---
 
 ## trace.propagation (observability acceptance gate)

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
-import { useProfile } from '../../../shared/lib/api/hooks';
+import { useStudentProfile } from '../../lib/api/profile';
 import { auth } from '../../../shared/lib/api';
 
 const navItems = [
@@ -37,7 +37,7 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { data: profile } = useProfile();
+  const { data: profile } = useStudentProfile();
 
   const initials = profile ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}` : 'ST';
 

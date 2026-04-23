@@ -9,12 +9,18 @@ pub mod gateway {
 }
 
 // Declare submodules
+pub mod cache;
 mod constants;
+pub mod flag_middleware;
 mod service;
 pub mod types;
 
 // Export middleware module
 pub mod middleware;
+
+// Re-export the unavailable-provider default so routes.rs doesn't
+// have to reach into the submodule explicitly.
+pub use flag_middleware::UnavailableProvider;
 
 // Tests module
 #[cfg(test)]

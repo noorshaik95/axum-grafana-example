@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { BookOpen, GraduationCap, Home, Inbox, User, LogOut } from 'lucide-react';
-import { useProfile } from '../../../shared/lib/api/hooks';
+import { useStudentProfile } from '../../lib/api/profile';
 import { auth } from '../../../shared/lib/api';
 
 interface NowChip {
@@ -30,7 +30,7 @@ const BOTTOM_NAV = [
 export function StudentTopbar({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { data: profile } = useProfile();
+  const { data: profile } = useStudentProfile();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const initials = profile ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}` : 'ST';
