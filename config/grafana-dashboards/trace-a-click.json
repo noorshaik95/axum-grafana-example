@@ -1,0 +1,158 @@
+{
+  "uid": "slate-trace-a-click",
+  "title": "Slate — Trace a Click (per-portal)",
+  "description": "Paste a request_id (or pick a portal) to render the full span tree with service.name + duration per span. Wave 5 acceptance dashboard.",
+  "tags": ["slate", "tracing", "wave5"],
+  "timezone": "browser",
+  "refresh": "",
+  "schemaVersion": 38,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "portal",
+        "label": "Portal",
+        "type": "custom",
+        "query": "admin,provider,student",
+        "current": { "selected": true, "text": "admin", "value": "admin" },
+        "options": [
+          { "selected": true, "text": "admin", "value": "admin" },
+          { "selected": false, "text": "provider", "value": "provider" },
+          { "selected": false, "text": "student", "value": "student" }
+        ]
+      },
+      {
+        "name": "request_id",
+        "label": "X-Request-ID",
+        "type": "textbox",
+        "query": "",
+        "current": { "text": "", "value": "" },
+        "description": "Paste the X-Request-ID from the TraceWidget (⌘-click on the pill to copy)."
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Usage",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "Pick a **portal** and paste the **X-Request-ID** from the TraceWidget. The TraceQL panel below resolves it to a trace; the table panel lists spans per service. If the trace shows fewer than 3 services, the portal's outbound gRPC/Kafka propagation is broken — `SendMessage` the owning expert per `plan/CONTRACTS.md` §trace.propagation."
+      }
+    },
+    {
+      "id": 2,
+      "type": "traces",
+      "title": "Span tree — $portal  /  request_id=$request_id",
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 4 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{ .request_id = \"$request_id\" }",
+          "limit": 20
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Spans by service (count + total duration)",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{ .request_id = \"$request_id\" } | by(resource.service.name) | count()",
+          "limit": 50
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Service count (≥3 required)",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 30 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "green", "value": 3 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{ .request_id = \"$request_id\" } | count_over_time() by(resource.service.name)"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Span count (≥3 required)",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 30 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "green", "value": 3 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{ .request_id = \"$request_id\" } | count()"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "logs",
+      "title": "Correlated logs (Loki, by request_id)",
+      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 30 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{job=~\".+\"} |= \"$request_id\"",
+          "maxLines": 200
+        }
+      ]
+    }
+  ]
+}

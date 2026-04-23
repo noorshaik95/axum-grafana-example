@@ -1,0 +1,262 @@
+{
+  "uid": "slate-kafka-topic-lag",
+  "title": "Slate — Kafka Topic Lag (16 topics)",
+  "description": "Consumer-group lag per topic across all 16 cross-cutting topics (docs/plan.md §Cross-cutting Concerns). One panel per topic.",
+  "tags": ["slate", "kafka", "wave5"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "onboarding.approved",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"onboarding.approved\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "tenant.provisioned",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"tenant.provisioned\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "tenant.deprovisioned",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"tenant.deprovisioned\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "grade.updated",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"grade.updated\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "assignment.created",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"assignment.created\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "course.lecture_started",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"course.lecture_started\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "course.lecture_ended",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"course.lecture_ended\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "course.module_completed",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"course.module_completed\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "discussion.mention",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"discussion.mention\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "metrics.threshold_breached",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 18 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"metrics.threshold_breached\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "incident.opened",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 18 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"incident.opened\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "incident.resolved",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 18 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"incident.resolved\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "audit.admin_action",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"audit.admin_action\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "audit.impersonation_started",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"audit.impersonation_started\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "migration.completed",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"migration.completed\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "broadcast.in_app",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 30 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (group) (kafka_consumergroup_lag{topic=\"broadcast.in_app\"})",
+          "legendFormat": "{{group}}"
+        }
+      ]
+    },
+    {
+      "id": 100,
+      "type": "stat",
+      "title": "Total lag across all 16 topics",
+      "gridPos": { "h": 6, "w": 16, "x": 8, "y": 30 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 100 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        }
+      },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(kafka_consumergroup_lag{topic=~\"onboarding\\\\.approved|tenant\\\\.provisioned|tenant\\\\.deprovisioned|grade\\\\.updated|assignment\\\\.created|course\\\\.lecture_started|course\\\\.lecture_ended|course\\\\.module_completed|discussion\\\\.mention|metrics\\\\.threshold_breached|incident\\\\.opened|incident\\\\.resolved|audit\\\\.admin_action|audit\\\\.impersonation_started|migration\\\\.completed|broadcast\\\\.in_app\"})"
+        }
+      ]
+    }
+  ]
+}

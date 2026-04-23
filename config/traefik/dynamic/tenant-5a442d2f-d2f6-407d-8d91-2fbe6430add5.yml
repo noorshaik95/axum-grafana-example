@@ -1,0 +1,17 @@
+http:
+  routers:
+    tenant-5a442d2f-d2f6-407d-8d91-2fbe6430add5:
+      rule: "Host(`testschool.slate.local`)"
+      service: api-gateway-svc
+      middlewares:
+        - inject-tenant-5a442d2f-d2f6-407d-8d91-2fbe6430add5
+  middlewares:
+    inject-tenant-5a442d2f-d2f6-407d-8d91-2fbe6430add5:
+      headers:
+        customRequestHeaders:
+          X-Tenant-ID: "5a442d2f-d2f6-407d-8d91-2fbe6430add5"
+  services:
+    api-gateway-svc:
+      loadBalancer:
+        servers:
+          - url: "http://api-gateway:8080"

@@ -1,0 +1,196 @@
+{
+  "uid": "slate-service-health",
+  "title": "Slate — Service Health (green/amber/red)",
+  "description": "Rolls up incident-service GetPublicStatus + Prometheus `up{}` into one row per monitored service. Each row shows current status (green/amber/red), the highest open incident priority, and a 1h error-rate sparkline.",
+  "tags": ["slate", "health", "wave5"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Data sources",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "Green/amber/red comes from **incident-service.GetPublicStatus** (`GET http://api.slate.local/api/status`, Wave 3 W4 contract). Lower panels drill into Prometheus `up{}` and per-service HTTP 5xx rate."
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Overall platform status",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 3 },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-incident-status"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": { "Operational": { "text": "Operational", "color": "green", "index": 0 } }
+            },
+            {
+              "type": "value",
+              "options": { "Degraded": { "text": "Degraded", "color": "orange", "index": 1 } }
+            },
+            {
+              "type": "value",
+              "options": { "Outage": { "text": "Outage", "color": "red", "index": 2 } }
+            }
+          ]
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://api-gateway:8080/api/status",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "overall",
+          "columns": [{ "selector": "", "text": "overall", "type": "string" }]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Open incidents (last 7d)",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 3 },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-incident-status"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://api-gateway:8080/api/status",
+          "url_options": { "method": "GET" },
+          "root_selector": "incidents_last_7d",
+          "columns": [{ "selector": "", "text": "incidents_last_7d", "type": "number" }]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Per-service status (from GetPublicStatus.components[])",
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 9 },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-incident-status"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "status" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "operational": { "text": "operational", "color": "green", "index": 0 }
+                    }
+                  },
+                  {
+                    "type": "value",
+                    "options": { "degraded": { "text": "degraded", "color": "orange", "index": 1 } }
+                  },
+                  {
+                    "type": "value",
+                    "options": { "outage": { "text": "outage", "color": "red", "index": 2 } }
+                  }
+                ]
+              },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "highest_priority" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "P0": { "color": "red", "index": 0 } } },
+                  { "type": "value", "options": { "P1": { "color": "red", "index": 1 } } },
+                  { "type": "value", "options": { "P2": { "color": "orange", "index": 2 } } },
+                  { "type": "value", "options": { "P3": { "color": "yellow", "index": 3 } } },
+                  { "type": "value", "options": { "P4": { "color": "yellow", "index": 4 } } }
+                ]
+              },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "url": "http://api-gateway:8080/api/status",
+          "url_options": { "method": "GET" },
+          "root_selector": "components",
+          "columns": [
+            { "selector": "service", "text": "service", "type": "string" },
+            { "selector": "status", "text": "status", "type": "string" },
+            { "selector": "highest_priority", "text": "highest_priority", "type": "string" },
+            { "selector": "description", "text": "description", "type": "string" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Prometheus up{} (one line per service)",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 23 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "up{job=~\".+-service|api-gateway\"}", "legendFormat": "{{job}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Gateway 5xx rate (by route, 5m)",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 23 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (route) (rate(gateway_requests_total{status=~\"5..\"}[5m]))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    }
+  ]
+}
