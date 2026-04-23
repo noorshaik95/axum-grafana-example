@@ -44,8 +44,11 @@ class ApiClient {
         if (error.response?.status === 401) {
           if (typeof window !== 'undefined') {
             localStorage.removeItem('admin_token')
+            localStorage.removeItem('admin_auth_token')
+            localStorage.removeItem('slate_token')
             localStorage.removeItem('impersonation_token')
             localStorage.removeItem('impersonation_user')
+            document.cookie = 'slate_token=; Path=/; Max-Age=0; SameSite=Lax'
             window.location.href = '/login'
           }
         }

@@ -29,13 +29,16 @@ export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const response = await apiClient.post<LoginResponse>('/admin/auth/login', credentials)
     if (response.data.accessToken) {
-      localStorage.setItem('admin_auth_token', response.data.accessToken)
-      // client.ts' request interceptor reads `admin_token` — keep both keys in
-      // sync so authenticated requests work after login without a reload.
+      // admin's axios client (lib/api/client.ts) reads `admin_token`.
       localStorage.setItem('admin_token', response.data.accessToken)
+      localStorage.setItem('admin_auth_token', response.data.accessToken)
+      // shared fetch client (shared/lib/api/client.ts) reads `slate_token`.
+      // Several admin pages use that client (platform stats, incidents,
+      // flags, audit), so without this key their requests go out unauthed.
+      localStorage.setItem('slate_token', response.data.accessToken)
       // middleware.ts runs on the server and can only see cookies, not
-      // localStorage. Set slate_token cookie so the auth guard lets
-      // post-login navigation through instead of bouncing back to /login.
+      // localStorage. Mirror the token into a cookie so the auth guard
+      // lets post-login navigation through instead of bouncing to /login.
       const maxAge = 60 * 60 * 8 // 8h; matches admin-auth access token TTL
       document.cookie = `slate_token=${response.data.accessToken}; Path=/; Max-Age=${maxAge}; SameSite=Lax`
     }
@@ -48,6 +51,7 @@ export const authService = {
     } finally {
       localStorage.removeItem('admin_auth_token')
       localStorage.removeItem('admin_token')
+      localStorage.removeItem('slate_token')
       document.cookie = 'slate_token=; Path=/; Max-Age=0; SameSite=Lax'
     }
   },
