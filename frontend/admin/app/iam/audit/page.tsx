@@ -38,12 +38,13 @@ export default function AuditLogPage() {
     pageSize: 30,
     search: search || undefined,
     action: action || undefined,
-    startDate: startDate || undefined,
-    endDate: endDate || undefined,
+    start: startDate || undefined,
+    end: endDate || undefined,
   })
 
-  const entries = data?.data ?? []
-  const totalPages = data?.totalPages ?? 1
+  const entries = data?.entries ?? []
+  const total = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / 30))
 
   return (
     <div className="space-y-6">
@@ -150,21 +151,27 @@ export default function AuditLogPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm">
-                      <span className="font-medium">{entry.userName}</span> acted on{' '}
-                      <span className="font-medium">{entry.resource}</span>
-                      {entry.resourceId && (
+                      <span className="font-medium">{entry.actor_email}</span> acted on{' '}
+                      <span className="font-medium">{entry.target_type}</span>
+                      {entry.target_id && (
                         <span className="font-mono text-xs text-muted-foreground ml-1">
-                          #{entry.resourceId.slice(0, 8)}
+                          #{entry.target_id.slice(0, 8)}
                         </span>
                       )}
                     </p>
-                    {entry.details && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{entry.details}</p>
+                    {entry.request_id && (
+                      <p className="font-mono text-xs text-muted-foreground mt-0.5">
+                        req {entry.request_id.slice(0, 8)}
+                      </p>
                     )}
                   </div>
                   <div className="flex-shrink-0 text-right">
-                    <p className="text-xs text-muted-foreground">{formatDate(entry.timestamp)}</p>
-                    <p className="text-xs text-muted-foreground">{entry.ipAddress}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(new Date(entry.created_at_unix_ms).toISOString())}
+                    </p>
+                    {entry.tenant_id && (
+                      <p className="text-xs text-muted-foreground">{entry.tenant_id.slice(0, 8)}</p>
+                    )}
                   </div>
                 </div>
               ))}
