@@ -16,6 +16,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	stdhttp "net/http"
 	"strings"
 	"time"
@@ -32,10 +33,21 @@ import (
 // Handler holds the wiring needed by the HTTP routes. Any field may be nil if
 // the corresponding feature is disabled at this tenant (e.g. SSO not
 // provisioned).
+//
+// LandingURLTemplate is the base URL for the option-A impersonation redirect.
+// When a GET /auth/impersonate request succeeds the handler builds:
+//
+//	{LandingURLTemplate}#token={access_token}&expires_at={expires_in}&tenant_slug={slug}
+//
+// and returns a 302 to that URL. The default value is
+// "http://teach.slate.local/auth/impersonate-landing" (overridden via the
+// IMPERSONATION_LANDING_URL_TEMPLATE env var).
 type Handler struct {
 	SSOManager             *sso.Manager
 	ImpersonationValidator *auth.ImpersonationValidator
 	MFAReset               *auth.MFAResetService
+	// LandingURLTemplate is the base URL (no fragment) for the browser redirect.
+	LandingURLTemplate string
 }
 
 // Register mounts W14 endpoints on the given ServeMux. Every handler is
@@ -208,6 +220,21 @@ func (h *Handler) handleImpersonate(w stdhttp.ResponseWriter, r *stdhttp.Request
 		writeErr(w, impersonationStatus(err), err.Error())
 		return
 	}
+
+	// Option-A: browser redirect (GET) — return 302 to the provider FE landing
+	// page with the tenant JWT in the URL fragment so it never hits server logs.
+	if r.Method == stdhttp.MethodGet {
+		base := h.LandingURLTemplate
+		if base == "" {
+			base = "http://teach.slate.local/auth/impersonate-landing"
+		}
+		landingURL := fmt.Sprintf("%s#token=%s&expires_at=%d&tenant_slug=%s",
+			base, res.AccessToken, res.ExpiresIn, res.TenantSlug)
+		stdhttp.Redirect(w, r, landingURL, stdhttp.StatusFound)
+		return
+	}
+
+	// POST / backchannel — return JSON as before.
 	writeJSON(w, stdhttp.StatusOK, map[string]interface{}{
 		"access_token":     res.AccessToken,
 		"expires_in":       res.ExpiresIn,

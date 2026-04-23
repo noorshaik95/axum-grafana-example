@@ -131,6 +131,7 @@ type ImpersonationResult struct {
 	TargetUserID    string
 	TargetEmail     string
 	ActorID         string
+	TenantSlug      string
 }
 
 // Validate performs the full W14.4 chain: parse → signature → type → tenant →
@@ -199,6 +200,13 @@ func (v *ImpersonationValidator) Validate(ctx context.Context, rawToken, clientI
 		})
 	}
 
+	// Prefer the slug embedded in the platform-issued JWT claim; fall back to
+	// the locally-configured tenantSlug so the handler can always build the
+	// fragment redirect URL without a round-trip.
+	slug := claims.TenantSlug
+	if slug == "" {
+		slug = v.tenantSlug
+	}
 	return &ImpersonationResult{
 		AccessToken:     accessToken,
 		ExpiresIn:       expiresIn,
@@ -206,6 +214,7 @@ func (v *ImpersonationValidator) Validate(ctx context.Context, rawToken, clientI
 		TargetUserID:    claims.TargetUserID,
 		TargetEmail:     claims.TargetEmail,
 		ActorID:         claims.ActorID,
+		TenantSlug:      slug,
 	}, nil
 }
 

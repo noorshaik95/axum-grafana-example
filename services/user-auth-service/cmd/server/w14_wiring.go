@@ -42,7 +42,13 @@ func wireW14Handlers(
 	tokenSvc *jwt.TokenService,
 	redisClient *redis.Client,
 ) *httpadmin.Handler {
-	h := &httpadmin.Handler{}
+	landingURLTemplate := os.Getenv("IMPERSONATION_LANDING_URL_TEMPLATE")
+	if landingURLTemplate == "" {
+		landingURLTemplate = "http://teach.slate.local/auth/impersonate-landing"
+	}
+	h := &httpadmin.Handler{
+		LandingURLTemplate: landingURLTemplate,
+	}
 
 	// SSO manager — gated on SSO_ENABLED + TENANT_SSO_CONFIG.
 	if os.Getenv("SSO_ENABLED") == "true" {
