@@ -1004,6 +1004,31 @@ route_overrides:
     http_method: "POST"
     service: "tenant-service"
 
+  # T2 #54 — PUT /api/tenants/:id/plan is a REST-only handler in
+  # tenant-service (`internal/handlers/tenant_handler.go:48`). No gRPC
+  # equivalent. Proxy to the service's HTTP listener on :8083 and rewrite
+  # the path to drop the `/api` prefix.
+  - http_path: "/api/tenants/:id/plan"
+    http_method: "PUT"
+    service: "tenant-service"
+    http_proxy_target: "http://tenant-service:8083"
+    http_proxy_path_template: "/tenants/:id/plan"
+
+  # Sibling REST-only handlers on the same service. Wiring them here too
+  # keeps the admin portal's tenant-management page working without
+  # portal-side direct-service URLs.
+  - http_path: "/api/tenants/:id/access"
+    http_method: "PATCH"
+    service: "tenant-service"
+    http_proxy_target: "http://tenant-service:8083"
+    http_proxy_path_template: "/tenants/:id/access"
+
+  - http_path: "/api/tenants/:id/usage"
+    http_method: "GET"
+    service: "tenant-service"
+    http_proxy_target: "http://tenant-service:8083"
+    http_proxy_path_template: "/tenants/:id/usage"
+
   # Health checks for new services
   # Service protos don't declare a `HealthCheck` RPC — the gRPC servers
   # register the standard `grpc.health.v1.Health` service instead. Fixed in
