@@ -15,7 +15,7 @@ INSERT INTO users (id, email, password_hash, first_name, last_name, is_active, a
 VALUES (
     gen_random_uuid(),
     'admin@slate.edu',
-    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lheG',
+    '$2b$10$VrRGtMhC/9hUf9IvGHFrgOzgRgKB4qzAEWnGU4nGmH0F85OOS3.km',
     'System',
     'Administrator',
     true,
