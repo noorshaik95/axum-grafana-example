@@ -78,10 +78,18 @@ async fn main() -> anyhow::Result<()> {
         .parse()
         .expect("Invalid gRPC address");
 
+    // P6: register grpc.health.v1.Health so the gateway's /api/health/video
+    // route (grpc.health.v1.Health/Check) resolves instead of 502-ing.
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter
+        .set_serving::<VideoConferencingServiceServer<VideoConferencingServiceImpl>>()
+        .await;
+
     let grpc_server_handle = tokio::spawn(async move {
         tracing::info!("gRPC server listening on {}", grpc_addr);
 
         Server::builder()
+            .add_service(health_service)
             .add_service(VideoConferencingServiceServer::new(grpc_service))
             .add_service(reflection_service)
             .serve(grpc_addr)

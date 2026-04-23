@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY proto/ /build/proto/
+COPY libs/common-rust /build/libs/common-rust
 
 # Copy manifest only — pre-build all deps before touching source so the
 # expensive compile step is only repeated when Cargo.toml changes.
