@@ -1,0 +1,191 @@
+syntax = "proto3";
+
+package admin_auth;
+
+option go_package = "slate/services/admin-auth-service/api/proto/adminauthpb";
+
+// AdminAuthService is the platform-level auth plane for Slate administrators.
+// Contract ratified in plan/CONTRACTS.md (W2).
+service AdminAuthService {
+  // AdminLogin authenticates a platform admin and returns a JWT with aud=platform.
+  rpc AdminLogin(LoginRequest) returns (LoginResponse);
+
+  // AdminLogout revokes an active admin token (Redis blacklist).
+  rpc AdminLogout(LogoutRequest) returns (LogoutResponse);
+
+  // ValidateAdminToken verifies a JWT and checks aud=platform.
+  rpc ValidateAdminToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+
+  // ListAdminUsers returns all platform admins (admin-fe /iam/users).
+  rpc ListAdminUsers(ListAdminUsersRequest) returns (ListAdminUsersResponse);
+
+  // Register creates a new platform admin.
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+
+  // Impersonate issues a short-lived RSA-signed impersonation token + redirect URL.
+  rpc Impersonate(ImpersonateRequest) returns (ImpersonateResponse);
+
+  // GenerateImpersonationToken is an alias of Impersonate kept for plan W2.2 naming.
+  rpc GenerateImpersonationToken(ImpersonateRequest) returns (ImpersonateResponse);
+
+  // ListAdminRoles returns all platform roles with their permissions (W2.5).
+  // Reads platform_roles. Powers admin-fe /iam/roles.
+  rpc ListAdminRoles(ListAdminRolesRequest) returns (ListAdminRolesResponse);
+
+  // GetAuditLog returns paginated platform_audit rows filtered by actor/action/time (W2.5).
+  // Powers admin-fe /iam/audit.
+  rpc GetAuditLog(GetAuditLogRequest) returns (GetAuditLogResponse);
+
+  // RefreshAdminToken exchanges a refresh token for a new access+refresh pair (W2.5).
+  // Rotates the refresh token (old jti revoked).
+  rpc RefreshAdminToken(RefreshAdminTokenRequest) returns (LoginResponse);
+}
+
+// ---- Messages ----
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_at_unix_ms = 3;
+  AdminUser user = 4;
+}
+
+message LogoutRequest {
+  string access_token = 1;
+}
+
+message LogoutResponse {
+  bool success = 1;
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string email = 3;
+  repeated string roles = 4;
+  string audience = 5;
+  string error = 6;
+}
+
+message ListAdminUsersRequest {
+  int32 limit = 1;
+  int32 offset = 2;
+}
+
+message ListAdminUsersResponse {
+  repeated AdminUser users = 1;
+  int32 total = 2;
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string full_name = 3;
+  repeated string roles = 4;
+  string created_by = 5;
+}
+
+message RegisterResponse {
+  AdminUser user = 1;
+}
+
+message ImpersonateRequest {
+  string admin_user_id = 1;
+  string tenant_id = 2;
+  string tenant_slug = 3;
+  string target_user_id = 4;
+}
+
+message ImpersonateResponse {
+  string token = 1;
+  string redirect_url = 2;
+  string impersonation_id = 3;
+  int64 expires_at_unix_ms = 4;
+}
+
+message AdminUser {
+  string id = 1;
+  string email = 2;
+  string full_name = 3;
+  repeated string roles = 4;
+  int64 created_at_unix_ms = 5;
+  int64 updated_at_unix_ms = 6;
+  bool disabled = 7;
+}
+
+// ---- W2.5: Roles ----
+
+message ListAdminRolesRequest {
+  // default 50, max 200; 0 = server default
+  int32 page_size = 1;
+  // opaque cursor; empty = first page
+  string page_token = 2;
+}
+
+message ListAdminRolesResponse {
+  repeated AdminRole roles = 1;
+  string next_page_token = 2;
+  int32 total = 3;
+}
+
+message AdminRole {
+  // Row key — matches AdminUser.roles[] entries (platform_roles.name).
+  string key = 1;
+  // Human-readable label derived server-side (e.g. "Super Admin").
+  string name = 2;
+  string description = 3;
+  // Permission strings in "resource:verb" format, or ["*"] for wildcard.
+  repeated string permissions = 4;
+  int64 created_at_unix_ms = 5;
+}
+
+// ---- W2.5: Audit log ----
+
+message GetAuditLogRequest {
+  optional string admin_user_id = 1; // platform_audit.actor_id
+  optional string action_type = 2;   // platform_audit.action (exact match)
+  optional string target_id = 3;
+  optional string target_type = 4;
+  optional int64 from_unix_ms = 5;   // inclusive
+  optional int64 to_unix_ms = 6;     // exclusive
+  // default 50, max 500
+  int32 limit = 7;
+  // opaque cursor; empty = newest page
+  string cursor = 8;
+}
+
+message GetAuditLogResponse {
+  repeated AuditEvent events = 1;
+  string next_cursor = 2;
+}
+
+message AuditEvent {
+  string id = 1;
+  string admin_user_id = 2;      // platform_audit.actor_id
+  string admin_email = 3;        // joined from platform_admins.email
+  string action_type = 4;        // platform_audit.action
+  string target_type = 5;
+  optional string target_id = 6;
+  // "success" | "failure" — derived from action_type suffix
+  string outcome = 7;
+  // populated from metadata->>'reason' when present
+  optional string error = 8;
+  int64 occurred_at_unix_ms = 9; // platform_audit.created_at
+  map<string, string> metadata = 10;
+  string request_id = 11;
+}
+
+// ---- W2.5: Refresh ----
+
+message RefreshAdminTokenRequest {
+  string token = 1;
+}

@@ -1,0 +1,125 @@
+syntax = "proto3";
+
+package discussion;
+
+option go_package = "slate/services/discussion-service/api/proto";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// DiscussionService — per-tenant Q&A threads with @mention → inbox notifications.
+service DiscussionService {
+  rpc CreateThread(CreateThreadRequest) returns (Thread);
+  rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse);
+  rpc GetThread(GetThreadRequest) returns (ThreadWithPosts);
+  rpc CreatePost(CreatePostRequest) returns (Post);
+  rpc GetInbox(GetInboxRequest) returns (InboxResponse);
+  // MarkInboxRead matches gateway route `PATCH /api/discussions/inbox/:id/read`.
+  rpc MarkInboxRead(MarkReadRequest) returns (google.protobuf.Empty);
+  // GetThreadsNeedingReply matches gateway route
+  // `GET /api/discussions/needing-reply`. docs/plan.md W5 also refers to this
+  // as `ListThreadsNeedingReply`; the gateway name is the integration contract.
+  rpc GetThreadsNeedingReply(ListNeedingReplyRequest) returns (ListThreadsResponse);
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message HealthCheckRequest {}
+message HealthCheckResponse {
+  string status = 1;
+}
+
+message CreateThreadRequest {
+  string tenant_id = 1;
+  string course_id = 2;
+  string title = 3;
+  string created_by = 4;
+  string initial_post = 5;
+}
+
+message Thread {
+  string id = 1;
+  string course_id = 2;
+  string title = 3;
+  string created_by = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp last_activity_at = 6;
+  int32 reply_count = 7;
+}
+
+message ListThreadsRequest {
+  string tenant_id = 1;
+  string course_id = 2;
+  int32 limit = 3;
+  string cursor = 4;
+}
+
+message ListThreadsResponse {
+  repeated Thread threads = 1;
+  string next_cursor = 2;
+  bool has_more = 3;
+}
+
+message GetThreadRequest {
+  string tenant_id = 1;
+  string thread_id = 2;
+}
+
+message ThreadWithPosts {
+  Thread thread = 1;
+  repeated Post posts = 2;
+}
+
+message CreatePostRequest {
+  string tenant_id = 1;
+  string thread_id = 2;
+  string author_id = 3;
+  string content = 4;
+  string parent_post_id = 5;
+}
+
+message Post {
+  string id = 1;
+  string thread_id = 2;
+  string author_id = 3;
+  string content = 4;
+  string parent_post_id = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp edited_at = 7;
+  repeated string mentioned_user_ids = 8;
+}
+
+message GetInboxRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+  int32 limit = 3;
+  string cursor = 4;
+  bool unseen_only = 5;
+}
+
+message InboxResponse {
+  repeated InboxItem items = 1;
+  string next_cursor = 2;
+  bool has_more = 3;
+}
+
+message InboxItem {
+  string id = 1;
+  string user_id = 2;
+  string type = 3;
+  string reference_id = 4;
+  google.protobuf.Timestamp seen_at = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message MarkReadRequest {
+  string tenant_id = 1;
+  string inbox_item_id = 2;
+  string user_id = 3;
+}
+
+message ListNeedingReplyRequest {
+  string tenant_id = 1;
+  string instructor_id = 2;
+  repeated string course_ids = 3;
+  int32 limit = 4;
+}

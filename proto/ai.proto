@@ -1,0 +1,147 @@
+syntax = "proto3";
+
+package slate.ai.v1;
+
+option go_package = "slate/services/ai-service/api/proto;aipb";
+
+// AiService is the tenant-scoped AI capability surface described in W7.
+// All RPCs are gated by the monthly token budget (W7.5).
+service AiService {
+  rpc GetWelcomeMessage(WelcomeMessageRequest) returns (WelcomeMessageResponse);
+  rpc GetGradeProjection(GradeProjectionRequest) returns (GradeProjectionResponse);
+  rpc GenerateStudyPlan(StudyPlanRequest) returns (StudyPlanResponse);
+  rpc GetCommandPaletteResults(CmdPaletteRequest) returns (CmdPaletteResponse);
+  rpc GetDraftFeedback(DraftFeedbackRequest) returns (DraftFeedbackResponse);
+}
+
+// --- W7.1 Welcome -----------------------------------------------------------
+
+message WelcomeMessageRequest {
+  string tenant_slug = 1;
+  string user_id = 2;
+  string today_context = 3; // short free-text summary of due items etc.
+}
+message WelcomeMessageResponse {
+  string text = 1;
+}
+
+// --- W7.2 Grade projection --------------------------------------------------
+
+message GradeEntry {
+  string assignment_id = 1;
+  double score = 2;         // earned points
+  double max_points = 3;    // max points
+  double weight = 4;        // weighting (sum should be ~1.0 across course)
+}
+
+message RemainingAssignment {
+  string assignment_id = 1;
+  double max_points = 2;
+  double weight = 3;
+  int64 due_at_unix = 4;
+}
+
+message GradeProjectionRequest {
+  string tenant_slug = 1;
+  string user_id = 2;
+  string course_id = 3;
+  double target_grade = 4;                       // e.g. 0.9 for an A-
+  repeated GradeEntry completed = 5;
+  repeated RemainingAssignment remaining = 6;
+}
+
+message PathToTargetEntry {
+  string assignment_id = 1;
+  double required_fraction = 2; // 0..1, clamped
+  bool   feasible = 3;          // true when required <= 1.0
+}
+
+message GradeProjectionResponse {
+  double current_grade = 1;      // weighted so far
+  double projected_grade = 2;    // assuming remaining = max
+  double required_average_remaining = 3;
+  bool   target_feasible = 4;
+  repeated PathToTargetEntry path = 5;
+}
+
+// --- W7.3 Study plan --------------------------------------------------------
+
+message AssignmentSummary {
+  string id = 1;
+  string title = 2;
+  int64 due_at_unix = 3;
+  int32 estimated_hours = 4;
+}
+
+message StudyPlanRequest {
+  string tenant_slug = 1;
+  string user_id = 2;
+  string university_name = 3;
+  int64 today_unix = 4;
+  repeated AssignmentSummary assignments = 5;
+}
+
+message StudyPlanTask {
+  string day = 1;              // e.g. "mon"
+  int32 duration_minutes = 2;
+  string title = 3;
+}
+message StudyPlanWeek {
+  int32 week = 1;              // 1..16
+  repeated StudyPlanTask tasks = 2;
+}
+message StudyPlanResponse {
+  repeated StudyPlanWeek weeks = 1;
+  string model_used = 2;
+  bool   from_cache = 3;
+}
+
+// --- W7.4 Command palette ---------------------------------------------------
+
+message CmdPaletteRoute {
+  string label = 1;
+  string route = 2;
+  string icon = 3;
+}
+message CmdPaletteRequest {
+  string tenant_slug = 1;
+  string user_id = 2;
+  string role = 3;
+  string query = 4;
+  repeated string courses = 5;
+  repeated CmdPaletteRoute route_catalog = 6;
+}
+message CmdPaletteResult {
+  string label = 1;
+  string route = 2;
+  string icon = 3;
+}
+message CmdPaletteResponse {
+  repeated CmdPaletteResult results = 1;
+  bool from_cache = 2;
+}
+
+// --- W7.6 Draft feedback ----------------------------------------------------
+
+message RubricRow {
+  string id = 1;
+  string label = 2;
+  double max_points = 3;
+  string criteria = 4;
+}
+message DraftFeedbackRequest {
+  string tenant_slug = 1;
+  string submission_id = 2;
+  string submission_text = 3;
+  repeated RubricRow rubric = 4;
+  bool   flag_enabled = 5;
+}
+message RubricFeedback {
+  string rubric_id = 1;
+  string feedback = 2;
+  double suggested_points = 3;
+}
+message DraftFeedbackResponse {
+  repeated RubricFeedback rows = 1;
+  string overall = 2;
+}

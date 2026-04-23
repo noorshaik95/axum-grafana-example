@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package flag;
+
+option go_package = "slate/services/feature-flag-service/api/proto";
+
+// FlagService — platform-level feature flag evaluator (W3).
+// gRPC :50062, HTTP :8092.
+service FlagService {
+  // Gateway-hot-path. Called once per authenticated request (via Redis cache).
+  rpc EvaluateFlags(EvaluateFlagsRequest) returns (EvaluateFlagsResponse);
+
+  // Admin-only. Backs GET /api/flags.
+  rpc ListFlags(ListFlagsRequest) returns (ListFlagsResponse);
+
+  // Admin-only. Backs GET /api/flags/:key. Returns NotFound when the key
+  // is absent so the HTTP layer can map cleanly to 404.
+  rpc GetFlag(GetFlagRequest) returns (Flag);
+
+  // Admin-only. Backs PUT /api/flags/:key. Invalidates Redis cache on success.
+  rpc UpdateFlag(UpdateFlagRequest) returns (Flag);
+
+  // Admin-only. Backs DELETE /api/flags/:key. Invalidates Redis cache on success.
+  rpc DeleteFlag(DeleteFlagRequest) returns (DeleteFlagResponse);
+}
+
+message EvaluateFlagsRequest {
+  string tenant_id = 1;
+  string tenant_slug = 2;
+  string user_id = 3;
+  repeated string roles = 4;
+}
+
+message EvaluateFlagsResponse {
+  map<string, bool> flags = 1;
+  int64 evaluated_at_unix_ms = 2;
+}
+
+message ListFlagsRequest {
+  string tenant_id = 1;
+}
+
+message GetFlagRequest {
+  string key = 1;
+  string tenant_id = 2;
+}
+
+message ListFlagsResponse {
+  repeated Flag flags = 1;
+}
+
+message Flag {
+  string key = 1;
+  string description = 2;
+  bool state = 3;
+  repeated TargetRule targets = 4;
+  int64 updated_at_unix_ms = 5;
+}
+
+message TargetRule {
+  // Rule types per plan W3.2: "all" | "tenant" | "role" | "percentage" | "user".
+  string rule_type = 1;
+  // JSON-encoded value matching rule_type, e.g. {"roles":["instructor"]} or {"percent":50}.
+  string rule_value_json = 2;
+}
+
+message UpdateFlagRequest {
+  string key = 1;
+  bool state = 2;
+  repeated TargetRule targets = 3;
+}
+
+message DeleteFlagRequest {
+  string key = 1;
+}
+
+message DeleteFlagResponse {
+  bool deleted = 1;
+}

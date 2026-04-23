@@ -1,0 +1,134 @@
+syntax = "proto3";
+
+package incident;
+
+option go_package = "slate/services/incident-service/api/proto";
+
+import "google/protobuf/empty.proto";
+
+// IncidentService is the platform-level service that tracks operational
+// incidents and exposes a public status page.
+//
+// Ratified contract: plan/CONTRACTS.md#incident.IncidentService (W4)
+service IncidentService {
+  rpc CreateIncident(CreateIncidentRequest) returns (Incident);
+  rpc UpdateIncident(UpdateIncidentRequest) returns (Incident);
+  rpc ListIncidents(ListIncidentsRequest) returns (ListIncidentsResponse);
+  rpc GetIncident(GetIncidentRequest) returns (Incident);
+  rpc PostIncidentEvent(PostIncidentEventRequest) returns (IncidentEvent);
+  rpc GetPublicStatus(google.protobuf.Empty) returns (PublicStatusResponse);
+}
+
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;
+  P0 = 1;
+  P1 = 2;
+  P2 = 3;
+  P3 = 4;
+  P4 = 5;
+}
+
+enum IncidentStatus {
+  INCIDENT_STATUS_UNSPECIFIED = 0;
+  OPEN = 1;
+  WATCHING = 2;
+  RESOLVED = 3;
+}
+
+enum StatusFilter {
+  STATUS_FILTER_UNSPECIFIED = 0;
+  FILTER_OPEN = 1;
+  FILTER_WATCH = 2;
+  FILTER_RESOLVED = 3;
+}
+
+enum OverallStatus {
+  OVERALL_STATUS_UNSPECIFIED = 0;
+  OPERATIONAL = 1;
+  DEGRADED = 2;
+  OUTAGE = 3;
+}
+
+enum ComponentHealth {
+  COMPONENT_HEALTH_UNSPECIFIED = 0;
+  GREEN = 1;
+  AMBER = 2;
+  RED = 3;
+}
+
+message Incident {
+  string id = 1;
+  optional string tenant_id = 2;
+  Priority priority = 3;
+  IncidentStatus status = 4;
+  string title = 5;
+  string impact = 6;
+  int64 opened_at_unix_ms = 7;
+  optional int64 resolved_at_unix_ms = 8;
+  repeated IncidentEvent events = 9;
+  optional string service = 10;
+  optional string created_by = 11;
+}
+
+message IncidentEvent {
+  string id = 1;
+  string incident_id = 2;
+  optional string actor_id = 3;
+  string event_type = 4;
+  string content = 5;
+  int64 created_at_unix_ms = 6;
+}
+
+message CreateIncidentRequest {
+  optional string tenant_id = 1;
+  Priority priority = 2;
+  string title = 3;
+  string impact = 4;
+  optional string service = 5;
+  optional string created_by = 6;
+}
+
+message UpdateIncidentRequest {
+  string id = 1;
+  optional IncidentStatus status = 2;
+  optional Priority priority = 3;
+  optional string title = 4;
+  optional string impact = 5;
+  optional string actor_id = 6;
+}
+
+message ListIncidentsRequest {
+  optional string tenant_id = 1;
+  optional StatusFilter status_filter = 2;
+  optional Priority priority = 3;
+  int32 limit = 4;
+}
+
+message ListIncidentsResponse {
+  repeated Incident incidents = 1;
+}
+
+message GetIncidentRequest {
+  string id = 1;
+}
+
+message PostIncidentEventRequest {
+  string incident_id = 1;
+  optional string actor_id = 2;
+  string event_type = 3;
+  string content = 4;
+}
+
+message ComponentStatus {
+  string service = 1;
+  ComponentHealth health = 2;
+  int32 open_incidents = 3;
+  optional Priority highest_priority = 4;
+}
+
+message PublicStatusResponse {
+  OverallStatus overall = 1;
+  repeated ComponentStatus components = 2;
+  int32 incidents_last_7d = 3;
+  int64 generated_at_unix_ms = 4;
+}
