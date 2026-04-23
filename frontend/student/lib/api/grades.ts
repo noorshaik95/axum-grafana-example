@@ -1,4 +1,27 @@
-import { get } from './client';
+import { get, getCurrentUserId } from './client';
+import { getEnrolledCourses } from './student';
+
+interface GatewayGradebookEntry {
+  assignment_id: string;
+  assignment_title: string;
+  max_points: number;
+  score?: number;
+  adjusted_score?: number;
+  status?: string;
+  due_date?: string;
+  submitted_at?: string;
+  is_late?: boolean;
+}
+
+interface GatewayStudentGradebookResponse {
+  student_id: string;
+  course_id: string;
+  entries: GatewayGradebookEntry[];
+  total_points: number;
+  earned_points: number;
+  percentage: number;
+  letter_grade: string;
+}
 
 export interface CourseGradeSummary {
   courseId: string;
@@ -51,12 +74,65 @@ export interface PerCourseGrade {
   weight: number;
 }
 
-export function getGradesOverview(): Promise<CourseGradeSummary[]> {
-  return get<CourseGradeSummary[]>('/api/students/me/grades');
+export async function getGradesOverview(): Promise<CourseGradeSummary[]> {
+  const userId = getCurrentUserId();
+  if (!userId) throw new Error('Not authenticated');
+  const courses = await getEnrolledCourses();
+  const results = await Promise.all(
+    courses.map(async (course) => {
+      const res = await get<GatewayStudentGradebookResponse>(
+        `/api/students/${userId}/gradebook?course_id=${encodeURIComponent(course.courseId)}`
+      );
+      const entries = res?.entries ?? [];
+      const completed = entries.filter(
+        (e) => e.status && e.status !== 'not_graded' && e.status !== 'ungraded'
+      ).length;
+      const earned = res?.earned_points ?? 0;
+      const total = res?.total_points ?? 0;
+      const currentGrade = res?.percentage ?? 0;
+      const summary: CourseGradeSummary = {
+        courseId: course.courseId,
+        courseTitle: course.title,
+        courseCode: course.courseCode,
+        currentGrade,
+        letterGrade: res?.letter_grade ?? '',
+        estimatedFinal: currentGrade,
+        totalPoints: total,
+        earnedPoints: earned,
+        completedAssignments: completed,
+        totalAssignments: entries.length,
+        breakdown: [],
+      };
+      return summary;
+    })
+  );
+  return results;
 }
 
-export function getCourseGrades(courseId: string): Promise<PerCourseGrade[]> {
-  return get<PerCourseGrade[]>(`/api/students/me/grades/${courseId}`);
+export async function getCourseGrades(courseId: string): Promise<PerCourseGrade[]> {
+  const userId = getCurrentUserId();
+  if (!userId) throw new Error('Not authenticated');
+  const res = await get<GatewayStudentGradebookResponse>(
+    `/api/students/${userId}/gradebook?course_id=${encodeURIComponent(courseId)}`
+  );
+  const entries = res?.entries ?? [];
+  return entries.map((e) => {
+    const rawStatus = e.status ?? 'ungraded';
+    const status: PerCourseGrade['status'] =
+      rawStatus === 'published' ? 'published' : rawStatus === 'draft' ? 'draft' : 'ungraded';
+    return {
+      assignmentId: e.assignment_id,
+      assignmentTitle: e.assignment_title,
+      maxPoints: e.max_points,
+      score: e.score ?? null,
+      adjustedScore: e.adjusted_score ?? null,
+      status,
+      feedback: null,
+      gradedAt: null,
+      category: '',
+      weight: 0,
+    };
+  });
 }
 
 export function getGradeDistribution(
@@ -72,5 +148,10 @@ export function getGradeEstimate(courseId: string): Promise<{
   estimatedLetter: string;
   confidence: number;
 }> {
-  return get(`/api/students/me/grade-estimate/${courseId}`);
+  const userId = getCurrentUserId();
+  if (!userId) throw new Error('Not authenticated');
+  // TODO: no gateway route for per-student grade estimate; metrics-service
+  // only exposes course-level distributions. Leaving user-scoped path as a
+  // placeholder until the backend RPC lands.
+  return get(`/api/students/${userId}/grade-estimate/${courseId}`);
 }

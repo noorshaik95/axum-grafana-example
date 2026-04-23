@@ -5,6 +5,22 @@ function getToken(): string | null {
   return localStorage.getItem('student_token') || localStorage.getItem('slate_token');
 }
 
+export function getCurrentUserId(): string | null {
+  const token = getToken();
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  try {
+    let payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = payload.length % 4;
+    if (pad) payload += '='.repeat(4 - pad);
+    const claims = JSON.parse(atob(payload)) as { user_id?: string };
+    return claims.user_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function getTenantId(): string | null {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('tenant_id');
