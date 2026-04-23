@@ -744,11 +744,13 @@ services:
   restate-server:
     image: docker.restate.dev/restatedev/restate:latest
     ports:
-      - "9080:9080"   # HTTP ingress
-      - "9095:9090"   # Admin API (9090 taken by Prometheus)
+      - "9080:8080"   # HTTP ingress (container binds 8080 by default)
+      - "9070:9070"   # Admin API
       - "5005:5005"   # Service discovery
     environment:
       RESTATE_LOG_LEVEL: info
+      RESTATE_ADMIN__BIND_ADDRESS: "0.0.0.0:9070"
+      RESTATE_INGRESS__BIND_ADDRESS: "0.0.0.0:8080"
     networks:
       - slate-network
     healthcheck:
@@ -772,7 +774,7 @@ services:
       context: .
       dockerfile: services/onboarding-service/Dockerfile
     environment:
-      RESTATE_ENDPOINT: "http://restate-server:9090"
+      RESTATE_ENDPOINT: "http://restate-server:9070"
       KAFKA_BROKERS: "kafka:9092"
       RUST_LOG: "info,onboarding_service=debug"
     ports:
@@ -785,12 +787,42 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-    restart: unless-stopped
+
+  # One-shot init container: registers onboarding-service with Restate admin API.
+  # Restate requires POST /deployments {"uri": "..."} to know about SDK endpoints.
+  # Runs once per compose up; idempotent on Restate side (409 on dupe = success).
+  restate-register-onboarding:
+    image: curlimages/curl:latest
+    depends_on:
+      restate-server:
+        condition: service_healthy
+      onboarding-service:
+        condition: service_started
+    networks:
+      - slate-network
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        echo "Waiting 5s for onboarding-service SDK endpoint..."
+        sleep 5
+        echo "Registering onboarding-service with Restate admin API..."
+        for i in 1 2 3 4 5; do
+          RESP=$$(curl -sS -w "\nHTTP %{http_code}\n" -X POST \
+            http://restate-server:9070/deployments \
+            -H "Content-Type: application/json" \
+            -d '{"uri":"http://onboarding-service:9080"}' 2>&1)
+          CODE=$$(echo "$$RESP" | tail -1 | awk '{print $$2}')
+          echo "Attempt $$i: HTTP $$CODE"
+          echo "$$RESP"
+          if [ "$$CODE" = "200" ] || [ "$$CODE" = "201" ] || [ "$$CODE" = "409" ]; then
+            echo "Registration complete (HTTP $$CODE)."
+            exit 0
+          fi
+          sleep 5
+        done
+        echo "Registration failed after 5 attempts"
+        exit 1
+    restart: "no"
 
   # ============================================================================
   # Observability Stack
