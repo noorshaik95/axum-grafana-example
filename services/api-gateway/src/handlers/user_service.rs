@@ -4,6 +4,17 @@ use crate::proto::user::*;
 use tonic::transport::Channel;
 use tracing::{debug, error};
 
+/// Map a tonic `Status` into a `GatewayError` that preserves the gRPC code.
+/// Used by every typed user-service handler so login/register/validate
+/// surface NotFound→404, Unauthenticated→401, etc. instead of collapsing
+/// to 502 BAD_GATEWAY (which also spuriously trips the circuit breaker).
+fn status_to_gateway_error(context: &str, status: tonic::Status) -> GatewayError {
+    GatewayError::GrpcStatus {
+        code: status.code(),
+        message: format!("{}: {}", context, status.message()),
+    }
+}
+
 /// Inject trace context into gRPC request metadata
 fn inject_trace_context<T>(mut request: tonic::Request<T>) -> tonic::Request<T> {
     use opentelemetry::propagation::Injector;
@@ -87,7 +98,7 @@ async fn handle_register(
     let grpc_request = inject_trace_context(tonic::Request::new(request));
     let response = client.register(grpc_request).await.map_err(|e| {
         error!(error = %e, "Register call failed");
-        GatewayError::GrpcCallFailed(format!("Register failed: {}", e))
+        status_to_gateway_error("Register failed", e)
     })?;
 
     let resp = response.into_inner();
@@ -116,7 +127,7 @@ async fn handle_login(
     let grpc_request = inject_trace_context(tonic::Request::new(request));
     let response = client.login(grpc_request).await.map_err(|e| {
         error!(error = %e, "Login call failed");
-        GatewayError::GrpcCallFailed(format!("Login failed: {}", e))
+        status_to_gateway_error("Login failed", e)
     })?;
 
     let resp = response.into_inner();
@@ -142,7 +153,7 @@ async fn handle_validate_token(
     let grpc_request = inject_trace_context(tonic::Request::new(request));
     let response = client.validate_token(grpc_request).await.map_err(|e| {
         error!(error = %e, "ValidateToken call failed");
-        GatewayError::GrpcCallFailed(format!("ValidateToken failed: {}", e))
+        status_to_gateway_error("ValidateToken failed", e)
     })?;
 
     let resp = response.into_inner();
@@ -174,7 +185,7 @@ async fn handle_oauth_auth_url(
         .await
         .map_err(|e| {
             error!(error = %e, "GetOAuthAuthorizationURL call failed");
-            GatewayError::GrpcCallFailed(format!("GetOAuthAuthorizationURL failed: {}", e))
+            status_to_gateway_error("GetOAuthAuthorizationURL failed", e)
         })?;
 
     let resp = response.into_inner();
@@ -206,7 +217,7 @@ async fn handle_oauth_callback(
         .await
         .map_err(|e| {
             error!(error = %e, "HandleOAuthCallback call failed");
-            GatewayError::GrpcCallFailed(format!("HandleOAuthCallback failed: {}", e))
+            status_to_gateway_error("HandleOAuthCallback failed", e)
         })?;
 
     let resp = response.into_inner();
@@ -238,7 +249,7 @@ async fn handle_saml_auth_request(
         .await
         .map_err(|e| {
             error!(error = %e, "GetSAMLAuthRequest call failed");
-            GatewayError::GrpcCallFailed(format!("GetSAMLAuthRequest failed: {}", e))
+            status_to_gateway_error("GetSAMLAuthRequest failed", e)
         })?;
 
     let resp = response.into_inner();
@@ -271,7 +282,7 @@ async fn handle_saml_assertion(
         .await
         .map_err(|e| {
             error!(error = %e, "HandleSAMLAssertion call failed");
-            GatewayError::GrpcCallFailed(format!("HandleSAMLAssertion failed: {}", e))
+            status_to_gateway_error("HandleSAMLAssertion failed", e)
         })?;
 
     let resp = response.into_inner();
@@ -294,7 +305,7 @@ async fn handle_saml_metadata(
     let grpc_request = inject_trace_context(tonic::Request::new(request));
     let response = client.get_saml_metadata(grpc_request).await.map_err(|e| {
         error!(error = %e, "GetSAMLMetadata call failed");
-        GatewayError::GrpcCallFailed(format!("GetSAMLMetadata failed: {}", e))
+        status_to_gateway_error("GetSAMLMetadata failed", e)
     })?;
 
     let resp = response.into_inner();

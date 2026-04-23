@@ -2,7 +2,7 @@ pub mod client;
 mod constants;
 pub mod dynamic_client;
 pub mod pool;
-mod types;
+pub mod types;
 
 #[cfg(test)]
 mod tests;

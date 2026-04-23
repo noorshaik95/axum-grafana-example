@@ -28,6 +28,13 @@ impl GrpcClientPool {
         let mut pools = HashMap::new();
         let mut circuit_breakers = HashMap::new();
 
+        // Optional dev override for breaker cooldown: 30s default is punishing
+        // during active development. `GATEWAY_BREAKER_COOLDOWN_SEC=10` cuts
+        // recovery time to 10s. Unset → honour per-service config.
+        let cooldown_override = std::env::var("GATEWAY_BREAKER_COOLDOWN_SEC")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok());
+
         for (name, config) in &services {
             info!(
                 service = %name,
@@ -42,7 +49,11 @@ impl GrpcClientPool {
             pools.insert(name.clone(), pool);
 
             // Create circuit breaker for this service
-            let circuit_breaker = CircuitBreaker::new(config.circuit_breaker.clone());
+            let mut breaker_cfg = config.circuit_breaker.clone();
+            if let Some(secs) = cooldown_override {
+                breaker_cfg.timeout_seconds = secs;
+            }
+            let circuit_breaker = CircuitBreaker::new(breaker_cfg);
             circuit_breakers.insert(name.clone(), circuit_breaker);
 
             debug!(service = %name, "Successfully created connection pool with circuit breaker");

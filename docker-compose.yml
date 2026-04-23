@@ -595,6 +595,9 @@ services:
       GATEWAY_AUTH_SERVICE_ENDPOINT: "http://user-auth-service:50051"
       GATEWAY_OBSERVABILITY_TEMPO_ENDPOINT: "http://tempo:4317"
       AUTH_TYPE: "normal"
+      # R2: dev default 10s circuit-breaker cooldown. Production should
+      # raise this via override (30-60s typical).
+      GATEWAY_BREAKER_COOLDOWN_SEC: "10"
       MAX_REQUEST_BODY_SIZE: "1048576"
       MAX_UPLOAD_BODY_SIZE: "26214400"
       UPLOAD_PATHS: "/upload,/api/upload,/api/assignments/*/submissions"

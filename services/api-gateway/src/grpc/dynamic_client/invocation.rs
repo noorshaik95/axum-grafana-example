@@ -54,11 +54,12 @@ pub async fn invoke_unary_bytes(
                 message = %status.message(),
                 "gRPC call failed"
             );
-            GrpcError::CallFailed(format!(
-                "gRPC call failed: {} - {}",
-                status.code(),
-                status.message()
-            ))
+            // Preserve the tonic Code so the HTTP mapper can distinguish
+            // business errors (NotFound → 404) from infra errors
+            // (Unavailable → 503). Losing the code here is what caused
+            // R2: every NotFound surfaced as 502 BAD_GATEWAY and tripped
+            // the circuit breaker on normal profile-404 traffic.
+            GrpcError::Status(status.code(), status.message().to_string())
         })?;
 
     Ok(response.into_inner())

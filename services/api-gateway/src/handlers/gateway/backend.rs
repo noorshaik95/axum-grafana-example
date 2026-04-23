@@ -121,7 +121,17 @@ async fn call_dynamic_client(
                 error = %e,
                 "Dynamic gRPC call failed"
             );
-            GatewayError::GrpcCallFailed(e.to_string())
+            // Preserve the tonic Code when available so the HTTP mapper
+            // emits 404/400/401/403/… for business errors. Only fall back
+            // to opaque BAD_GATEWAY for infra-level failures (reflection,
+            // codec, connection) that don't carry a Status.
+            match e.grpc_code() {
+                Some(code) => GatewayError::GrpcStatus {
+                    code,
+                    message: e.to_string(),
+                },
+                None => GatewayError::GrpcCallFailed(e.to_string()),
+            }
         })
 }
 
