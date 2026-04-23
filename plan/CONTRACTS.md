@@ -34,6 +34,37 @@ The build passed after Wave 0. That is the baseline. Every task from Wave 1 onwa
 
 ---
 
+## runtime-up gate (non-negotiable, applies to every task touching services or infra)
+
+Defined: 2026-04-22 by team-lead (post-Tier-1 E2E failure analysis)
+Consumers: **every agent** touching docker-compose.yml, Dockerfiles, service code, gateway config
+Status: **mandatory** — complements build.green-baseline; build green is necessary but not sufficient
+
+Three gates must all pass before a task is closed:
+
+1. **Gate 1 — Local build/test green**
+   `cargo build && cargo test` (Rust) / `go build ./... && go test ./...` (Go) / `pnpm typecheck && pnpm lint` (FE) exits 0.
+
+2. **Gate 2 — Docker Compose build**
+   `docker compose build <service>` exits 0 with no layer errors. If the change affects multiple services, build all of them.
+
+3. **Gate 3 — Runtime healthy**
+   `docker compose up -d --no-deps <service>` followed by `docker compose ps <service>` must show `healthy` (not `starting` or `restarting`) within 60s.
+   Then smoke-test the critical path: at minimum one curl to a route the service owns must return the expected 2xx (or expected 404/401 for auth-gated routes).
+
+### Anti-patterns that caused the Tier-1 cascade (2026-04-22):
+
+- Unit tests passed but bcrypt hash was wrong in migration SQL → Gate 3 required.
+- circuit_breaker.rs fix landed but old gateway binary still running → Gate 3 required.
+- YAML route changed but gateway container not restarted → Gate 3 required.
+- Service added to compose but missing env var (TENANT_DB_DSN) → Gate 3 catches on boot failure.
+
+### Gate 3 timeout policy
+
+If the service fails to become healthy within 60s, run `docker compose logs <service> --tail 50` and diagnose before declaring completion. Do not close the task with a restartng container.
+
+---
+
 ## trace.propagation (observability acceptance gate)
 
 Defined: 2026-04-18 by po-analyst (ratified by foundation-expert's Wave 0c delivery)
