@@ -8,7 +8,7 @@ import { AppShell } from '../../../shared/components/app-shell/app-shell';
 import { TabNav, type TabItem } from '../../../shared/components/app-shell/tab-nav';
 import type { NowBarChip } from '../../../shared/components/app-shell/now-bar';
 import { auth } from '../../../shared/lib/api';
-import { useStudentAssignments, useNextLecture, useOfficeHoursSlots } from '@/lib/api/hooks';
+import { useStudentAssignments, useNextLecture } from '@/lib/api/hooks';
 import { useStudentProfile, clearStudentProfile } from '@/lib/api/profile';
 
 const STUDENT_TABS: TabItem[] = [
@@ -34,7 +34,10 @@ export function AppShellWrapper({ children }: { children: React.ReactNode }) {
 
   const openAssignments = useStudentAssignments({ status: 'open' });
   const nextLecture = useNextLecture();
-  const officeHours = useOfficeHoursSlots();
+  // NowBar OH chip was calling useOfficeHoursSlots() with no args from every
+  // student page, but scheduling-service requires `instructor_id`. Result: 400
+  // on 15 pages. Layout has no instructor context; the cosmetic chip isn't
+  // worth a per-student ListSlots RPC. /office-hours page has its own call.
 
   const nowChips: NowBarChip[] = [];
   const firstAssignment = openAssignments.data?.[0];
@@ -54,16 +57,7 @@ export function AppShellWrapper({ children }: { children: React.ReactNode }) {
       href: nextLecture.data.joinUrl ?? `/courses/${nextLecture.data.courseId}`,
     });
   }
-  const openSlots = (officeHours.data ?? []).filter(
-    (s: { available: boolean }) => s.available
-  ).length;
-  if (openSlots > 0) {
-    nowChips.push({
-      id: 'oh',
-      label: `${openSlots} office-hours open`,
-      href: '/office-hours',
-    });
-  }
+  // OH-open chip removed — see comment above about layout-level slot queries.
 
   const initials = (() => {
     if (profile?.firstName || profile?.lastName) {

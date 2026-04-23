@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package scheduling;
+
+option go_package = "slate/services/scheduling-service/api/proto;proto";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// SchedulingService — tenant-level office-hours + appointment booking (W6).
+// gRPC :50063. One container per tenant ("scheduling-{slug}").
+service SchedulingService {
+  rpc CreateSchedule(CreateScheduleRequest) returns (Schedule);
+  rpc ListSchedules(ListSchedulesRequest) returns (ListSchedulesResponse);
+  rpc ListAvailableSlots(ListSlotsRequest) returns (ListSlotsResponse);
+  rpc BookSlot(BookSlotRequest) returns (Booking);
+  rpc CancelBooking(CancelBookingRequest) returns (google.protobuf.Empty);
+  rpc GetInstructorDay(GetInstructorDayRequest) returns (InstructorDayResponse);
+}
+
+message Schedule {
+  string id = 1;
+  string instructor_id = 2;
+  int32 day_of_week = 3;            // 0=Sunday ... 6=Saturday
+  string start_time = 4;            // "HH:MM" 24-hour
+  string end_time = 5;              // "HH:MM"
+  int32 slot_duration_minutes = 6;
+  string format = 7;                // "online" | "in_person"
+  string location = 8;
+  bool is_active = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+message CreateScheduleRequest {
+  string tenant_slug = 1;
+  string instructor_id = 2;
+  int32 day_of_week = 3;
+  string start_time = 4;
+  string end_time = 5;
+  int32 slot_duration_minutes = 6;
+  string format = 7;
+  string location = 8;
+}
+
+message ListSchedulesRequest {
+  string tenant_slug = 1;
+  string instructor_id = 2;
+  bool active_only = 3;
+}
+
+message ListSchedulesResponse {
+  repeated Schedule schedules = 1;
+}
+
+message ListSlotsRequest {
+  string tenant_slug = 1;
+  string instructor_id = 2;
+  string date_from = 3;   // "YYYY-MM-DD"
+  string date_to = 4;     // "YYYY-MM-DD" inclusive
+}
+
+message Slot {
+  string schedule_id = 1;
+  string instructor_id = 2;
+  string slot_date = 3;         // "YYYY-MM-DD"
+  string slot_start_time = 4;   // "HH:MM"
+  string slot_end_time = 5;     // "HH:MM"
+  string format = 6;
+  string location = 7;
+}
+
+message ListSlotsResponse {
+  repeated Slot slots = 1;
+  bool from_cache = 2;
+}
+
+message BookSlotRequest {
+  string tenant_slug = 1;
+  string schedule_id = 2;
+  string instructor_id = 3;
+  string student_id = 4;
+  string slot_date = 5;       // "YYYY-MM-DD"
+  string slot_start_time = 6; // "HH:MM"
+  string pre_context = 7;     // student's current assignment / draft question
+}
+
+message Booking {
+  string id = 1;
+  string schedule_id = 2;
+  string instructor_id = 3;
+  string student_id = 4;
+  string slot_date = 5;
+  string slot_start_time = 6;
+  string questions = 7;
+  string status = 8;  // "confirmed" | "cancelled"
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message CancelBookingRequest {
+  string tenant_slug = 1;
+  string booking_id = 2;
+  string student_id = 3;  // audit / authorization hint
+}
+
+message GetInstructorDayRequest {
+  string tenant_slug = 1;
+  string instructor_id = 2;
+  string slot_date = 3;   // "YYYY-MM-DD"
+}
+
+message InstructorDayResponse {
+  string instructor_id = 1;
+  string slot_date = 2;
+  repeated Booking bookings = 3;
+}

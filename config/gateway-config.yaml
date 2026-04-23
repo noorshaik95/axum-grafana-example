@@ -963,46 +963,43 @@ route_overrides:
     http_method: "GET"
     service: "metrics-service"
 
-  # Tenant Service (admin operations)
-  - grpc_method: "tenant.TenantService/CreateTenant"
-    http_path: "/api/tenants"
+  # Tenant Service (admin operations) — REST-only.
+  #
+  # #67 (T-A2) root cause: tenant-service's cmd/server/main.go registers
+  # only grpc.health.v1.Health + reflection — there is no gRPC server
+  # for `tenant.TenantService`. Proto file exists, but no stubs are
+  # generated and no handler is registered. Gateway reflection probe
+  # correctly returned "proto: not found" for `CreateTenant`.
+  #
+  # Fix without touching tenant-service: proxy all tenant admin routes
+  # to the existing REST surface on :8083 (`internal/handlers/tenant_handler.go`).
+  # Routes without a REST handler (UpdateTenant, GetProvisioningStatus,
+  # GetStorageQuota, CreateTenantAdmin) are omitted and will 404 at the
+  # gateway until either a REST handler is added or a gRPC server is
+  # registered in tenant-service.
+  - http_path: "/api/tenants"
     http_method: "POST"
     service: "tenant-service"
+    http_proxy_target: "http://tenant-service:8083"
+    http_proxy_path_template: "/tenants"
 
-  - grpc_method: "tenant.TenantService/GetTenant"
-    http_path: "/api/tenants/:id"
+  - http_path: "/api/tenants"
     http_method: "GET"
     service: "tenant-service"
+    http_proxy_target: "http://tenant-service:8083"
+    http_proxy_path_template: "/tenants"
 
-  - grpc_method: "tenant.TenantService/UpdateTenant"
-    http_path: "/api/tenants/:id"
-    http_method: "PUT"
+  - http_path: "/api/tenants/:id"
+    http_method: "GET"
     service: "tenant-service"
+    http_proxy_target: "http://tenant-service:8083"
+    http_proxy_path_template: "/tenants/:id"
 
-  - grpc_method: "tenant.TenantService/DeleteTenant"
-    http_path: "/api/tenants/:id"
+  - http_path: "/api/tenants/:id"
     http_method: "DELETE"
     service: "tenant-service"
-
-  - grpc_method: "tenant.TenantService/ListTenants"
-    http_path: "/api/tenants"
-    http_method: "GET"
-    service: "tenant-service"
-
-  - grpc_method: "tenant.TenantService/GetProvisioningStatus"
-    http_path: "/api/tenants/:id/provisioning"
-    http_method: "GET"
-    service: "tenant-service"
-
-  - grpc_method: "tenant.TenantService/GetStorageQuota"
-    http_path: "/api/tenants/:id/storage"
-    http_method: "GET"
-    service: "tenant-service"
-
-  - grpc_method: "tenant.TenantService/CreateTenantAdmin"
-    http_path: "/api/tenants/:id/admins"
-    http_method: "POST"
-    service: "tenant-service"
+    http_proxy_target: "http://tenant-service:8083"
+    http_proxy_path_template: "/tenants/:id"
 
   # T2 #54 — PUT /api/tenants/:id/plan is a REST-only handler in
   # tenant-service (`internal/handlers/tenant_handler.go:48`). No gRPC
