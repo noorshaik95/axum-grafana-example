@@ -3,10 +3,12 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Bell, LogOut } from 'lucide-react'
+import { useMemo } from 'react'
 import { AppShell } from '../../../shared/components/app-shell/app-shell'
 import { TabNav, type TabItem } from '../../../shared/components/app-shell/tab-nav'
 import type { NowBarChip } from '../../../shared/components/app-shell/now-bar'
 import { useProfile } from '../../../shared/lib/api/hooks'
+import { getCurrentClaims } from '../../lib/api/client'
 
 const PROVIDER_TABS: TabItem[] = [
   { label: 'Teach', href: '/teach' },
@@ -31,11 +33,14 @@ const PROVIDER_NOW_CHIPS: NowBarChip[] = [
 
 export function AppShellWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  // useProfile may 404 today (#57). Don't block shell rendering on it —
+  // fall back to JWT claims so initials + profile UI render offline.
   const { data: profile } = useProfile()
+  const claims = useMemo(() => getCurrentClaims(), [])
 
-  const initials = profile
-    ? `${profile.firstName?.[0] ?? ''}${profile.lastName?.[0] ?? ''}`.toUpperCase()
-    : 'IN'
+  const firstName = profile?.firstName ?? claims.firstName ?? ''
+  const lastName = profile?.lastName ?? claims.lastName ?? ''
+  const initials = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase() || 'IN'
 
   const handleLogout = () => {
     if (typeof window !== 'undefined') {

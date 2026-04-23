@@ -2,62 +2,58 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { auth } from '../../../shared/lib/api'
-import type { User } from '../../../shared/lib/api/types'
+import { decodeJwtClaims, hasInstructorRole } from '../../lib/api/client'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
 }
 
+/**
+ * T3-R1 (#57): previously this component blocked layout mount on a successful
+ * GET /api/users/profile response. That endpoint 404s today for instructor
+ * JWTs (seed / gateway mismatch), so 18 dashboard pages were stuck spinning
+ * on every load.
+ *
+ * We now authorize purely from the JWT claims (same pattern student-fe uses
+ * per task #46). The backend still validates the token on every downstream
+ * request — this shell-level decode is an optimistic gate that lets the UI
+ * render immediately. If the token is missing/expired or lacks an instructor
+ * role, we redirect to /login exactly as before.
+ */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const [isAuthorized, setIsAuthorized] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [status, setStatus] = useState<'checking' | 'authorized' | 'redirecting'>('checking')
   const router = useRouter()
 
   useEffect(() => {
-    const checkAuth = async () => {
-      if (typeof window === 'undefined') return
+    if (typeof window === 'undefined') return
 
-      const token = localStorage.getItem('slate_token')
-      if (!token) {
-        router.push('/login')
-        return
-      }
-
-      try {
-        const profile: User = await auth.getProfile()
-        const isInstructor = profile.roles.some(
-          (r) => r.name === 'instructor' || r.name === 'admin' || r.name === 'superadmin'
-        )
-
-        if (!isInstructor) {
-          router.push('/login')
-          return
-        }
-
-        setIsAuthorized(true)
-      } catch {
-        localStorage.removeItem('slate_token')
-        router.push('/login')
-      } finally {
-        setIsLoading(false)
-      }
+    const token = localStorage.getItem('slate_token')
+    if (!token) {
+      setStatus('redirecting')
+      router.push('/login')
+      return
     }
 
-    checkAuth()
+    const claims = decodeJwtClaims(token)
+    if (!claims.userId || !hasInstructorRole(claims)) {
+      localStorage.removeItem('slate_token')
+      setStatus('redirecting')
+      router.push('/login')
+      return
+    }
+
+    setStatus('authorized')
   }, [router])
 
-  if (isLoading) {
+  if (status === 'checking') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-forest-600" />
       </div>
     )
   }
 
-  if (!isAuthorized) {
-    return null
-  }
+  if (status !== 'authorized') return null
 
   return <>{children}</>
 }
