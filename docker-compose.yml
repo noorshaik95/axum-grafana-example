@@ -372,7 +372,10 @@ services:
       DB_DSN: "postgres://postgres:postgres@postgres:5432/adminauth?sslmode=disable"
       REDIS_URL: "redis://redis:6379"
       KAFKA_BROKERS: "kafka:9092"
-      JWT_SECRET: "${ADMIN_JWT_SECRET:-change-me-in-prod-admin-jwt-secret-32-chars}"
+      # Dev: share JWT secret with user-auth so the api-gateway's ValidateToken
+      # delegation to user-auth can verify admin-auth-issued tokens. Production
+      # needs proper multi-issuer validation per token `iss` claim.
+      JWT_SECRET: "${ADMIN_JWT_SECRET:-your-super-secret-jwt-key-change-in-production}"
       ACCESS_TOKEN_TTL: "1h"
       REFRESH_TOKEN_TTL: "168h"
       PLATFORM_PRIVATE_KEY_PATH: "/run/secrets/platform_private_key"
