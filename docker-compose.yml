@@ -370,6 +370,7 @@ services:
       GRPC_PORT: "50060"
       HTTP_PORT: "8090"
       DB_DSN: "postgres://postgres:postgres@postgres:5432/adminauth?sslmode=disable"
+      TENANT_DB_DSN: "postgres://postgres:postgres@postgres:5432/tenantdb?sslmode=disable"
       REDIS_URL: "redis://redis:6379"
       KAFKA_BROKERS: "kafka:9092"
       # Dev: share JWT secret with user-auth so the api-gateway's ValidateToken
