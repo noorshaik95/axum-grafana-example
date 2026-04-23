@@ -1,20 +1,22 @@
 //! X-Request-ID + W3C traceparent middleware.
 //!
-//! Behavior:
-//! - If the incoming request carries `X-Request-ID`, reuse it; otherwise generate
-//!   a UUIDv4. Always echo the value back on the response.
-//! - Parse the incoming `traceparent` (W3C Trace Context v00). If missing,
-//!   derive a parent span from the current OpenTelemetry span (or generate a
-//!   new root) so downstream services always receive a traceparent.
-//! - #63: when a *valid* inbound traceparent is present, adopt it as the OTEL
-//!   remote parent for the active tracing span so the gateway span shares the
-//!   caller's trace_id. Without this, Tempo sees a fresh trace per inbound
-//!   request and the "trace a click" dashboard can't stitch FE → gateway →
-//!   backend hops.
-//! - Record `request_id` + `tenant.slug` as span attributes so the Tempo
-//!   dashboard's `{ .request_id = "..." }` TraceQL lookup resolves.
-//! - Record `request_id` as a span attribute and tag the request's extensions
-//!   so downstream handlers (including gRPC outbound) can propagate it.
+//! Two responsibilities — split deliberately:
+//!
+//! 1. `request_id_middleware` — pure header canonicalization. Mint/reuse
+//!    `X-Request-ID`, mint a fresh `traceparent` if missing, echo both on
+//!    the response, stash a `RequestContext` for downstream code.
+//!
+//! 2. `make_gateway_span(&Request)` — used by `tower_http::TraceLayer::
+//!    make_span_with` to build the per-request root tracing span. This is
+//!    where #63's OTEL remote-parent adoption happens, because
+//!    `make_span_with` runs *at span-creation time* — before
+//!    `tracing-opentelemetry` attaches an OTEL context. Calling
+//!    `span.set_parent()` inside this closure means the span's OTEL
+//!    context is stamped with the caller's trace_id, and every child
+//!    span (including the `#[instrument]`-marked `gateway_handler`)
+//!    inherits it. Setting the parent *after* the span is established —
+//!    the approach initially tried in `request_id_middleware` — doesn't
+//!    work: children are already bound to the old context.
 
 use axum::{
     body::Body,
@@ -73,7 +75,10 @@ impl RequestContext {
     }
 }
 
-/// Middleware: stamp every request with X-Request-ID + traceparent.
+/// Middleware: stamp every request with `X-Request-ID` + `traceparent`
+/// and echo them on the response. All OTEL/tempo wiring now lives in
+/// `make_gateway_span` so that parent-context adoption runs at span-
+/// creation time (see module docs).
 pub async fn request_id_middleware(mut request: Request, next: Next) -> Response<Body> {
     let request_id = request
         .headers()
@@ -83,28 +88,13 @@ pub async fn request_id_middleware(mut request: Request, next: Next) -> Response
         .map(|s| s.to_string())
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-    // #63: capture the raw inbound traceparent *before* fallback so we can
-    // adopt it as the OTEL remote parent. If missing/malformed, we mint a
-    // new one below (gateway-originated trace).
-    let inbound_traceparent = request
+    let traceparent = request
         .headers()
         .get(TRACEPARENT_HEADER)
         .and_then(|v| v.to_str().ok())
         .filter(|s| is_valid_traceparent(s))
-        .map(|s| s.to_string());
-
-    let traceparent = inbound_traceparent
-        .clone()
+        .map(|s| s.to_string())
         .unwrap_or_else(new_traceparent);
-
-    // #63: read the Traefik-injected tenant slug (if any) for Tempo indexing.
-    // Use the slug, not the tenant UUID, because the "trace a click" dashboard
-    // filters by human-readable handles.
-    let tenant_slug = request
-        .headers()
-        .get("x-tenant-slug")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
 
     // Write back onto the request so inner services + gRPC clients see the
     // canonical values (guaranteed present, no duplicates).
@@ -121,28 +111,6 @@ pub async fn request_id_middleware(mut request: Request, next: Next) -> Response
     };
     request.extensions_mut().insert(ctx);
 
-    let span = Span::current();
-    span.record("request_id", tracing::field::display(&request_id));
-    span.record("traceparent", tracing::field::display(&traceparent));
-
-    // #63: promote the inbound traceparent (if any) to the span's OTEL
-    // remote parent so `tracing-opentelemetry` emits this span under the
-    // caller's trace_id. This is the fix that stitches FE → gateway →
-    // backend hops into a single Tempo trace.
-    if let Some(tp) = inbound_traceparent.as_deref() {
-        if let Some(remote_ctx) = parse_traceparent_to_context(tp) {
-            span.set_parent(remote_ctx);
-        }
-    }
-
-    // #63: set Tempo-indexed span attributes. The "trace a click" dashboard
-    // queries `{ .request_id = "..." }` so every gateway span must carry it.
-    // `tenant.slug` is added when present for per-tenant filtering.
-    span.set_attribute("request_id", request_id.clone());
-    if let Some(slug) = &tenant_slug {
-        span.set_attribute("tenant.slug", slug.clone());
-    }
-
     let mut response = next.run(request).await;
 
     // Always echo the canonical values on the response.
@@ -158,6 +126,72 @@ pub async fn request_id_middleware(mut request: Request, next: Next) -> Response
     }
 
     response
+}
+
+/// Build the per-request root tracing span. Intended to be passed to
+/// `tower_http::TraceLayer::new_for_http().make_span_with(make_gateway_span)`.
+///
+/// #63: this closure runs **before** `tracing-opentelemetry` has attached
+/// an OTEL context to the span, so `span.set_parent(remote_ctx)` called
+/// here actually changes the span's OTEL trace_id. The span is explicitly
+/// INFO-level so it passes the default `RUST_LOG=info` filter — the
+/// library default of DEBUG would drop it and leave the OTEL pipeline
+/// with no span to attach children to.
+///
+/// Attributes set:
+/// - `request_id` (from X-Request-ID, or minted UUIDv4 if missing)
+/// - `tenant.slug` (when X-Tenant-Slug is injected by Traefik)
+/// - `http.method`, `http.route` for dashboard filters
+///
+/// The span's target is `gateway_request` so Tempo's `rootTraceName`
+/// search surfaces it cleanly.
+pub fn make_gateway_span(request: &axum::http::Request<Body>) -> Span {
+    let request_id = request
+        .headers()
+        .get(REQUEST_ID_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+
+    let tenant_slug = request
+        .headers()
+        .get("x-tenant-slug")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    let method = request.method().as_str().to_string();
+    let path = request.uri().path().to_string();
+
+    // Create the span at INFO so the env_filter `info` default keeps it.
+    // Fields must be pre-declared here; `tracing-opentelemetry` promotes
+    // them to OTLP attributes, which is what Tempo indexes on.
+    let span = tracing::info_span!(
+        "gateway_request",
+        request_id = %request_id,
+        "tenant.slug" = %tenant_slug,
+        "http.method" = %method,
+        "http.route" = %path,
+    );
+
+    // Adopt the caller's W3C traceparent (when present and valid) as the
+    // OTEL remote parent. Doing this *inside* make_span_with is the
+    // load-bearing ordering decision: tracing-opentelemetry's
+    // on_new_span hook fires when this span is first entered, and by
+    // then the parent override is already in place.
+    if let Some(tp) = request
+        .headers()
+        .get(TRACEPARENT_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .filter(|s| is_valid_traceparent(s))
+    {
+        if let Some(remote_ctx) = parse_traceparent_to_context(tp) {
+            span.set_parent(remote_ctx);
+        }
+    }
+
+    span
 }
 
 /// Parse a validated W3C traceparent into an `opentelemetry::Context` that

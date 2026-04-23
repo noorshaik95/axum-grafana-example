@@ -172,11 +172,21 @@ fn apply_middleware(
 
     // X-Request-ID + W3C traceparent: must run first so every downstream layer
     // (including the TraceLayer span and gRPC clients) sees the canonical values.
+    //
+    // #63: `TraceLayer::make_span_with(make_gateway_span)` produces the
+    // per-request root span. `make_gateway_span` runs at span-creation time
+    // (before tracing-opentelemetry attaches an OTEL context), which is the
+    // correct point to adopt an inbound W3C traceparent as the OTEL remote
+    // parent. Doing this in a regular middleware runs too late — children
+    // have already been bound to the fresh (wrong) OTEL context.
     let mut app = router
         .layer(axum::middleware::from_fn(
             crate::middleware::request_id_middleware,
         ))
-        .layer(TraceLayer::new_for_http());
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(crate::middleware::request_id::make_gateway_span),
+        );
 
     // Add CORS middleware if enabled
     if let Some(cors_config) = &app_state.config.cors {
