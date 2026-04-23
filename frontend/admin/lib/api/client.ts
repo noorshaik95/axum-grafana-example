@@ -1,6 +1,10 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://api.slate.local'
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://api.slate.local'
+// Gateway mounts all routes under /api/* (see config/gateway-config.yaml).
+// Strip any trailing slash from the env value and append /api once so
+// callers can keep writing `/tenants`, `/admin/auth/login`, etc.
+const API_URL = RAW_API_URL.replace(/\/+$/, '') + '/api'
 
 class ApiClient {
   private client: AxiosInstance

@@ -6,11 +6,13 @@ export interface LoginRequest {
 }
 
 export interface LoginResponse {
-  access_token: string
-  refresh_token: string
+  accessToken: string
+  refreshToken: string
+  expiresAtUnixMs?: string
   user: {
     id: string
     email: string
+    fullName?: string
     roles: string[]
   }
 }
@@ -25,9 +27,12 @@ export interface User {
 
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    const response = await apiClient.post('/admin/auth/login', credentials)
-    if (response.data.access_token) {
-      localStorage.setItem('admin_auth_token', response.data.access_token)
+    const response = await apiClient.post<LoginResponse>('/admin/auth/login', credentials)
+    if (response.data.accessToken) {
+      localStorage.setItem('admin_auth_token', response.data.accessToken)
+      // client.ts' request interceptor reads `admin_token` — keep both keys in
+      // sync so authenticated requests work after login without a reload.
+      localStorage.setItem('admin_token', response.data.accessToken)
     }
     return response.data
   },

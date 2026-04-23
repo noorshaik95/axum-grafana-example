@@ -2,12 +2,18 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '../../../shared/components/ui/button'
+import { Input } from '../../../shared/components/ui/input'
+import { Label } from '../../../shared/components/ui/label'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '../../../shared/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
-import { auth } from '../../../shared/lib/api'
+import authService from '../../lib/api/auth'
 import { Shield } from 'lucide-react'
 
 export default function LoginPage() {
@@ -22,9 +28,15 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const response = await auth.login({ email, password })
+      const response = await authService.login({ email, password })
 
-      const isAdmin = response.user.roles.some((r) => r.name === 'admin' || r.name === 'superadmin')
+      const roles = response.user?.roles ?? []
+      const isAdmin = roles.some((r: unknown) =>
+        typeof r === 'string'
+          ? r === 'admin' || r === 'superadmin'
+          : (r as { name?: string })?.name === 'admin' ||
+            (r as { name?: string })?.name === 'superadmin'
+      )
 
       if (!isAdmin) {
         toast({
@@ -32,7 +44,7 @@ export default function LoginPage() {
           description: 'You do not have admin privileges.',
           variant: 'destructive',
         })
-        await auth.logout()
+        await authService.logout()
         return
       }
 
