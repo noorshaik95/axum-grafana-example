@@ -14,6 +14,7 @@ import {
   broadcastApi,
   statusApi,
   adminUsersApi,
+  auditApi,
   platformMetricsApi,
   platformTenantsApi,
   alertsApi,
@@ -24,6 +25,7 @@ import {
   type UpdateFlagRequest,
   type BroadcastRequest,
   type ListAdminUsersParams,
+  type ListAuditParams as PlatformListAuditParams,
   type ListTenantsParams as PlatformListTenantsParams,
 } from '../api/platform'
 import type { ListParams, ResourcePlan } from '../api/types'
@@ -202,10 +204,10 @@ export function useUpdateRolePermissions() {
   })
 }
 
-export function useAuditLogs(params?: ListAuditParams) {
+export function useAuditLogs(params?: PlatformListAuditParams) {
   return useQuery({
     queryKey: ['admin', 'audit', params],
-    queryFn: () => iamApi.listAuditLogs(params),
+    queryFn: () => auditApi.list(params),
   })
 }
 
