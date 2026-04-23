@@ -93,12 +93,17 @@ export async function deleteCourse(id: string): Promise<void> {
   return apiClient.delete(`/api/courses/${id}`)
 }
 
-export async function lockCourse(id: string): Promise<void> {
-  return apiClient.patch(`/api/courses/${id}/lock`)
+// T2 reject-with-toast: the remaining course/module/lesson write ops below
+//   have no gateway routes + no corresponding course-service RPCs today.
+//   We throw client-side so mutations surface as toasts rather than 404s.
+//   Flip back to apiClient calls when course-expert exposes them (post-MVP).
+
+export async function lockCourse(_id: string): Promise<void> {
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
-export async function unlockCourse(id: string): Promise<void> {
-  return apiClient.patch(`/api/courses/${id}/unlock`)
+export async function unlockCourse(_id: string): Promise<void> {
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
 export async function getModules(courseId: string): Promise<Module[]> {
@@ -110,19 +115,19 @@ export async function createModule(courseId: string, data: CreateModuleDto): Pro
 }
 
 export async function updateModule(
-  courseId: string,
-  moduleId: string,
-  data: UpdateModuleDto
+  _courseId: string,
+  _moduleId: string,
+  _data: UpdateModuleDto
 ): Promise<Module> {
-  return apiClient.put<Module>(`/api/courses/${courseId}/modules/${moduleId}`, data)
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
-export async function deleteModule(courseId: string, moduleId: string): Promise<void> {
-  return apiClient.delete(`/api/courses/${courseId}/modules/${moduleId}`)
+export async function deleteModule(_courseId: string, _moduleId: string): Promise<void> {
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
-export async function reorderModules(courseId: string, order: ModuleOrder[]): Promise<void> {
-  return apiClient.patch(`/api/courses/${courseId}/modules/reorder`, order)
+export async function reorderModules(_courseId: string, _order: ModuleOrder[]): Promise<void> {
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
 export async function getLessons(courseId: string, moduleId: string): Promise<Lesson[]> {
@@ -130,39 +135,36 @@ export async function getLessons(courseId: string, moduleId: string): Promise<Le
 }
 
 export async function createLesson(
-  courseId: string,
-  moduleId: string,
-  data: CreateLessonDto
+  _courseId: string,
+  _moduleId: string,
+  _data: CreateLessonDto
 ): Promise<Lesson> {
-  return apiClient.post<Lesson>(`/api/courses/${courseId}/modules/${moduleId}/lessons`, data)
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
 export async function updateLesson(
-  courseId: string,
-  moduleId: string,
-  lessonId: string,
-  data: UpdateLessonDto
+  _courseId: string,
+  _moduleId: string,
+  _lessonId: string,
+  _data: UpdateLessonDto
 ): Promise<Lesson> {
-  return apiClient.put<Lesson>(
-    `/api/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}`,
-    data
-  )
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
 export async function deleteLesson(
-  courseId: string,
-  moduleId: string,
-  lessonId: string
+  _courseId: string,
+  _moduleId: string,
+  _lessonId: string
 ): Promise<void> {
-  return apiClient.delete(`/api/courses/${courseId}/modules/${moduleId}/lessons/${lessonId}`)
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
 export async function reorderLessons(
-  courseId: string,
-  moduleId: string,
-  order: LessonOrder[]
+  _courseId: string,
+  _moduleId: string,
+  _order: LessonOrder[]
 ): Promise<void> {
-  return apiClient.patch(`/api/courses/${courseId}/modules/${moduleId}/lessons/reorder`, order)
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
 export async function getCourseAnalytics(courseId: string): Promise<CourseAnalytics> {

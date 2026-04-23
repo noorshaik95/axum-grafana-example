@@ -39,21 +39,25 @@ export async function getAnnouncement(id: string): Promise<Announcement> {
   return apiClient.get<Announcement>(`/api/announcements/${id}`)
 }
 
-export async function createAnnouncement(data: CreateAnnouncementDto): Promise<Announcement> {
-  return apiClient.post<Announcement>('/api/announcements', data)
+// T2 reject-with-toast: /api/announcements write ops have no gateway routes
+//   + no corresponding service yet. Thrown errors surface as UI toasts.
+//   Flip back to apiClient.* when an announcements service lands post-MVP.
+
+export async function createAnnouncement(_data: CreateAnnouncementDto): Promise<Announcement> {
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
 export async function updateAnnouncement(
-  id: string,
-  data: UpdateAnnouncementDto
+  _id: string,
+  _data: UpdateAnnouncementDto
 ): Promise<Announcement> {
-  return apiClient.put<Announcement>(`/api/announcements/${id}`, data)
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
-export async function publishAnnouncement(id: string): Promise<Announcement> {
-  return apiClient.post<Announcement>(`/api/announcements/${id}/publish`)
+export async function publishAnnouncement(_id: string): Promise<Announcement> {
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
-export async function deleteAnnouncement(id: string): Promise<void> {
-  return apiClient.delete(`/api/announcements/${id}`)
+export async function deleteAnnouncement(_id: string): Promise<void> {
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }

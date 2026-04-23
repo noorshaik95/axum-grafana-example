@@ -54,8 +54,12 @@ export async function updateSession(id: string, data: UpdateSessionDto): Promise
   return apiClient.put<VideoSession>(`/api/video/sessions/${id}`, data)
 }
 
-export async function cancelSession(id: string): Promise<void> {
-  return apiClient.patch(`/api/video/sessions/${id}/cancel`)
+export async function cancelSession(_id: string): Promise<void> {
+  // T2: PATCH /api/video/sessions/:id/cancel has no gateway route + no
+  //   corresponding video-service RPC. Reject client-side so the UI surfaces
+  //   a toast instead of a 404. Remove this stub when the cancel endpoint
+  //   lands (video-expert follow-up, post-MVP).
+  throw new Error('Not available in MVP — backend endpoint not yet implemented')
 }
 
 // W11.2 Lecture Q&A
