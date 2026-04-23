@@ -178,11 +178,13 @@ export function useGradeSubmission() {
   return useMutation({
     mutationFn: ({
       submissionId,
+      assignmentId,
       data,
     }: {
       submissionId: string
+      assignmentId: string
       data: gradingApi.GradeSubmissionDto
-    }) => gradingApi.gradeSubmission(submissionId, data),
+    }) => gradingApi.gradeSubmission(submissionId, assignmentId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['submissions'] })
       qc.invalidateQueries({ queryKey: ['pending-submissions'] })

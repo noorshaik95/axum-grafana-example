@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '../../../shared/components/ui/card'
+import { Button } from '../../../shared/components/ui/button'
+import { Input } from '../../../shared/components/ui/input'
+import { Label } from '../../../shared/components/ui/label'
+import { Textarea } from '../../../shared/components/ui/textarea'
+import { Badge } from '../../../shared/components/ui/badge'
 import { Loader2, ChevronLeft, ChevronRight, FileText, CheckCircle } from 'lucide-react'
 import { useGradeSubmission } from '@/lib/api/hooks'
 import { formatDateTime } from '@/lib/utils'
@@ -18,7 +18,7 @@ interface SubmissionGraderProps {
   submissions: Submission[]
 }
 
-export function SubmissionGrader({ assignmentId: _assignmentId, maxPoints, submissions }: SubmissionGraderProps) {
+export function SubmissionGrader({ assignmentId, maxPoints, submissions }: SubmissionGraderProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [score, setScore] = useState('')
   const [feedback, setFeedback] = useState('')
@@ -55,6 +55,7 @@ export function SubmissionGrader({ assignmentId: _assignmentId, maxPoints, submi
     if (!score) return
     await gradeSubmission.mutateAsync({
       submissionId: currentSubmission.id,
+      assignmentId,
       data: {
         score: parseFloat(score),
         feedback: feedback.trim() || undefined,

@@ -144,18 +144,37 @@ export async function getSubmissions(assignmentId: string): Promise<Submission[]
 }
 
 export async function getAllPendingSubmissions(): Promise<Submission[]> {
-  return apiClient.get<Submission[]>('/api/submissions?status=submitted')
+  // TODO: no /api/submissions aggregate route; use per-assignment endpoint
+  return []
 }
 
 export async function gradeSubmission(
   submissionId: string,
+  assignmentId: string,
   data: GradeSubmissionDto
 ): Promise<Grade> {
-  return apiClient.post<Grade>(`/api/submissions/${submissionId}/grade`, data)
+  const rubric_scores: BatchRubricScore[] = data.rubricScores
+    ? Object.entries(data.rubricScores).map(([row_id, points]) => ({ row_id, points }))
+    : [{ row_id: 'total', points: data.score }]
+  const result = await applyBatch({
+    pattern_id: submissionId,
+    assignment_id: assignmentId,
+    submission_ids: [submissionId],
+    rubric_scores,
+    feedback_template: data.feedback ?? '',
+  })
+  const grade: Grade = {
+    id: result.grade_ids[0] ?? submissionId,
+    submissionId,
+    score: data.score,
+    feedback: data.feedback,
+  } as Grade
+  return grade
 }
 
-export async function autoGrade(assignmentId: string): Promise<void> {
-  return apiClient.post(`/api/assignments/${assignmentId}/auto-grade`)
+export async function autoGrade(_assignmentId: string): Promise<void> {
+  // TODO: no auto-grade RPC in assignment-grading-service yet
+  return
 }
 
 export async function getDistribution(
@@ -166,21 +185,22 @@ export async function getDistribution(
   return apiClient.get<GradeDistribution>(`/api/metrics/grades/distribution/${courseId}${params}`)
 }
 
-export async function getGradingRules(courseId?: string): Promise<GradingRule[]> {
-  const params = courseId ? `?courseId=${courseId}` : ''
-  return apiClient.get<GradingRule[]>(`/api/grading-rules${params}`)
+export async function getGradingRules(_courseId?: string): Promise<GradingRule[]> {
+  // TODO: no grading-rules gateway route
+  return []
 }
 
-export async function createGradingRule(data: GradingRuleDto): Promise<GradingRule> {
-  return apiClient.post<GradingRule>('/api/grading-rules', data)
+export async function createGradingRule(_data: GradingRuleDto): Promise<GradingRule> {
+  throw new Error('TODO: grading-rules backend not wired')
 }
 
-export async function updateGradingRule(id: string, data: GradingRuleDto): Promise<GradingRule> {
-  return apiClient.put<GradingRule>(`/api/grading-rules/${id}`, data)
+export async function updateGradingRule(_id: string, _data: GradingRuleDto): Promise<GradingRule> {
+  throw new Error('TODO: grading-rules backend not wired')
 }
 
-export async function deleteGradingRule(id: string): Promise<void> {
-  return apiClient.delete(`/api/grading-rules/${id}`)
+export async function deleteGradingRule(_id: string): Promise<void> {
+  // TODO: no grading-rules gateway route
+  return
 }
 
 // --- W9.4: pattern-grouped queue ---
