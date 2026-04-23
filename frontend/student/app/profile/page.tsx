@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { User, Mail, Calendar, Loader2, Bell, Lock } from 'lucide-react';
-import { useProfile } from '../../../shared/lib/api/hooks';
+import { useStudentProfile } from '@/lib/api/profile';
 import { ActivityCalendar } from '@/components/progress/ActivityCalendar';
 
 export default function ProfilePage() {
-  const { data: profile, isLoading } = useProfile();
+  const { data: profile, isLoading } = useStudentProfile();
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,

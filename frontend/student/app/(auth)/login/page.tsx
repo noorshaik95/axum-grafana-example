@@ -23,7 +23,11 @@ export default function LoginPage() {
       const result = await auth.login({ email, password });
       // Store token as cookie for middleware redirect
       document.cookie = `slate_token=${result.accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; samesite=lax`;
-      router.push('/dashboard');
+      // Cache user so layout doesn't need to hit /api/users/profile (see useStudentProfile).
+      if (result.user) {
+        window.localStorage.setItem('student_user', JSON.stringify(result.user));
+      }
+      router.push('/today');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid email or password. Please try again.');
     } finally {

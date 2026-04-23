@@ -1,4 +1,4 @@
-import { get, post } from './client';
+import { get, post, getCurrentUserId } from './client';
 
 export interface MessageThread {
   id: string;
@@ -29,12 +29,22 @@ export interface Message {
   readAt: string | null;
 }
 
+// email.MessagingService.GetInbox requires tenant_id + user_id per proto
+// (services/email-service/api/proto/email.proto GetInboxRequest).
 export function getInbox(): Promise<MessageThread[]> {
-  return get<MessageThread[]>('/api/messages/inbox');
+  const userId = getCurrentUserId();
+  if (!userId) return Promise.resolve([]);
+  const p = new URLSearchParams();
+  p.set('user_id', userId);
+  return get<MessageThread[]>(`/api/messages/inbox?${p.toString()}`);
 }
 
 export function getSent(): Promise<MessageThread[]> {
-  return get<MessageThread[]>('/api/messages/sent');
+  const userId = getCurrentUserId();
+  if (!userId) return Promise.resolve([]);
+  const p = new URLSearchParams();
+  p.set('user_id', userId);
+  return get<MessageThread[]>(`/api/messages/sent?${p.toString()}`);
 }
 
 export function getThread(threadId: string): Promise<{

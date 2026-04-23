@@ -5,4 +5,7 @@ export * as videoApi from './video';
 export * as announcementsApi from './announcements';
 export * as messagesApi from './messages';
 export * as progressApi from './progress';
+export * as aiApi from './ai';
+export * as contentApi from './content';
+export * as schedulingApi from './scheduling';
 export { ApiError } from './client';

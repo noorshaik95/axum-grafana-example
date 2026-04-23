@@ -3,20 +3,16 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { BookOpen, Loader2, ChevronRight } from 'lucide-react';
-import {
-  useCourses,
-  useMyEnrollments,
-  useProfile,
-  useEnrollInCourse,
-} from '../../../shared/lib/api/hooks';
+import { useCourses, useMyEnrollments, useEnrollInCourse } from '../../../shared/lib/api/hooks';
 import { useGradesOverview } from '@/lib/api/hooks';
+import { useStudentProfile } from '@/lib/api/profile';
 
 type TabFilter = 'all' | 'active' | 'archive';
 
 export default function CoursesPage() {
   const [tabFilter, setTabFilter] = useState<TabFilter>('all');
 
-  const { data: profile } = useProfile();
+  const { data: profile } = useStudentProfile();
   const studentId = profile?.id ?? '';
   const { data: coursesData, isLoading, isError } = useCourses();
   const { data: enrollments } = useMyEnrollments(studentId);

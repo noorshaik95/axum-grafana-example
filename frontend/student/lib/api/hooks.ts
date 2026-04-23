@@ -8,6 +8,8 @@ import * as videoApi from './video';
 import * as announcementsApi from './announcements';
 import * as messagesApi from './messages';
 import * as progressApi from './progress';
+import * as contentApi from './content';
+import * as schedulingApi from './scheduling';
 
 // Student / Courses
 export function useEnrolledCourses() {
@@ -217,5 +219,42 @@ export function useTimeOnTask() {
   return useQuery({
     queryKey: ['time-on-task'],
     queryFn: progressApi.getTimeOnTask,
+  });
+}
+
+// Content
+export function useContent(contentId: string) {
+  return useQuery({
+    queryKey: ['content', contentId],
+    queryFn: () => contentApi.getContent(contentId),
+    enabled: !!contentId,
+  });
+}
+
+export function useUpdatePosition() {
+  return useMutation({
+    mutationFn: (vars: { contentId: string; positionSeconds: number }) =>
+      contentApi.putPosition(vars.contentId, vars.positionSeconds),
+  });
+}
+
+// Video / live lecture
+export function useNextLecture() {
+  return useQuery({
+    queryKey: ['next-lecture'],
+    queryFn: studentApi.getNextLecture,
+  });
+}
+
+// Scheduling / office hours
+export function useOfficeHoursSlots(params?: {
+  instructorId?: string;
+  courseId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  return useQuery({
+    queryKey: ['office-hours-slots', params],
+    queryFn: () => schedulingApi.getSlots(params),
   });
 }

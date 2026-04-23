@@ -13,20 +13,16 @@ import {
   BookOpen,
   ArrowLeft,
 } from 'lucide-react';
-import {
-  useCourse,
-  useProfile,
-  useMyEnrollments,
-  useEnrollInCourse,
-} from '../../../../shared/lib/api/hooks';
+import { useCourse, useMyEnrollments, useEnrollInCourse } from '../../../../shared/lib/api/hooks';
 import { useCourseModules } from '@/lib/api/hooks';
+import { useStudentProfile } from '@/lib/api/profile';
 
 export default function CourseDetailPage() {
   const params = useParams();
   const courseId = params.id as string;
 
   const { data: course, isLoading, isError } = useCourse(courseId);
-  const { data: profile } = useProfile();
+  const { data: profile } = useStudentProfile();
   const studentId = profile?.id ?? '';
   const { data: enrollments } = useMyEnrollments(studentId);
   const enrollMutation = useEnrollInCourse();
