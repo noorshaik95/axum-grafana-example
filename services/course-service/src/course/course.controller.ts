@@ -10,17 +10,21 @@ export class CourseController {
   constructor(
     private readonly courseService: CourseService,
     private readonly enrollmentService: EnrollmentService,
-  ) { }
+  ) {}
 
   // Course CRUD
   @GrpcMethod('CourseService', 'CreateCourse')
   async createCourse(data: any) {
+    // The gateway injects the authenticated caller's identity as `user_id`.
+    // Clients may also supply `instructor_id` explicitly (e.g. admin portals
+    // creating a course on behalf of another instructor).  `instructor_id`
+    // wins when present; otherwise fall back to the authenticated `user_id`.
     const course = await this.courseService.createCourse({
       title: data.title,
       description: data.description,
       term: data.term,
       syllabus: data.syllabus,
-      instructorId: data.instructor_id,
+      instructorId: data.instructor_id || data.user_id,
       metadata: data.metadata,
     });
 
@@ -86,9 +90,14 @@ export class CourseController {
   // Enrollment
   @GrpcMethod('CourseService', 'SelfEnroll')
   async selfEnroll(data: any) {
+    // Gateway path is `/api/courses/:id/enroll`.  The `:id` segment arrives
+    // as `data.id` (path-param injection in conversion.rs).  The authenticated
+    // student's identity is injected as `data.user_id` by the auth context.
+    // Legacy callers that send explicit `courseId` / `studentId` fields are
+    // still supported as fallbacks.
     const enrollment = await this.enrollmentService.selfEnroll(
-      data.courseId,
-      data.studentId,
+      data.courseId || data.id,
+      data.studentId || data.user_id,
       data.sectionId,
     );
     return { enrollment: this.toEnrollmentProto(enrollment) };
@@ -224,7 +233,10 @@ export class CourseController {
 
   @GrpcMethod('CourseService', 'RemoveCoInstructor')
   async removeCoInstructor(data: any) {
-    const course = await this.courseService.removeCoInstructor(data.courseId, data.co_instructor_id);
+    const course = await this.courseService.removeCoInstructor(
+      data.courseId,
+      data.co_instructor_id,
+    );
     return { course: this.toCourseProto(course) };
   }
 
@@ -394,4 +406,3 @@ export class CourseController {
     };
   }
 }
-

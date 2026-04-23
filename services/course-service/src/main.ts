@@ -8,6 +8,7 @@ import { join } from 'path';
 import { Server } from '@grpc/grpc-js';
 import { ReflectionService } from '@grpc/reflection';
 import * as protoLoader from '@grpc/proto-loader';
+import { GrpcExceptionFilter } from './common/filters/grpc-exception.filter';
 
 // Initialize OpenTelemetry tracing before anything else
 initializeTracing();
@@ -70,6 +71,7 @@ async function bootstrap() {
   });
 
   grpcApp.useLogger(grpcApp.get(Logger));
+  grpcApp.useGlobalFilters(new GrpcExceptionFilter());
 
   await grpcApp.listen();
   console.log(`gRPC server listening on ${grpcHost}:${grpcPort}`);
