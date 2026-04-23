@@ -1129,28 +1129,17 @@ route_overrides:
     http_method: "GET"
     service: "feature-flag-service"
 
-  # Onboarding Service (platform)
-  - grpc_method: "onboarding.OnboardingService/StartOnboarding"
-    http_path: "/api/onboarding"
-    http_method: "POST"
-    service: "onboarding-service"
-
-  - grpc_method: "onboarding.OnboardingService/GetOnboardingStatus"
-    http_path: "/api/onboarding/:id"
-    http_method: "GET"
-    service: "onboarding-service"
-
-  - grpc_method: "onboarding.OnboardingService/CanvasImport"
-    http_path: "/api/onboarding/canvas-import"
-    http_method: "POST"
-    service: "onboarding-service"
-
-  # Proto declares `rpc Health(HealthRequest) returns (HealthResponse)`
-  # (see proto/onboarding.proto:40). Fixed in proto-audit #29.
-  - grpc_method: "onboarding.OnboardingService/Health"
-    http_path: "/api/health/onboarding"
-    http_method: "GET"
-    service: "onboarding-service"
+  # Onboarding Service (platform) — Restate Virtual Objects
+  #
+  # The three legacy gRPC passthroughs (StartOnboarding / GetOnboardingStatus /
+  # CanvasImport) were removed in §1b. onboarding-service is a Restate
+  # workflow runtime, not a gRPC server — user-facing paths are defined
+  # above under "§1b HTTP-passthrough routes" with http_proxy_path_template
+  # rewriting `/api/onboarding/*` onto `/OnboardingWorkflow/:id/*` and
+  # `/CanvasMigration/:id/*` Virtual Object handlers.
+  #
+  # /api/health/onboarding is served by the separate health sidecar (HTTP
+  # :9081); it is not exposed through the gateway.
 
   # Broadcast (platform — routes into email-service)
   - grpc_method: "email.MessagingService/SendBroadcast"
@@ -1363,8 +1352,6 @@ auth:
     - path: "/api/health/incidents"
       method: "GET"
     - path: "/api/health/flags"
-      method: "GET"
-    - path: "/api/health/onboarding"
       method: "GET"
     - path: "/api/health/discussions"
       method: "GET"
