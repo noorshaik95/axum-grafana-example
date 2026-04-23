@@ -731,6 +731,43 @@ Pattern: same REST-passthrough approach as the course-service REST routes (optio
 
 ---
 
+## assignment.GradingService + assignment.SubmissionService (P2 / W9) — ratified
+
+Defined: 2026-04-22 (grading-expert re-close of Task #31 with REST-parity patch).
+Status: **✅ ratified additively**. assignment-grading-service build green: `go build/test/vet` exit 0 + 83 tests pass; `docker compose build assignment-grading-service` exit 0.
+
+5 RPCs exposed on gRPC `:50055`, wired via gateway `config/gateway-config.yaml` lines 646-664 + 1284:
+
+| RPC                    | Service                        | Delegates to                                                | REST parity (JSON shape)                                 |
+| ---------------------- | ------------------------------ | ----------------------------------------------------------- | -------------------------------------------------------- |
+| `GetGradingQueue`      | `assignment.GradingService`    | `GradingQueueService.GetGradingQueue`                       | `{assignment_id, patterns[], total_pending}`             |
+| `GetGradingQueueCount` | `assignment.GradingService`    | `GradingQueueService.GetGradingQueue` (sums `Count`)        | `{assignment_id, pending, patterns}`                     |
+| `BatchPublishGrades`   | `assignment.GradingService`    | `BatchGradingService.Apply` (pattern-mode) / legacy publish | `{pattern_id, assignment_id, graded_count, grade_ids[]}` |
+| `SaveDraft`            | `assignment.SubmissionService` | `SubmissionService.UpsertDraft`                             | `Submission`                                             |
+| `GetDraft`             | `assignment.SubmissionService` | `SubmissionService.GetDraft`                                | `Submission`                                             |
+
+### Additive proto fields — ratified (back-compat preserved)
+
+- **`GetGradingQueueResponse`**: added `assignment_id`, `patterns[] (PatternGroup)`, `total_pending`; legacy `groups[]` kept as alias populated identically to `patterns`.
+- **`GetGradingQueueCountResponse`**: added `assignment_id`, `pending`, `patterns` (int32 count); legacy `count` kept as alias of `pending`.
+- **`BatchPublishGradesRequest`**: added `pattern_id`, `assignment_id`, `submission_ids[]`, `rubric_scores[] (RubricScoreInput)`, `feedback_template`, `graded_by`, `instructor_id`; legacy `grade_ids[]` preserved for publish-only callers. **Dispatch rule:** if `pattern_id != "" || rubric_scores not empty` → `BatchGradingService.Apply` (pattern-mode, emits `grade.updated` per student); else if `grade_ids` present → loop `PublishGrade(id)` (legacy-mode back-compat).
+- **`BatchPublishGradesResponse`**: added `pattern_id`, `assignment_id`, `graded_count`, `grade_ids[]`; legacy `published_count` (alias of `graded_count`) + `failed_ids[]` preserved.
+- **New message `RubricScoreInput { row_id, points }`** — mirrors `service.RubricScoreInput` in Go code.
+
+### Kafka contract
+
+`grade.updated` emission path is **unchanged** — pattern-mode gRPC BatchPublishGrades delegates to the same `batch_grading_service.go::Apply` used by REST `POST /grades/batch`. One execution + one Kafka contract shared between gateway-transcoded gRPC callers and direct-REST callers. No new event shapes or topics.
+
+### Trace propagation
+
+All 5 RPCs inherit `otelgrpc.NewServerHandler()` + `tracing.TracingUnaryInterceptor` + `tracing.LoggingUnaryInterceptor` at `cmd/server/main.go:228-234`. Outbound `grade.updated` events inherit traceparent/x-request-id/x-tenant-slug injection from `pkg/kafka/producer.go::PublishEvent` (W9.5 wiring, unchanged).
+
+### Precedent
+
+Same "additive + legacy aliased" pattern as metrics-service P0 ratification above. Legacy callers (any that existed against the pre-patch proto signatures) continue to work; new callers get REST-parity shapes.
+
+---
+
 ## content.ContentManagementService (W10) — ratified
 
 Defined: 2026-04-18 (session close-out). Consumers: student `/modules/[id]` VideoPlayer, metrics-service (`content.position_updated` Kafka consumer).
