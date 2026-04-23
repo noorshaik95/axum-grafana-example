@@ -33,6 +33,11 @@ export const authService = {
       // client.ts' request interceptor reads `admin_token` — keep both keys in
       // sync so authenticated requests work after login without a reload.
       localStorage.setItem('admin_token', response.data.accessToken)
+      // middleware.ts runs on the server and can only see cookies, not
+      // localStorage. Set slate_token cookie so the auth guard lets
+      // post-login navigation through instead of bouncing back to /login.
+      const maxAge = 60 * 60 * 8 // 8h; matches admin-auth access token TTL
+      document.cookie = `slate_token=${response.data.accessToken}; Path=/; Max-Age=${maxAge}; SameSite=Lax`
     }
     return response.data
   },
@@ -42,6 +47,8 @@ export const authService = {
       await apiClient.post('/admin/auth/logout')
     } finally {
       localStorage.removeItem('admin_auth_token')
+      localStorage.removeItem('admin_token')
+      document.cookie = 'slate_token=; Path=/; Max-Age=0; SameSite=Lax'
     }
   },
 
