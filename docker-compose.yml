@@ -13,7 +13,7 @@ services:
       - "--configFile=/config/traefik/traefik.yml"
     ports:
       - "80:80"
-      - "8090:8080"   # Traefik dashboard
+      - "8099:8080"   # Traefik dashboard (moved from 8090 to avoid admin-auth conflict)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./config/traefik:/config/traefik
@@ -352,6 +352,62 @@ services:
           memory: 128M
     networks:
       - tenant-dev-network
+    restart: unless-stopped
+
+  # ============================================================================
+  # Platform Admin Auth Service (W2) — manages Slate platform operators
+  # gRPC :50060, HTTP health :8090. Issues JWT aud=platform and RSA-signed
+  # impersonation tokens (type=impersonation, 5m TTL).
+  # ============================================================================
+  admin-auth-service:
+    build:
+      context: .
+      dockerfile: services/admin-auth-service/Dockerfile
+    container_name: slate-admin-auth
+    environment:
+      ENVIRONMENT: "development"
+      LOG_LEVEL: "info"
+      GRPC_PORT: "50060"
+      HTTP_PORT: "8090"
+      DB_DSN: "postgres://postgres:postgres@postgres:5432/adminauth?sslmode=disable"
+      REDIS_URL: "redis://redis:6379"
+      KAFKA_BROKERS: "kafka:9092"
+      JWT_SECRET: "${ADMIN_JWT_SECRET:-change-me-in-prod-admin-jwt-secret-32-chars}"
+      ACCESS_TOKEN_TTL: "1h"
+      REFRESH_TOKEN_TTL: "168h"
+      PLATFORM_PRIVATE_KEY_PATH: "/run/secrets/platform_private_key"
+      PLATFORM_PUBLIC_KEY_PATH: "/run/secrets/platform_public_key"
+      IMPERSONATION_TTL: "5m"
+      IMPERSONATION_REDIRECT_TEMPLATE: "http://{slug}.slate.local/auth/impersonate?token={token}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
+    ports:
+      - "50060:50060"
+      - "8090:8090"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8090/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      tempo:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    networks:
+      - slate-network
     restart: unless-stopped
 
   # Course Management Service (NestJS/MongoDB)
@@ -805,6 +861,9 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_UNIFIED_ALERTING_ENABLED=true
       - GF_ALERTING_ENABLED=false
+      # Wave 5 Service Health dashboard polls incident-service GetPublicStatus
+      # over HTTP via the Infinity datasource plugin.
+      - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
     volumes:
       - ./config/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
       - ./config/grafana-dashboard-provider.yaml:/etc/grafana/provisioning/dashboards/default.yaml
@@ -940,6 +999,76 @@ services:
       - slate-network
     restart: unless-stopped
 
+  # Incident Service (Go) — W4 platform service
+  incident-service:
+    build:
+      context: .
+      dockerfile: services/incident-service/Dockerfile
+    environment:
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8091"
+      GRPC_HOST: "0.0.0.0"
+      GRPC_PORT: "50061"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_NAME: "incidentdb"
+      DB_SSLMODE: "disable"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_GROUP_ID: "incident-service"
+      KAFKA_ENABLED: "true"
+      REDIS_ADDR: "redis:6379"
+      REDIS_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
+      LOG_LEVEL: "info"
+    ports:
+      - "50061:50061"   # gRPC
+      - "8091:8091"     # HTTP
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - slate-network
+    restart: unless-stopped
+
+  # Discussion Service (Go) — per-tenant in prod (container `discussion-{slug}`);
+  # this compose entry is for dev integration testing only. W16 tenant-expert's
+  # provisioner will spawn real per-tenant containers from the same Dockerfile.
+  discussion-service:
+    build:
+      context: .
+      dockerfile: services/discussion-service/Dockerfile
+    environment:
+      GRPC_HOST: "0.0.0.0"
+      GRPC_PORT: "50056"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_NAME: "discussion_service"
+      DB_SSLMODE: "disable"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_ENABLED: "true"
+      USER_AUTH_GRPC_ADDR: "user-auth-service:50053"
+      TENANT_SLUG: "dev"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
+      LOG_LEVEL: "info"
+    ports:
+      - "50066:50056"   # gRPC (host 50066 to avoid collision with email-service 50058)
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - slate-network
+    restart: unless-stopped
+
   # Metrics Service (Go)
   metrics-service:
     build:
@@ -968,6 +1097,70 @@ services:
       postgres:
         condition: service_healthy
       prometheus:
+        condition: service_started
+    networks:
+      - slate-network
+    restart: unless-stopped
+
+  # AI Service (Go) — Claude-backed welcome/study-plan/cmd-palette/grade-projection, W7
+  ai-service:
+    build:
+      context: .
+      dockerfile: services/ai-service/Dockerfile
+    environment:
+      GRPC_HOST: "0.0.0.0"
+      GRPC_PORT: "50064"
+      REDIS_ADDR: "redis:6379"
+      REDIS_DB: "0"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_ENABLED: "true"
+      KAFKA_GROUP_ID: "ai-service"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      ANTHROPIC_DEFAULT_MODEL: "claude-sonnet-4-6"
+      ANTHROPIC_STUDY_PLAN_MODEL: "claude-opus-4-7"
+      TENANT_AI_TOKEN_BUDGET: "1000000"
+      TENANT_SLUG: "default"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+      LOG_LEVEL: "info"
+    ports:
+      - "50064:50064"   # gRPC
+    depends_on:
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_started
+    networks:
+      - slate-network
+    restart: unless-stopped
+
+  # Feature Flag Service (Go) — platform flag evaluator, W3
+  feature-flag-service:
+    build:
+      context: .
+      dockerfile: services/feature-flag-service/Dockerfile
+    environment:
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8092"
+      GRPC_HOST: "0.0.0.0"
+      GRPC_PORT: "50062"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_NAME: "feature_flags"
+      DB_SSLMODE: "disable"
+      REDIS_ADDR: "redis:6379"
+      REDIS_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
+      LOG_LEVEL: "info"
+    ports:
+      - "50062:50062"   # gRPC
+      - "8092:8092"     # HTTP
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_started
     networks:
       - slate-network
@@ -1025,6 +1218,43 @@ services:
         reservations:
           cpus: '0.5'
           memory: 256M
+    networks:
+      - tenant-dev-network
+    restart: unless-stopped
+
+  # Scheduling Service (Go) — W6 tenant service (one container per tenant in prod,
+  # single shared instance in dev for local testing / tenant-provisioner template).
+  scheduling-service:
+    build:
+      context: .
+      dockerfile: services/scheduling-service/Dockerfile
+    environment:
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "8093"
+      GRPC_HOST: "0.0.0.0"
+      GRPC_PORT: "50063"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_NAME: "scheduling"
+      DB_SSLMODE: "disable"
+      REDIS_ADDR: "redis:6379"
+      REDIS_ENABLED: "true"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_GROUP_ID: "scheduling-service"
+      KAFKA_ENABLED: "false"
+      TENANT_SLUG: "default"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "tempo:4317"
+      LOG_LEVEL: "info"
+    ports:
+      - "50063:50063"   # gRPC
+      - "8093:8093"     # HTTP
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - tenant-dev-network
     restart: unless-stopped
