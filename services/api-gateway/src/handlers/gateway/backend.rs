@@ -128,7 +128,7 @@ async fn call_dynamic_client(
             match e.grpc_code() {
                 Some(code) => GatewayError::GrpcStatus {
                     code,
-                    message: e.to_string(),
+                    message: e.grpc_message(),
                 },
                 None => GatewayError::GrpcCallFailed(e.to_string()),
             }

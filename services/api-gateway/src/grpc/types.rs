@@ -45,6 +45,16 @@ impl GrpcError {
             _ => None,
         }
     }
+
+    /// Return just the message text without the `"gRPC status X: "` prefix.
+    /// Used when the caller will re-wrap this into a `GatewayError::GrpcStatus`
+    /// that already formats the code, so the prefix would double up.
+    pub fn grpc_message(&self) -> String {
+        match self {
+            GrpcError::Status(_, msg) => msg.clone(),
+            _ => self.to_string(),
+        }
+    }
 }
 
 /// Classify a gRPC code as a "client/business" error (maps to HTTP 4xx) vs

@@ -144,9 +144,10 @@ impl tonic::codec::Decoder for BytesDecoder {
         buf: &mut tonic::codec::DecodeBuf<'_>,
     ) -> Result<Option<Self::Item>, Self::Error> {
         let chunk = buf.chunk();
-        if chunk.is_empty() {
-            return Ok(None);
-        }
+        // An empty chunk means the server sent a zero-byte proto3 body (all
+        // fields at default values). Return Some(vec![]) so tonic doesn't
+        // produce "Missing response message" — prost DynamicMessage::decode
+        // handles empty bytes as a valid all-defaults message.
         let bytes = chunk.to_vec();
         buf.advance(chunk.len());
         Ok(Some(bytes))
