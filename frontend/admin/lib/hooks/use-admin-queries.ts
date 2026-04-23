@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import authService, { type LoginResponse } from '../api/auth'
+import type { LoginResponse } from '../api/auth'
 import { onboardingApi } from '../api/onboarding'
 import { tenantsApi, type ListTenantsParams } from '../api/tenants'
 import { iamApi } from '../api/iam'
@@ -33,13 +33,14 @@ import type { ListOnboardingParams } from '../api/onboarding'
 import type { InviteUserRequest } from '../api/iam'
 
 /**
- * Admin profile hook — reads the admin user object from localStorage
- * (written at login time by `authService.login`) so the top-nav can render
- * without hitting the network. Falls back to `authService.getProfile()`
- * which talks to admin-auth via the admin axios client (`/admin/auth/profile`)
- * — explicitly NOT the shared `useProfile` hook which hits
- * `/api/users/profile` and 502s for admin JWTs (R1: admin user_id does not
- * exist in user-auth's `users` table).
+ * Admin profile hook — reads the admin user object from localStorage,
+ * written at login time by `authService.login`. No network call: the
+ * backend has no profile projection endpoint (admin-auth proto exposes
+ * no GetProfile RPC and the gateway has no `/api/admin/auth/profile`
+ * route — #56 follow-up to R1). Returning `null` when localStorage is
+ * missing is safe because the auth guard in `middleware.ts` already
+ * redirects unauthenticated traffic to `/login` before this hook fires.
+ * Consumers must render a fallback state for null.
  */
 export type AdminProfile = LoginResponse['user']
 
@@ -57,23 +58,7 @@ function readAdminUserFromStorage(): AdminProfile | null {
 export function useAdminProfile() {
   return useQuery<AdminProfile | null>({
     queryKey: ['admin', 'profile'],
-    queryFn: async () => {
-      const cached = readAdminUserFromStorage()
-      if (cached) return cached
-      // Network fallback only if localStorage was cleared — uses admin axios
-      // (targets admin-auth-service), NOT shared fetch client.
-      try {
-        const res = await authService.getProfile()
-        return {
-          id: res.id,
-          email: res.email,
-          fullName: res.name,
-          roles: res.roles,
-        }
-      } catch {
-        return null
-      }
-    },
+    queryFn: () => Promise.resolve(readAdminUserFromStorage()),
     staleTime: Infinity,
     retry: false,
   })

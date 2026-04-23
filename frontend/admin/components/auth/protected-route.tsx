@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import authService from '../../lib/api/auth'
 
 /**
- * Admin-only ProtectedRoute. Uses admin-auth profile (via admin axios
- * client at `/admin/auth/profile`) instead of the shared user-auth
- * `/api/users/profile` which 502s for admin JWTs (R1). Role data is
- * sourced from the persisted `admin_user` localStorage key written at
- * login — no network call on the happy path.
+ * Admin-only ProtectedRoute. Role data is sourced from the persisted
+ * `admin_user` localStorage key written at login. No profile network
+ * call: admin-auth proto has no GetProfile RPC and the gateway has no
+ * `/api/admin/auth/profile` route (#56). If the localStorage payload is
+ * missing, we bounce to `/login` — the user re-auths and the login
+ * handler repopulates `admin_user` fresh.
  */
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -36,58 +36,39 @@ function isAdminRole(roles: RoleLike[]): boolean {
   })
 }
 
+function clearAuthStorage() {
+  localStorage.removeItem('admin_auth_token')
+  localStorage.removeItem('admin_token')
+  localStorage.removeItem('slate_token')
+  localStorage.removeItem('admin_user')
+}
+
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    const checkAuth = async () => {
-      if (typeof window === 'undefined') return
+    if (typeof window === 'undefined') return
 
-      const token =
-        localStorage.getItem('admin_auth_token') ||
-        localStorage.getItem('admin_token') ||
-        localStorage.getItem('slate_token')
-      if (!token) {
-        router.push('/login')
-        return
-      }
-
-      // Prefer the cached admin_user — avoids any profile network call.
-      const cachedRoles = rolesFromStorage()
-      if (cachedRoles.length > 0) {
-        if (!isAdminRole(cachedRoles)) {
-          router.push('/login')
-          return
-        }
-        setIsAuthorized(true)
-        setIsLoading(false)
-        return
-      }
-
-      // Fallback: hit admin-auth profile (admin axios client). Never the
-      // shared user-auth /api/users/profile route.
-      try {
-        const profile = await authService.getProfile()
-        const roles = (profile.roles ?? []) as RoleLike[]
-        if (!isAdminRole(roles)) {
-          router.push('/login')
-          return
-        }
-        setIsAuthorized(true)
-      } catch {
-        localStorage.removeItem('admin_auth_token')
-        localStorage.removeItem('admin_token')
-        localStorage.removeItem('slate_token')
-        localStorage.removeItem('admin_user')
-        router.push('/login')
-      } finally {
-        setIsLoading(false)
-      }
+    const token =
+      localStorage.getItem('admin_auth_token') ||
+      localStorage.getItem('admin_token') ||
+      localStorage.getItem('slate_token')
+    if (!token) {
+      router.push('/login')
+      return
     }
 
-    checkAuth()
+    const roles = rolesFromStorage()
+    if (roles.length === 0 || !isAdminRole(roles)) {
+      clearAuthStorage()
+      router.push('/login')
+      return
+    }
+
+    setIsAuthorized(true)
+    setIsLoading(false)
   }, [router])
 
   if (isLoading) {

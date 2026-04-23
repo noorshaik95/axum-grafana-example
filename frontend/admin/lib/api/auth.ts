@@ -17,14 +17,6 @@ export interface LoginResponse {
   }
 }
 
-export interface User {
-  id: string
-  email: string
-  name: string
-  roles: string[]
-  created_at: string
-}
-
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const response = await apiClient.post<LoginResponse>('/admin/auth/login', credentials)
@@ -63,11 +55,6 @@ export const authService = {
       localStorage.removeItem('admin_user')
       document.cookie = 'slate_token=; Path=/; Max-Age=0; SameSite=Lax'
     }
-  },
-
-  async getProfile(): Promise<User> {
-    const response = await apiClient.get('/admin/auth/profile')
-    return response.data
   },
 
   async validateToken(): Promise<boolean> {
