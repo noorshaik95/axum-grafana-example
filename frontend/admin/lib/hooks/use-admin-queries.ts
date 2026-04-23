@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import authService, { type LoginResponse } from '../api/auth'
 import { onboardingApi } from '../api/onboarding'
 import { tenantsApi, type ListTenantsParams } from '../api/tenants'
 import { iamApi } from '../api/iam'
@@ -30,6 +31,53 @@ import {
 import type { ListParams, OnboardingPayload, ResourcePlan } from '../api/types'
 import type { ListOnboardingParams } from '../api/onboarding'
 import type { InviteUserRequest } from '../api/iam'
+
+/**
+ * Admin profile hook — reads the admin user object from localStorage
+ * (written at login time by `authService.login`) so the top-nav can render
+ * without hitting the network. Falls back to `authService.getProfile()`
+ * which talks to admin-auth via the admin axios client (`/admin/auth/profile`)
+ * — explicitly NOT the shared `useProfile` hook which hits
+ * `/api/users/profile` and 502s for admin JWTs (R1: admin user_id does not
+ * exist in user-auth's `users` table).
+ */
+export type AdminProfile = LoginResponse['user']
+
+function readAdminUserFromStorage(): AdminProfile | null {
+  if (typeof window === 'undefined') return null
+  const raw = window.localStorage.getItem('admin_user')
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as AdminProfile
+  } catch {
+    return null
+  }
+}
+
+export function useAdminProfile() {
+  return useQuery<AdminProfile | null>({
+    queryKey: ['admin', 'profile'],
+    queryFn: async () => {
+      const cached = readAdminUserFromStorage()
+      if (cached) return cached
+      // Network fallback only if localStorage was cleared — uses admin axios
+      // (targets admin-auth-service), NOT shared fetch client.
+      try {
+        const res = await authService.getProfile()
+        return {
+          id: res.id,
+          email: res.email,
+          fullName: res.name,
+          roles: res.roles,
+        }
+      } catch {
+        return null
+      }
+    },
+    staleTime: Infinity,
+    retry: false,
+  })
+}
 
 // Onboarding
 export function useOnboardingJobs(params?: ListOnboardingParams) {
@@ -239,13 +287,6 @@ export function useImpersonationSessions(params?: ListParams) {
   return useQuery({
     queryKey: ['impersonation', 'sessions', params],
     queryFn: () => impersonationApi.listSessions(params),
-  })
-}
-
-export function useStartImpersonation() {
-  return useMutation({
-    mutationFn: ({ targetUserId, reason }: { targetUserId: string; reason: string }) =>
-      impersonationApi.start(targetUserId, reason),
   })
 }
 

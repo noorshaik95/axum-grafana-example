@@ -1,252 +1,299 @@
 'use client'
 
-import { useState } from 'react'
-import { useImpersonationSessions, useStartImpersonation } from '@/lib/hooks/use-admin-queries'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useMemo, useState } from 'react'
+import { History, Loader2, LogIn, Search, UserCog, X, AlertTriangle } from 'lucide-react'
+import {
+  useAdminUsers,
+  useImpersonationSessions,
+  usePlatformTenants,
+  useStartAdminImpersonation,
+} from '@/lib/hooks/use-admin-queries'
+import { EmptyStateIllustrated, StatusPill } from '../../../shared/components'
+import { Spinner } from '../../../shared/components/ui'
 import { formatDate } from '@/lib/utils'
-import { UserCog, Search, X, AlertTriangle, Loader2, LogIn, History } from 'lucide-react'
+import type { AdminUser } from '@/lib/api/platform'
+import type { TenantSummary } from '@/lib/api/platform'
 
-function ImpersonationBanner({
-  user,
-  onEnd,
-}: {
-  user: { name: string; tenantName: string }
-  onEnd: () => void
-}) {
+function StartImpersonationModal({ onClose }: { onClose: () => void }) {
+  const [tenantId, setTenantId] = useState('')
+  const [userId, setUserId] = useState('')
+  const [userSearch, setUserSearch] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const tenantsQuery = usePlatformTenants()
+  const usersQuery = useAdminUsers({
+    tenant: tenantId || undefined,
+    search: userSearch || undefined,
+    pageSize: 25,
+  })
+  const impersonate = useStartAdminImpersonation()
+
+  const tenants: TenantSummary[] = tenantsQuery.data?.tenants ?? []
+  const users: AdminUser[] = usersQuery.data?.users ?? []
+
+  const onStart = async () => {
+    if (!tenantId || !userId) {
+      setError('Pick a tenant and a target user.')
+      return
+    }
+    setError(null)
+    try {
+      const res = await impersonate.mutateAsync({ tenantId, userId })
+      window.location.href = res.redirect_url
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impersonation failed')
+    }
+  }
+
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between bg-yellow-400 px-6 py-2 shadow-md">
-      <div className="flex items-center gap-2 text-sm font-medium text-yellow-900">
-        <AlertTriangle className="h-4 w-4" />
-        Impersonating <strong>{user.name}</strong> at <strong>{user.tenantName}</strong>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-warm-900/40 p-4">
+      <div className="w-full max-w-lg space-y-5 rounded-2xl bg-white p-6 shadow-xl">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2">
+            <UserCog className="h-5 w-5 text-warm-700" />
+            <h2 className="font-display text-lg font-bold text-warm-900">Start impersonation</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-full p-1 text-warm-700 hover:bg-warm-50"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+          <p className="text-xs text-warm-700">
+            This action grants full access to the target user&apos;s account and is audit-logged.
+            Only impersonate for legitimate support.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium uppercase tracking-wide text-warm-700">
+            Tenant
+          </label>
+          <select
+            className="w-full rounded-lg border border-warm-200 bg-white px-3 py-2 text-sm text-warm-900 focus:border-forest-500 focus:outline-none"
+            value={tenantId}
+            onChange={(e) => {
+              setTenantId(e.target.value)
+              setUserId('')
+            }}
+          >
+            <option value="">
+              {tenantsQuery.isLoading ? 'Loading tenants…' : 'Select tenant…'}
+            </option>
+            {tenants.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.slug})
+              </option>
+            ))}
+          </select>
+          {tenantsQuery.isError ? (
+            <p className="text-xs text-red-600">
+              Could not load tenants — paste tenant ID below instead.
+            </p>
+          ) : null}
+          <input
+            type="text"
+            placeholder="…or paste tenant UUID"
+            value={tenantId}
+            onChange={(e) => setTenantId(e.target.value)}
+            className="w-full rounded-lg border border-warm-200 bg-white px-3 py-2 font-mono text-xs text-warm-900 focus:border-forest-500 focus:outline-none"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium uppercase tracking-wide text-warm-700">
+            Target user
+          </label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-warm-500" />
+            <input
+              type="text"
+              placeholder="Filter users by name or email…"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              disabled={!tenantId}
+              className="w-full rounded-lg border border-warm-200 bg-white py-2 pl-10 pr-3 text-sm text-warm-900 placeholder:text-warm-500 focus:border-forest-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
+          <select
+            className="w-full rounded-lg border border-warm-200 bg-white px-3 py-2 text-sm text-warm-900 focus:border-forest-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+            disabled={!tenantId || usersQuery.isLoading}
+          >
+            <option value="">
+              {!tenantId
+                ? 'Pick a tenant first'
+                : usersQuery.isLoading
+                  ? 'Loading users…'
+                  : 'Select user…'}
+            </option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.first_name} {u.last_name} — {u.email}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="…or paste user UUID"
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+            className="w-full rounded-lg border border-warm-200 bg-white px-3 py-2 font-mono text-xs text-warm-900 focus:border-forest-500 focus:outline-none"
+          />
+        </div>
+
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-warm-200 bg-white px-4 py-2 text-sm font-medium text-warm-900 hover:bg-warm-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onStart}
+            disabled={!tenantId || !userId || impersonate.isPending}
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-warm-900 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {impersonate.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <LogIn className="h-4 w-4" />
+            )}
+            Start session
+          </button>
+        </div>
       </div>
-      <Button
-        size="sm"
-        variant="outline"
-        className="border-yellow-800 text-yellow-900 hover:bg-yellow-500"
-        onClick={onEnd}
-      >
-        End Session
-      </Button>
     </div>
   )
 }
 
 export default function ImpersonationPage() {
-  const { data, isLoading } = useImpersonationSessions({ page: 1, pageSize: 30 })
-  const startImpersonation = useStartImpersonation()
-
-  const [activeSession, setActiveSession] = useState<{ name: string; tenantName: string } | null>(
-    null
-  )
   const [showModal, setShowModal] = useState(false)
-  const [targetUserId, setTargetUserId] = useState('')
-  const [reason, setReason] = useState('')
   const [search, setSearch] = useState('')
 
-  const sessions = (data?.data ?? []).filter(
-    (s) =>
-      !search ||
-      s.targetUserName.toLowerCase().includes(search.toLowerCase()) ||
-      s.targetTenantName.toLowerCase().includes(search.toLowerCase())
-  )
+  const sessionsQuery = useImpersonationSessions({ page: 1, pageSize: 30 })
 
-  async function handleStart() {
-    if (!targetUserId || !reason) return
-    const result = await startImpersonation.mutateAsync({ targetUserId, reason })
-    // Store impersonation token
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('impersonation_token', result.token)
-      localStorage.setItem('impersonation_user', JSON.stringify(result.user))
-    }
-    setActiveSession({ name: result.user.name, tenantName: result.user.tenantName })
-    setShowModal(false)
-    setTargetUserId('')
-    setReason('')
-  }
-
-  function handleEnd() {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('impersonation_token')
-      localStorage.removeItem('impersonation_user')
-    }
-    setActiveSession(null)
-  }
+  const sessions = useMemo(() => {
+    const rows = sessionsQuery.data?.data ?? []
+    if (!search) return rows
+    const needle = search.toLowerCase()
+    return rows.filter(
+      (s) =>
+        s.targetUserName.toLowerCase().includes(needle) ||
+        s.targetTenantName.toLowerCase().includes(needle)
+    )
+  }, [sessionsQuery.data?.data, search])
 
   return (
     <>
-      {activeSession && <ImpersonationBanner user={activeSession} onEnd={handleEnd} />}
-
-      <div className={`space-y-8 ${activeSession ? 'pt-10' : ''}`}>
-        <div className="flex items-center justify-between">
+      <div className="space-y-6">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Impersonation</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Impersonate a university user to investigate or provide support. All sessions are
-              logged.
+            <h1 className="font-display text-2xl font-bold text-warm-900">Impersonation</h1>
+            <p className="mt-1 text-sm text-warm-700">
+              Impersonate a tenant user for support. All sessions are audit-logged; the impersonated
+              portal manages the session token and teardown.
             </p>
           </div>
-          <Button onClick={() => setShowModal(true)} disabled={!!activeSession}>
-            <LogIn className="mr-2 h-4 w-4" />
-            Start Impersonation
-          </Button>
+          <button
+            type="button"
+            onClick={() => setShowModal(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-forest-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-forest-800"
+          >
+            <LogIn className="h-4 w-4" />
+            Start impersonation
+          </button>
         </div>
 
-        {activeSession && (
-          <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4 flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0" />
-            <div>
-              <p className="font-medium text-yellow-900">Active impersonation session</p>
-              <p className="text-sm text-yellow-700">
-                You are currently impersonating <strong>{activeSession.name}</strong> at{' '}
-                <strong>{activeSession.tenantName}</strong>. All API calls are made as this user.
-              </p>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="ml-auto border-yellow-600 text-yellow-800"
-              onClick={handleEnd}
-            >
-              End Session
-            </Button>
-          </div>
-        )}
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-10"
-            placeholder="Search by user or university…"
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-warm-500" />
+          <input
+            type="text"
+            placeholder="Search sessions by user or tenant…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-warm-200 bg-white py-2 pl-10 pr-4 text-sm text-warm-900 placeholder:text-warm-500 focus:border-forest-500 focus:outline-none"
           />
         </div>
 
-        {/* Session History */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Session History
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center py-10">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : sessions.length === 0 ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">
-                No impersonation sessions yet
-              </p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-muted-foreground">
-                    <th className="pb-3 text-left font-medium">Admin</th>
-                    <th className="pb-3 text-left font-medium">Target User</th>
-                    <th className="pb-3 text-left font-medium">University</th>
-                    <th className="pb-3 text-left font-medium">Reason</th>
-                    <th className="pb-3 text-left font-medium">Started</th>
-                    <th className="pb-3 text-left font-medium">Status</th>
+        <div className="overflow-hidden rounded-xl border border-warm-200 bg-white">
+          <div className="flex items-center gap-2 border-b border-warm-200 bg-warm-50 px-5 py-3">
+            <History className="h-4 w-4 text-warm-700" />
+            <p className="text-sm font-semibold text-warm-900">Session history</p>
+          </div>
+          {sessionsQuery.isLoading ? (
+            <div className="flex justify-center py-10">
+              <Spinner size="sm" />
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="p-6">
+              <EmptyStateIllustrated
+                illustration="empty-inbox"
+                title="No session history"
+                description="Session listing is not yet wired on the backend — start an impersonation above to test the flow."
+              />
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-warm-200 bg-warm-50/60">
+                  <th className="px-5 py-2 text-left text-xs font-medium uppercase text-warm-700">
+                    Admin
+                  </th>
+                  <th className="px-5 py-2 text-left text-xs font-medium uppercase text-warm-700">
+                    Target user
+                  </th>
+                  <th className="px-5 py-2 text-left text-xs font-medium uppercase text-warm-700">
+                    Tenant
+                  </th>
+                  <th className="px-5 py-2 text-left text-xs font-medium uppercase text-warm-700">
+                    Reason
+                  </th>
+                  <th className="px-5 py-2 text-left text-xs font-medium uppercase text-warm-700">
+                    Started
+                  </th>
+                  <th className="px-5 py-2 text-left text-xs font-medium uppercase text-warm-700">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((s) => (
+                  <tr
+                    key={s.id}
+                    className="border-b border-warm-200 last:border-b-0 hover:bg-warm-50/60"
+                  >
+                    <td className="px-5 py-3 text-warm-900">{s.adminUserName}</td>
+                    <td className="px-5 py-3 font-medium text-warm-900">{s.targetUserName}</td>
+                    <td className="px-5 py-3 text-warm-700">{s.targetTenantName}</td>
+                    <td className="max-w-[240px] truncate px-5 py-3 text-warm-700">{s.reason}</td>
+                    <td className="px-5 py-3 text-warm-700">{formatDate(s.startedAt)}</td>
+                    <td className="px-5 py-3">
+                      <StatusPill
+                        tone={s.endedAt ? 'gray' : 'amber'}
+                        label={s.endedAt ? 'ended' : 'active'}
+                      />
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {sessions.map((s) => (
-                    <tr key={s.id} className="hover:bg-muted/20 transition-colors">
-                      <td className="py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-xs font-semibold">
-                            {s.adminUserName.charAt(0)}
-                          </div>
-                          <span>{s.adminUserName}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 font-medium">{s.targetUserName}</td>
-                      <td className="py-3 text-muted-foreground">{s.targetTenantName}</td>
-                      <td className="py-3 text-muted-foreground max-w-[200px] truncate">
-                        {s.reason}
-                      </td>
-                      <td className="py-3 text-muted-foreground">{formatDate(s.startedAt)}</td>
-                      <td className="py-3">
-                        {s.endedAt ? (
-                          <Badge variant="outline" className="bg-gray-100 text-gray-600">
-                            ended
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-yellow-100 text-yellow-800">active</Badge>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
-      {/* Start Impersonation Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-2xl bg-background p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
-                <UserCog className="h-5 w-5" />
-                <h2 className="text-lg font-semibold">Start Impersonation</h2>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => setShowModal(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3 mb-4">
-              <p className="text-sm text-yellow-800">
-                <AlertTriangle className="inline h-3.5 w-3.5 mr-1" />
-                This session will be recorded in the audit log. Only impersonate users for
-                legitimate support purposes.
-              </p>
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Target User ID</Label>
-                <Input
-                  placeholder="UUID of the user to impersonate"
-                  value={targetUserId}
-                  onChange={(e) => setTargetUserId(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Reason (required for audit)</Label>
-                <Input
-                  placeholder="e.g. User reported login issue – ticket #1234"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setShowModal(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleStart}
-                  disabled={!targetUserId || !reason || startImpersonation.isPending}
-                  className="bg-yellow-500 hover:bg-yellow-600 text-yellow-900"
-                >
-                  {startImpersonation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Start Session
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {showModal ? <StartImpersonationModal onClose={() => setShowModal(false)} /> : null}
     </>
   )
 }

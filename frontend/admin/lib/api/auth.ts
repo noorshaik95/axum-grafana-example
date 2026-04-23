@@ -42,6 +42,14 @@ export const authService = {
       const maxAge = 60 * 60 * 8 // 8h; matches admin-auth access token TTL
       document.cookie = `slate_token=${response.data.accessToken}; Path=/; Max-Age=${maxAge}; SameSite=Lax`
     }
+    // Persist the admin user object so `useAdminProfile` can render the
+    // top-nav avatar/name without a network call. Admin JWTs are issued by
+    // admin-auth-service and carry a user_id that does NOT exist in
+    // user-auth's `users` table, so `GET /api/users/profile` 502s (R1).
+    // Admin portal must never hit that shared endpoint.
+    if (response.data.user) {
+      localStorage.setItem('admin_user', JSON.stringify(response.data.user))
+    }
     return response.data
   },
 
@@ -52,6 +60,7 @@ export const authService = {
       localStorage.removeItem('admin_auth_token')
       localStorage.removeItem('admin_token')
       localStorage.removeItem('slate_token')
+      localStorage.removeItem('admin_user')
       document.cookie = 'slate_token=; Path=/; Max-Age=0; SameSite=Lax'
     }
   },
