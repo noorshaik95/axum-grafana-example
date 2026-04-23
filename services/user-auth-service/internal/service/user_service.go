@@ -2,11 +2,14 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"slate/libs/common-go/tracing"
 	"slate/services/user-auth-service/internal/models"
+	"slate/services/user-auth-service/internal/repository"
 	"slate/services/user-auth-service/pkg/logger"
 	"slate/services/user-auth-service/pkg/validation"
 
@@ -90,10 +93,27 @@ func (s *UserService) Register(ctx context.Context, email, password, firstName, 
 		return nil, nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Create user with sanitized names
+	// Create user with sanitized names. Derive a unique username from the
+	// email local-part (same convention migration 010 used for backfill:
+	// lowercase, numeric suffix -N on collision). Admin can rename later
+	// via the user API.
 	user = models.NewUser(email, string(hashedPassword), sanitizedFirstName, sanitizedLastName, phone)
-	if err = s.userRepo.Create(ctx, user); err != nil {
+	base := deriveUsernameBase(email)
+	for attempt := 0; attempt < 16; attempt++ {
+		user.Username = base
+		if attempt > 0 {
+			user.Username = fmt.Sprintf("%s-%d", base, attempt+1)
+		}
+		if err = s.userRepo.Create(ctx, user); err == nil {
+			break
+		}
+		if errors.Is(err, repository.ErrUsernameTaken) {
+			continue
+		}
 		return nil, nil, err
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to allocate username after retries: %w", err)
 	}
 
 	// Assign default "user" role
@@ -390,10 +410,26 @@ func (s *UserService) CreateUser(ctx context.Context, email, password, firstName
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Create user with sanitized names
+	// Create user with sanitized names. Same username-derivation retry loop
+	// as Register so admin-created users get a unique @handle too.
 	user := models.NewUser(email, string(hashedPassword), sanitizedFirstName, sanitizedLastName, phone)
-	if err := s.userRepo.Create(ctx, user); err != nil {
-		return nil, err
+	base := deriveUsernameBase(email)
+	var createErr error
+	for attempt := 0; attempt < 16; attempt++ {
+		user.Username = base
+		if attempt > 0 {
+			user.Username = fmt.Sprintf("%s-%d", base, attempt+1)
+		}
+		if createErr = s.userRepo.Create(ctx, user); createErr == nil {
+			break
+		}
+		if errors.Is(createErr, repository.ErrUsernameTaken) {
+			continue
+		}
+		return nil, createErr
+	}
+	if createErr != nil {
+		return nil, fmt.Errorf("unable to allocate username after retries: %w", createErr)
 	}
 
 	// Assign roles
@@ -760,4 +796,34 @@ func (s *UserService) GetSupportedAuthTypes() []AuthType {
 	// Return the active auth type
 	// Note: In the current implementation, only one auth type is active at a time
 	return []AuthType{activeAuthType}
+}
+
+// deriveUsernameBase returns the lowercase local-part of the email with
+// characters outside [a-z0-9_-.] stripped. Matches migration 010's backfill
+// convention so fresh registrations share the same handle space as existing
+// rows. Returns "user" as a last-resort fallback for pathological emails.
+func deriveUsernameBase(email string) string {
+	at := strings.IndexByte(email, '@')
+	if at <= 0 {
+		at = len(email)
+	}
+	raw := strings.ToLower(email[:at])
+	var b strings.Builder
+	b.Grow(len(raw))
+	for _, r := range raw {
+		switch {
+		case r >= 'a' && r <= 'z',
+			r >= '0' && r <= '9',
+			r == '_', r == '-', r == '.':
+			b.WriteRune(r)
+		}
+	}
+	out := strings.Trim(b.String(), ".-_")
+	if out == "" {
+		return "user"
+	}
+	if len(out) > 60 {
+		out = out[:60]
+	}
+	return out
 }

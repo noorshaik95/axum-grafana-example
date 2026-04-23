@@ -29,20 +29,30 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) (err err
 	defer tracing.EndSpanWithError(span, &err)
 
 	query := `
-		INSERT INTO users (id, email, password_hash, first_name, last_name, phone, timezone, avatar_url, bio, organization_id, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		INSERT INTO users (id, email, password_hash, first_name, last_name, phone, timezone, avatar_url, bio, organization_id, username, is_active, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`
 	_, err = r.db.ExecContext(ctx, query, user.ID, user.Email, user.PasswordHash, user.FirstName,
-		user.LastName, user.Phone, user.Timezone, user.AvatarURL, user.Bio, user.OrganizationID, user.IsActive, user.CreatedAt, user.UpdatedAt)
+		user.LastName, user.Phone, user.Timezone, user.AvatarURL, user.Bio, user.OrganizationID, user.Username, user.IsActive, user.CreatedAt, user.UpdatedAt)
 
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
+			// Distinguish username-index violation from email-key violation
+			// so Register can retry with a numeric suffix. Constraint name
+			// comes from migration 010's `CREATE UNIQUE INDEX idx_users_username_lower`.
+			if pqErr.Constraint == "idx_users_username_lower" {
+				return ErrUsernameTaken
+			}
 			return fmt.Errorf("user with email %s already exists", user.Email)
 		}
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 	return nil
 }
+
+// ErrUsernameTaken is returned when the derived username collides with an
+// existing row's LOWER(username). Register retries with a numeric suffix.
+var ErrUsernameTaken = fmt.Errorf("username collision")
 
 // GetByID retrieves a user by ID
 func (r *UserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {

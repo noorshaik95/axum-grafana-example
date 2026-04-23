@@ -61,7 +61,10 @@ type TokenPair struct {
 	ExpiresIn    int64  `json:"expires_in"`
 }
 
-// NewUser creates a new user with a generated UUID
+// NewUser creates a new user with a generated UUID and a best-effort default
+// username derived from the email local-part (migration 010 backfill
+// convention). Callers that care about collision-safe allocation should
+// overwrite `Username` with a suffix-retry loop before insert.
 func NewUser(email, passwordHash, firstName, lastName, phone string) *User {
 	now := time.Now()
 	return &User{
@@ -72,10 +75,45 @@ func NewUser(email, passwordHash, firstName, lastName, phone string) *User {
 		LastName:     lastName,
 		Phone:        phone,
 		Timezone:     "UTC", // Default timezone
+		Username:     defaultUsernameFromEmail(email),
 		IsActive:     true,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
+}
+
+// defaultUsernameFromEmail is the model-level fallback so every freshly-minted
+// user has a non-empty Username even when callers (SSO/OAuth/SAML JIT paths)
+// skip the explicit derivation. Collision-safe retry is a caller concern.
+func defaultUsernameFromEmail(email string) string {
+	at := -1
+	for i := 0; i < len(email); i++ {
+		if email[i] == '@' {
+			at = i
+			break
+		}
+	}
+	if at <= 0 {
+		at = len(email)
+	}
+	// Lowercase + strip anything outside [a-z0-9_.-]
+	buf := make([]byte, 0, at)
+	for i := 0; i < at; i++ {
+		c := email[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '.' {
+			buf = append(buf, c)
+		}
+	}
+	if len(buf) == 0 {
+		return "user"
+	}
+	if len(buf) > 60 {
+		buf = buf[:60]
+	}
+	return string(buf)
 }
 
 // FullName returns the user's full name

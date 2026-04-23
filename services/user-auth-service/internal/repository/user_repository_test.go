@@ -41,7 +41,7 @@ func TestUserRepository_Create_Success(t *testing.T) {
 	mock.ExpectExec("INSERT INTO users").
 		WithArgs(user.ID, user.Email, user.PasswordHash, user.FirstName, user.LastName,
 			user.Phone, user.Timezone, user.AvatarURL, user.Bio, user.OrganizationID,
-			user.IsActive, user.CreatedAt, user.UpdatedAt).
+			user.Username, user.IsActive, user.CreatedAt, user.UpdatedAt).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	err = repo.Create(context.Background(), user)
@@ -76,8 +76,8 @@ func TestUserRepository_Create_DuplicateEmail(t *testing.T) {
 	mock.ExpectExec("INSERT INTO users").
 		WithArgs(user.ID, user.Email, user.PasswordHash, user.FirstName, user.LastName,
 			user.Phone, user.Timezone, user.AvatarURL, user.Bio, user.OrganizationID,
-			user.IsActive, user.CreatedAt, user.UpdatedAt).
-		WillReturnError(&pq.Error{Code: "23505"})
+			user.Username, user.IsActive, user.CreatedAt, user.UpdatedAt).
+		WillReturnError(&pq.Error{Code: "23505", Constraint: "users_email_key"})
 
 	err = repo.Create(context.Background(), user)
 	assert.Error(t, err)
