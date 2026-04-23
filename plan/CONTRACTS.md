@@ -85,6 +85,28 @@ committed — leaving the repo in a broken state for everyone downstream.
 
 > Committed: `<sha>` — verified on HEAD via `git log --oneline | head -1`
 
+### Gate 3.1 augmentation — scope + recovery (2026-04-23)
+
+After a fourth uncommitted-work incident + one scope-bleed (728 lines across 13 files) in the same session, the recovery steps below were ratified as part of Gate 3.1. Root cause: husky+lint-staged's stash-and-restore loop silently dropped agent changes when the shared working tree had large amounts of untracked work from parallel agents. The mechanical failure mode is real; agent self-reports of "tsc green in my local container" do not prove durability.
+
+Before any completion SendMessage, run both:
+
+```
+git log --oneline | head -3
+git show --stat HEAD
+```
+
+and paste BOTH in the report body. If files appear in `git show --stat HEAD` that you did not intend to ship, you scope-bled — soft-reset and re-stage narrowly before the next SendMessage.
+
+**Recovery when the stash-loop bites:**
+
+1. `git status -s` — if scope mismatches intent, unstage the extras first.
+2. `git add -- <exact-paths>` — never `git add .` or `git add -A`.
+3. After commit, `git show --stat HEAD` — if unexpected files appear, `git reset --soft HEAD~` + re-stage narrowly.
+4. provider-fe-expert's #53 pattern is the reference implementation.
+
+**Enforcement.** PO verifies on every acceptance via `git log --oneline` + `git show --stat <SHA>` independent of agent claims. Reports lacking the self-check lines are bounced immediately without further analysis.
+
 ---
 
 ## trace.propagation (observability acceptance gate)
