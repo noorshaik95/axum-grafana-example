@@ -672,7 +672,7 @@ route_overrides:
     service: "user-auth-service"
 
   # Health Check Endpoints
-  - grpc_method: "auth.AuthService/HealthCheck"
+  - grpc_method: "grpc.health.v1.Health/Check"
     http_path: "/api/health/auth"
     http_method: "GET"
     service: "user-auth-service"
@@ -687,7 +687,7 @@ route_overrides:
     http_method: "GET"
     service: "content-management-service"
 
-  - grpc_method: "assignment.AssignmentService/HealthCheck"
+  - grpc_method: "grpc.health.v1.Health/Check"
     http_path: "/api/health/assignments"
     http_method: "GET"
     service: "assignment-grading-service"
@@ -1138,8 +1138,13 @@ route_overrides:
   # rewriting `/api/onboarding/*` onto `/OnboardingWorkflow/:id/*` and
   # `/CanvasMigration/:id/*` Virtual Object handlers.
   #
-  # /api/health/onboarding is served by the separate health sidecar (HTTP
-  # :9081); it is not exposed through the gateway.
+  # /api/health/onboarding proxies to the Restate-service health sidecar at
+  # onboarding-service:9081 (the Restate SDK port :9080 has no /health).
+  - http_path: "/api/health/onboarding"
+    http_method: "GET"
+    service: "onboarding-service"
+    http_proxy_target: "http://onboarding-service:9081"
+    http_proxy_path_template: "/health"
 
   # Broadcast (platform — routes into email-service)
   - grpc_method: "email.MessagingService/SendBroadcast"
@@ -1183,7 +1188,7 @@ route_overrides:
     http_method: "GET"
     service: "discussion-service"
 
-  - grpc_method: "discussion.DiscussionService/HealthCheck"
+  - grpc_method: "grpc.health.v1.Health/Check"
     http_path: "/api/health/discussions"
     http_method: "GET"
     service: "discussion-service"
@@ -1358,6 +1363,8 @@ auth:
     - path: "/api/health/scheduling"
       method: "GET"
     - path: "/api/health/ai"
+      method: "GET"
+    - path: "/api/health/onboarding"
       method: "GET"
 
 rate_limit:
