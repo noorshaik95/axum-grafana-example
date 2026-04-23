@@ -1,5 +1,6 @@
 /// List of headers to propagate to backend services
 pub const PROPAGATE_HEADERS: &[&str] = &[
+    "authorization",
     "x-trace-id",
     "x-span-id",
     "x-parent-span-id",

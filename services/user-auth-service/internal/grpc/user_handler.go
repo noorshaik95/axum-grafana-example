@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 
 	pb "slate/services/user-auth-service/api/proto"
 	"slate/services/user-auth-service/internal/auth"
@@ -385,7 +386,14 @@ func (s *UserServiceServer) ListUsers(ctx context.Context, req *pb.ListUsersRequ
 
 // GetProfile retrieves a user's profile
 func (s *UserServiceServer) GetProfile(ctx context.Context, req *pb.GetProfileRequest) (*pb.ProfileResponse, error) {
-	profile, err := s.userService.GetProfile(ctx, req.UserId)
+	userID := req.UserId
+	if userID == "" {
+		userID = userIDFromAuthMetadata(ctx, s.userService)
+	}
+	if userID == "" {
+		return nil, status.Error(codes.Unauthenticated, "user_id required")
+	}
+	profile, err := s.userService.GetProfile(ctx, userID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "profile not found: %v", err)
 	}
@@ -848,4 +856,32 @@ func (s *UserServiceServer) GetSAMLMetadata(ctx context.Context, req *pb.SAMLMet
 	return &pb.SAMLMetadataResponse{
 		MetadataXml: metadataXML,
 	}, nil
+}
+
+// userIDFromAuthMetadata recovers the caller's user_id from a forwarded
+// Authorization header when the request body omits user_id (e.g. the gateway
+// routes GET /api/users/profile with an empty body). Returns "" on any error
+// so the caller can return Unauthenticated. Reuses the existing JWT validator
+// so blacklist/revocation still applies.
+func userIDFromAuthMetadata(ctx context.Context, userSvc *service.UserService) string {
+	if userSvc == nil {
+		return ""
+	}
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ""
+	}
+	vals := md.Get("authorization")
+	if len(vals) == 0 {
+		return ""
+	}
+	token := strings.TrimSpace(strings.TrimPrefix(vals[0], "Bearer "))
+	if token == "" {
+		return ""
+	}
+	userID, _, err := userSvc.ValidateToken(ctx, token)
+	if err != nil {
+		return ""
+	}
+	return userID
 }
