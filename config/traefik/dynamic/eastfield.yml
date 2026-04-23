@@ -1,0 +1,37 @@
+# Static router for the Eastfield University seed tenant — eastfield.slate.local
+# Tenant slug: eastfield
+#
+# NOTE: This file is a short-term workaround for Bug 4 (#40).
+# In production the tenant-service provisioner writes per-tenant Traefik config
+# automatically when POST /api/tenants is called (see internal/traefik/generator.go
+# and internal/handlers/tenant_handler.go). The generated file is named
+# tenant-{uuid}.yml and injects the real X-Tenant-ID UUID.
+#
+# This static file uses the slug as a stand-in tenant ID. The api-gateway
+# resolves the real tenant record by matching the X-Tenant-Slug header (or
+# by looking up the slug from the Host header). Replace "eastfield" below with
+# the actual UUID once the tenant is provisioned and the dynamic file is in place.
+#
+# TODO: Remove this file once the provisioner is reliably called during seed
+#       (tracked in #40 Bug 4 / plan W16.3 generator wiring).
+http:
+  routers:
+    tenant-eastfield:
+      rule: "Host(`eastfield.slate.local`)"
+      entryPoints:
+        - web
+      service: api-gateway-svc
+      middlewares:
+        - inject-tenant-eastfield
+
+  middlewares:
+    inject-tenant-eastfield:
+      headers:
+        customRequestHeaders:
+          X-Tenant-ID: "eastfield"
+
+  services:
+    api-gateway-svc:
+      loadBalancer:
+        servers:
+          - url: "http://api-gateway:8080"
