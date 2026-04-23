@@ -2,18 +2,18 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Button } from '../../../../shared/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../../../../shared/components/ui/card'
+import { Input } from '../../../../shared/components/ui/input'
+import { Label } from '../../../../shared/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Progress } from '@/components/ui/progress'
+} from '../../../../shared/components/ui/select'
+import { Progress } from '../../../../shared/components/ui/progress'
 import { useToast } from '@/hooks/use-toast'
 import { useStartOnboarding } from '@/lib/hooks/use-admin-queries'
 import type { InstitutionDetails, AdminUserDetails, ResourcePlan } from '@/lib/api/types'
@@ -126,7 +126,7 @@ export function OnboardingWizard() {
 
   const handleSubmit = async () => {
     try {
-      const job = await startOnboarding.mutateAsync({
+      const result = await startOnboarding.mutateAsync({
         institutionDetails: institution,
         adminUser,
         resourcePlan,
@@ -135,7 +135,7 @@ export function OnboardingWizard() {
         title: 'Onboarding started',
         description: `Institution "${institution.name}" has been submitted for review.`,
       })
-      router.push(`/onboarding/${job.id}`)
+      router.push(`/onboarding/${result.id}`)
     } catch (err) {
       toast({
         title: 'Failed to start onboarding',

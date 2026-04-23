@@ -3,9 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useOnboardingJobs } from '@/lib/hooks/use-admin-queries'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '../../../shared/components/ui/card'
+import { Badge } from '../../../shared/components/ui/badge'
+import { Button } from '../../../shared/components/ui/button'
 import {
   Table,
   TableBody,
@@ -13,15 +13,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
+} from '../../../shared/components/ui/table'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Progress } from '@/components/ui/progress'
+} from '../../../shared/components/ui/select'
+import { Progress } from '../../../shared/components/ui/progress'
 import type { OnboardingStatus } from '@/lib/api/types'
 import { Plus, Eye, ChevronLeft, ChevronRight, Loader2, ClipboardList } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
@@ -123,7 +123,15 @@ export default function OnboardingListPage() {
                 <TableRow>
                   <TableCell colSpan={6} className="py-12 text-center">
                     <ClipboardList className="mx-auto h-8 w-8 text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">No onboarding jobs found</p>
+                    <p className="mt-2 text-sm font-medium text-muted-foreground">
+                      No onboarding jobs to show
+                    </p>
+                    <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
+                      The onboarding list view is powered by a projection backend that hasn&apos;t
+                      shipped yet (#47). Start a new workflow from the button above — you&apos;ll be
+                      redirected to its detail page. If you already have a workflow URL, navigate to
+                      it directly.
+                    </p>
                   </TableCell>
                 </TableRow>
               ) : (
