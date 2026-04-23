@@ -4,7 +4,7 @@
 //! using dynamic message types.
 
 use prost::Message;
-use prost_reflect::{DescriptorPool, DynamicMessage};
+use prost_reflect::{DescriptorPool, DeserializeOptions, DynamicMessage};
 use tracing::{debug, error};
 
 use crate::grpc::types::GrpcError;
@@ -46,13 +46,25 @@ pub fn json_to_protobuf(
     // Parse and clean JSON
     let cleaned_json = clean_gateway_metadata(json_bytes)?;
 
-    // Deserialize JSON into dynamic message
+    // Deserialize JSON into dynamic message.
+    //
+    // Tolerate unknown fields (T2): FE payloads frequently carry extras that
+    // aren't part of the proto (client-side UI state, echoed metadata,
+    // forward-compat additions). prost-reflect defaults `deny_unknown_fields=true`
+    // which turns every such extra into a 502 Conversion error. Flipping to
+    // `false` makes the converter drop unknown fields silently — matching
+    // google.protobuf.json-format's standard permissive behaviour.
+    let options = DeserializeOptions::new().deny_unknown_fields(false);
     let mut deserializer = serde_json::Deserializer::from_str(&cleaned_json);
-    let message =
-        DynamicMessage::deserialize(input_desc.clone(), &mut deserializer).map_err(|e| {
-            error!(error = %e, "Failed to deserialize JSON to protobuf");
-            GrpcError::ConversionError(format!("JSON to protobuf conversion failed: {}", e))
-        })?;
+    let message = DynamicMessage::deserialize_with_options(
+        input_desc.clone(),
+        &mut deserializer,
+        &options,
+    )
+    .map_err(|e| {
+        error!(error = %e, "Failed to deserialize JSON to protobuf");
+        GrpcError::ConversionError(format!("JSON to protobuf conversion failed: {}", e))
+    })?;
 
     // Ensure all JSON was consumed
     deserializer.end().map_err(|e| {
@@ -156,4 +168,77 @@ fn clean_gateway_metadata(json_bytes: &[u8]) -> Result<String, GrpcError> {
         error!(error = %e, "Failed to serialize cleaned JSON");
         GrpcError::ConversionError(format!("JSON serialization failed: {}", e))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build a descriptor pool from an inline proto FileDescriptorProto so the
+    /// test can exercise the converter without the real registry. We use a
+    /// minimal `Msg { field: string f = 1 }` type.
+    fn tiny_pool() -> (DescriptorPool, prost_reflect::MessageDescriptor) {
+        use prost_reflect::prost_types::{
+            field_descriptor_proto, DescriptorProto, FieldDescriptorProto, FileDescriptorProto,
+        };
+
+        let field = FieldDescriptorProto {
+            name: Some("f".to_string()),
+            number: Some(1),
+            r#type: Some(field_descriptor_proto::Type::String as i32),
+            label: Some(field_descriptor_proto::Label::Optional as i32),
+            json_name: Some("f".to_string()),
+            ..Default::default()
+        };
+        let msg = DescriptorProto {
+            name: Some("Msg".to_string()),
+            field: vec![field],
+            ..Default::default()
+        };
+        let file = FileDescriptorProto {
+            name: Some("tiny.proto".to_string()),
+            package: Some("tiny".to_string()),
+            syntax: Some("proto3".to_string()),
+            message_type: vec![msg],
+            ..Default::default()
+        };
+        let mut pool = DescriptorPool::new();
+        pool.add_file_descriptor_proto(file).unwrap();
+        let desc = pool.get_message_by_name("tiny.Msg").unwrap();
+        (pool, desc)
+    }
+
+    #[test]
+    fn converter_drops_unknown_fields_instead_of_erroring() {
+        // T2 primary bug: prost-reflect's default `deny_unknown_fields=true`
+        // turned every FE payload carrying a non-proto field into a 502
+        // Conversion error. The converter must now accept and drop extras.
+        let (_pool, desc) = tiny_pool();
+        let json = br#"{"f":"hello","unknownClientState":"ignored"}"#;
+        let options = DeserializeOptions::new().deny_unknown_fields(false);
+        let mut de = serde_json::Deserializer::from_slice(json);
+        let msg = DynamicMessage::deserialize_with_options(desc, &mut de, &options)
+            .expect("unknown fields must not error the converter");
+        let got = msg
+            .get_field_by_name("f")
+            .expect("f present")
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert_eq!(got, "hello");
+    }
+
+    #[test]
+    fn converter_default_options_would_reject_unknown_fields() {
+        // Guard: if this ever flips upstream, we want to know immediately
+        // so our explicit override stays meaningful.
+        let (_pool, desc) = tiny_pool();
+        let json = br#"{"f":"hello","extra":1}"#;
+        let mut de = serde_json::Deserializer::from_slice(json);
+        let res = DynamicMessage::deserialize(desc, &mut de);
+        assert!(
+            res.is_err(),
+            "upstream default was expected to deny_unknown_fields; if this passes, the override in json_to_protobuf is obsolete"
+        );
+    }
 }
