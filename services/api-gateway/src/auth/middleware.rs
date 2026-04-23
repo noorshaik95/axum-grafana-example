@@ -10,6 +10,7 @@ use serde::Serialize;
 use std::sync::Arc;
 use tracing::{debug, error, warn};
 
+use crate::auth::tenant_resolver::TenantResolver;
 use crate::auth::{AuthError, AuthResult, AuthService};
 use crate::grpc::client::GrpcClientPool;
 use crate::router::RequestRouter;
@@ -64,6 +65,10 @@ pub struct AuthMiddlewareState {
     pub router_lock: Arc<RwLock<RequestRouter>>,
     pub public_routes: Vec<(String, String)>, // (path, method) tuples
     pub auth_failure_counter: prometheus::IntCounter,
+    /// #64: resolves `Host: {slug}.slate.local` → tenant UUID. Populated
+    /// on successful auth so `AuthContext.tenant_id` flows into proto
+    /// fields via `conversion.rs::add_auth_context`.
+    pub tenant_resolver: Arc<TenantResolver>,
 }
 
 /// Check if path should skip authentication.
@@ -231,7 +236,7 @@ pub async fn auth_middleware(
         get_auth_policy(&state.auth_service, &state.grpc_pool, &routing_decision).await?;
 
     // Perform authorization
-    let auth_ctx = perform_authorization(
+    let mut auth_ctx = perform_authorization(
         &state.auth_service,
         &headers,
         &auth_policy,
@@ -239,6 +244,24 @@ pub async fn auth_middleware(
         &state.auth_failure_counter,
     )
     .await?;
+
+    // #64: If the token didn't carry a tenant scope, derive it from the
+    // `Host` subdomain. `{slug}.slate.local` → tenant UUID via the resolver.
+    // Platform traffic (api.slate.local / admin.*) stays tenant-less. The
+    // JWT claim wins if both are present (signed > inferred).
+    if auth_ctx.authenticated && auth_ctx.tenant_id.is_none() {
+        if let Some(slug) = headers
+            .get(axum::http::header::HOST)
+            .and_then(|h| h.to_str().ok())
+            .and_then(TenantResolver::slug_from_host)
+        {
+            if let Some(tenant_id) = state.tenant_resolver.resolve(&slug).await {
+                auth_ctx.tenant_id = Some(tenant_id);
+            } else {
+                debug!(slug = %slug, "host subdomain didn't resolve to a tenant");
+            }
+        }
+    }
 
     // Insert auth context and continue
     request.extensions_mut().insert(auth_ctx);

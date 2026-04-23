@@ -13,10 +13,14 @@ pub mod cache;
 mod constants;
 pub mod flag_middleware;
 mod service;
+pub mod tenant_resolver;
 pub mod types;
 
 // Export middleware module
 pub mod middleware;
+
+// Re-export the tenant resolver so app/routes can wire it into middleware state.
+pub use tenant_resolver::TenantResolver;
 
 // Re-export the unavailable-provider default so routes.rs doesn't
 // have to reach into the submodule explicitly.

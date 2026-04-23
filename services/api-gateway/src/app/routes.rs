@@ -10,6 +10,7 @@ use std::sync::Arc;
 use tracing::info;
 
 use crate::auth::middleware::{auth_middleware, AuthMiddlewareState};
+use crate::auth::TenantResolver;
 use crate::docs;
 use crate::handlers::{gateway::gateway_handler, refresh_routes_handler};
 use crate::health::{health_handler, liveness_handler, readiness_handler, HealthChecker};
@@ -62,12 +63,21 @@ fn create_auth_middleware_state(app_state: &Arc<AppState>) -> AuthMiddlewareStat
         .map(|r| (r.path.clone(), r.method.clone()))
         .collect();
 
+    // #64: TenantResolver maps `{slug}.slate.local` Host headers to tenant
+    // UUIDs by querying tenant-service's REST list endpoint. Override the
+    // target with `TENANT_SERVICE_REST_URL` (defaults to the in-network
+    // docker hostname).
+    let tenant_service_url = std::env::var("TENANT_SERVICE_REST_URL")
+        .unwrap_or_else(|_| "http://tenant-service:8083".to_string());
+    let tenant_resolver = Arc::new(TenantResolver::new(tenant_service_url));
+
     AuthMiddlewareState {
         auth_service: app_state.auth_service.clone(),
         grpc_pool: app_state.grpc_pool.clone(),
         router_lock: app_state.router_lock.clone(),
         public_routes,
         auth_failure_counter: app_state.metrics.auth_failure_counter.clone(),
+        tenant_resolver,
     }
 }
 
