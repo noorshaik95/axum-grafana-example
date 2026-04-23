@@ -14,7 +14,6 @@ import {
   broadcastApi,
   statusApi,
   adminUsersApi,
-  auditApi,
   platformMetricsApi,
   platformTenantsApi,
   alertsApi,
@@ -25,12 +24,11 @@ import {
   type UpdateFlagRequest,
   type BroadcastRequest,
   type ListAdminUsersParams,
-  type ListAuditParams as PlatformListAuditParams,
   type ListTenantsParams as PlatformListTenantsParams,
 } from '../api/platform'
-import type { ListParams, OnboardingPayload, ResourcePlan } from '../api/types'
-import type { ListOnboardingParams } from '../api/onboarding'
-import type { InviteUserRequest } from '../api/iam'
+import type { ListParams, ResourcePlan } from '../api/types'
+import type { ListOnboardingParams, StartOnboardingRequest } from '../api/onboarding'
+import type { InviteUserRequest, ListAuditParams } from '../api/iam'
 
 /**
  * Admin profile hook — reads the admin user object from localStorage,
@@ -92,7 +90,7 @@ export function useOnboardingStatus(id: string) {
 export function useStartOnboarding() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (payload: OnboardingPayload) => onboardingApi.start(payload),
+    mutationFn: (body: StartOnboardingRequest) => onboardingApi.start(body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['onboarding'] }),
   })
 }
@@ -204,10 +202,10 @@ export function useUpdateRolePermissions() {
   })
 }
 
-export function useAuditLogs(params?: PlatformListAuditParams) {
+export function useAuditLogs(params?: ListAuditParams) {
   return useQuery({
     queryKey: ['admin', 'audit', params],
-    queryFn: () => auditApi.list(params),
+    queryFn: () => iamApi.listAuditLogs(params),
   })
 }
 

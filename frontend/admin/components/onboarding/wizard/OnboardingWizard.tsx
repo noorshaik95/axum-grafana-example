@@ -16,6 +16,7 @@ import {
 import { Progress } from '../../../../shared/components/ui/progress'
 import { useToast } from '@/hooks/use-toast'
 import { useStartOnboarding } from '@/lib/hooks/use-admin-queries'
+import { onboardingApi } from '@/lib/api/onboarding'
 import type { InstitutionDetails, AdminUserDetails, ResourcePlan } from '@/lib/api/types'
 import { Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 
@@ -126,11 +127,25 @@ export function OnboardingWizard() {
 
   const handleSubmit = async () => {
     try {
+      // Restate OnboardingWorkflow::start expects only the minimal
+      // snake_case shape per services/onboarding-service/src/state.rs.
       const result = await startOnboarding.mutateAsync({
-        institutionDetails: institution,
-        adminUser,
-        resourcePlan,
+        institution_name: institution.name,
+        admin_email: adminUser.email,
       })
+      // Persist the rich wizard payload as step 1 so the workflow has the
+      // full context (slug/domain/resource plan/admin name) available for
+      // downstream steps. Non-blocking: the workflow is already started.
+      try {
+        await onboardingApi.saveStep(result.id, 1, {
+          institutionDetails: institution,
+          adminUser,
+          resourcePlan,
+        })
+      } catch {
+        // save-step failure doesn't invalidate the started workflow —
+        // admin can retry from the detail page.
+      }
       toast({
         title: 'Onboarding started',
         description: `Institution "${institution.name}" has been submitted for review.`,

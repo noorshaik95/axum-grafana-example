@@ -1,14 +1,13 @@
 import apiClient from './client'
-import type {
-  OnboardingJob,
-  OnboardingPayload,
-  OnboardingStatus,
-  PaginatedResponse,
-  ListParams,
-} from './types'
+import type { OnboardingJob, OnboardingStatus, PaginatedResponse, ListParams } from './types'
 
 export interface ListOnboardingParams extends ListParams {
   status?: OnboardingStatus
+}
+
+export interface StartOnboardingRequest {
+  institution_name: string
+  admin_email: string
 }
 
 export interface StartOnboardingResponse {
@@ -81,29 +80,18 @@ export const onboardingApi = {
     return status.job
   },
 
-  async start(payload: OnboardingPayload): Promise<StartOnboardingResponse> {
-    const id = newWorkflowId()
+  async start(body: StartOnboardingRequest): Promise<StartOnboardingResponse> {
     // Restate OnboardingWorkflow::start expects a minimal snake_case payload
-    // (services/onboarding-service/src/state.rs::StartPayload):
+    // matching services/onboarding-service/src/state.rs::StartPayload:
     //   { institution_name: String, admin_email: String }
-    // Rich wizard data (institutionDetails.{slug,domain,size}, resourcePlan,
-    // adminUser.firstName/lastName) flows through subsequent save-step calls.
-    const startBody = {
-      institution_name: payload.institutionDetails?.name ?? '',
-      admin_email: payload.adminUser?.email ?? '',
-    }
-    const response = await apiClient.post(`/onboarding/${id}/start`, startBody)
-    const body = (response.data ?? {}) as Record<string, unknown>
-    const maybeJob = (body.job ?? body) as OnboardingJob | undefined
-    // Persist the full wizard payload as step 1 so the workflow has the
-    // original rich data available for downstream steps.
-    try {
-      await onboardingApi.saveStep(id, 1, payload as unknown as Record<string, unknown>)
-    } catch {
-      // save-step failure doesn't invalidate the started workflow — admin
-      // can retry the wizard; the workflow id is already returned.
-    }
-    return { id, job: maybeJob, raw: body }
+    // Callers (wizards) are responsible for passing those exact keys + for
+    // persisting richer wizard data via subsequent `saveStep(id, 1, ...)`
+    // calls so the workflow has full context available downstream.
+    const id = newWorkflowId()
+    const response = await apiClient.post(`/onboarding/${id}/start`, body)
+    const resData = (response.data ?? {}) as Record<string, unknown>
+    const maybeJob = (resData.job ?? resData) as OnboardingJob | undefined
+    return { id, job: maybeJob, raw: resData }
   },
 
   async saveStep(id: string, step: number, data: Record<string, unknown>): Promise<OnboardingJob> {

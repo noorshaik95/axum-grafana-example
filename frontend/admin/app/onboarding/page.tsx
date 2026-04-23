@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useOnboardingJobs } from '@/lib/hooks/use-admin-queries'
 import { Card, CardContent } from '../../../shared/components/ui/card'
-import { Badge } from '../../../shared/components/ui/badge'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '../../../shared/components/ui/button'
 import {
   Table,
