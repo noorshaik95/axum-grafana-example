@@ -23,9 +23,10 @@ export function InstructorTopbar() {
   }
 
   return (
-    <div className="sticky top-0 z-50 flex flex-col">
+    <header role="banner" className="sticky top-0 z-50 flex flex-col">
       {/* Main top bar */}
-      <div
+      <nav
+        aria-label="Primary"
         className="flex h-14 items-center justify-between px-6 border-b"
         style={{
           background: 'rgba(251,250,245,0.85)',
@@ -107,7 +108,7 @@ export function InstructorTopbar() {
             </div>
           </div>
         </div>
-      </div>
+      </nav>
 
       {/* Urgent items bar */}
       <div
@@ -141,6 +142,6 @@ export function InstructorTopbar() {
           OH · 4 booked · 2pm
         </Link>
       </div>
-    </div>
+    </header>
   )
 }
