@@ -3,7 +3,9 @@ import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
   const token = request.cookies.get('slate_token')?.value
-  const isAuthPage = request.nextUrl.pathname.startsWith('/login')
+  const isAuthPage =
+    request.nextUrl.pathname.startsWith('/login') ||
+    request.nextUrl.pathname.startsWith('/auth/impersonate-landing')
 
   if (!token && !isAuthPage) {
     return NextResponse.redirect(new URL('/login', request.url))
