@@ -6,6 +6,13 @@
 //! - Parse the incoming `traceparent` (W3C Trace Context v00). If missing,
 //!   derive a parent span from the current OpenTelemetry span (or generate a
 //!   new root) so downstream services always receive a traceparent.
+//! - #63: when a *valid* inbound traceparent is present, adopt it as the OTEL
+//!   remote parent for the active tracing span so the gateway span shares the
+//!   caller's trace_id. Without this, Tempo sees a fresh trace per inbound
+//!   request and the "trace a click" dashboard can't stitch FE → gateway →
+//!   backend hops.
+//! - Record `request_id` + `tenant.slug` as span attributes so the Tempo
+//!   dashboard's `{ .request_id = "..." }` TraceQL lookup resolves.
 //! - Record `request_id` as a span attribute and tag the request's extensions
 //!   so downstream handlers (including gRPC outbound) can propagate it.
 
@@ -15,8 +22,10 @@ use axum::{
     http::{header::HeaderName, HeaderValue, Response},
     middleware::Next,
 };
+use opentelemetry::trace::{SpanContext, SpanId, TraceContextExt, TraceFlags, TraceId, TraceState};
 use std::sync::OnceLock;
 use tracing::Span;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use uuid::Uuid;
 
 /// Header name for the request-scoped correlation ID.
@@ -74,13 +83,28 @@ pub async fn request_id_middleware(mut request: Request, next: Next) -> Response
         .map(|s| s.to_string())
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-    let traceparent = request
+    // #63: capture the raw inbound traceparent *before* fallback so we can
+    // adopt it as the OTEL remote parent. If missing/malformed, we mint a
+    // new one below (gateway-originated trace).
+    let inbound_traceparent = request
         .headers()
         .get(TRACEPARENT_HEADER)
         .and_then(|v| v.to_str().ok())
         .filter(|s| is_valid_traceparent(s))
-        .map(|s| s.to_string())
+        .map(|s| s.to_string());
+
+    let traceparent = inbound_traceparent
+        .clone()
         .unwrap_or_else(new_traceparent);
+
+    // #63: read the Traefik-injected tenant slug (if any) for Tempo indexing.
+    // Use the slug, not the tenant UUID, because the "trace a click" dashboard
+    // filters by human-readable handles.
+    let tenant_slug = request
+        .headers()
+        .get("x-tenant-slug")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
 
     // Write back onto the request so inner services + gRPC clients see the
     // canonical values (guaranteed present, no duplicates).
@@ -101,6 +125,24 @@ pub async fn request_id_middleware(mut request: Request, next: Next) -> Response
     span.record("request_id", tracing::field::display(&request_id));
     span.record("traceparent", tracing::field::display(&traceparent));
 
+    // #63: promote the inbound traceparent (if any) to the span's OTEL
+    // remote parent so `tracing-opentelemetry` emits this span under the
+    // caller's trace_id. This is the fix that stitches FE → gateway →
+    // backend hops into a single Tempo trace.
+    if let Some(tp) = inbound_traceparent.as_deref() {
+        if let Some(remote_ctx) = parse_traceparent_to_context(tp) {
+            span.set_parent(remote_ctx);
+        }
+    }
+
+    // #63: set Tempo-indexed span attributes. The "trace a click" dashboard
+    // queries `{ .request_id = "..." }` so every gateway span must carry it.
+    // `tenant.slug` is added when present for per-tenant filtering.
+    span.set_attribute("request_id", request_id.clone());
+    if let Some(slug) = &tenant_slug {
+        span.set_attribute("tenant.slug", slug.clone());
+    }
+
     let mut response = next.run(request).await;
 
     // Always echo the canonical values on the response.
@@ -116,6 +158,33 @@ pub async fn request_id_middleware(mut request: Request, next: Next) -> Response
     }
 
     response
+}
+
+/// Parse a validated W3C traceparent into an `opentelemetry::Context` that
+/// carries the caller's SpanContext as `is_remote = true`. Returns `None`
+/// on any byte-shape failure — callers should have validated with
+/// `is_valid_traceparent` first, but this helper re-checks defensively so
+/// it's safe to call on raw input.
+fn parse_traceparent_to_context(s: &str) -> Option<opentelemetry::Context> {
+    let parts: Vec<&str> = s.split('-').collect();
+    if parts.len() != 4 {
+        return None;
+    }
+    let trace_id_bytes: [u8; 16] = hex::decode(parts[1]).ok()?.try_into().ok()?;
+    let span_id_bytes: [u8; 8] = hex::decode(parts[2]).ok()?.try_into().ok()?;
+    let flags_byte: u8 = u8::from_str_radix(parts[3], 16).ok()?;
+
+    let sc = SpanContext::new(
+        TraceId::from_bytes(trace_id_bytes),
+        SpanId::from_bytes(span_id_bytes),
+        TraceFlags::new(flags_byte),
+        /* is_remote */ true,
+        TraceState::default(),
+    );
+    if !sc.is_valid() {
+        return None;
+    }
+    Some(opentelemetry::Context::current().with_remote_span_context(sc))
 }
 
 /// W3C traceparent validator: version-trace_id-span_id-flags (00-<32hex>-<16hex>-<2hex>).
@@ -201,6 +270,32 @@ mod tests {
             assert!(is_valid_traceparent(&tp), "generated bad traceparent: {tp}");
             assert!(tp.ends_with("-01"));
         }
+    }
+
+    // #63: parse helper adopts inbound traceparent as remote SpanContext.
+    #[test]
+    fn parse_traceparent_extracts_remote_span_context() {
+        let tp = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+        let ctx = parse_traceparent_to_context(tp).expect("should parse");
+        let sc = ctx.span().span_context().clone();
+        assert!(sc.is_valid());
+        assert!(sc.is_remote());
+        assert_eq!(sc.trace_id().to_string(), "4bf92f3577b34da6a3ce929d0e0e4736");
+        assert_eq!(sc.span_id().to_string(), "00f067aa0ba902b7");
+        assert_eq!(sc.trace_flags().to_u8(), 0x01);
+    }
+
+    #[test]
+    fn parse_traceparent_rejects_malformed_input() {
+        // Unvalidated inputs should cleanly return None without panicking.
+        assert!(parse_traceparent_to_context("").is_none());
+        assert!(parse_traceparent_to_context("not-a-traceparent").is_none());
+        assert!(parse_traceparent_to_context("00-short-00f067aa0ba902b7-01").is_none());
+        // All-zero trace id fails validity check.
+        assert!(parse_traceparent_to_context(
+            "00-00000000000000000000000000000000-00f067aa0ba902b7-01"
+        )
+        .is_none());
     }
 
     use axum::{body::Body, http::StatusCode, routing::get, Router};
