@@ -1402,6 +1402,10 @@ cors:
     - "authorization"
     - "x-request-id"
     - "x-trace-id"
+    - "x-tenant-id"
+    - "x-tenant-slug"
+    - "traceparent"
+    - "tracestate"
   expose_headers:
     - "x-trace-id"
     - "x-request-id"

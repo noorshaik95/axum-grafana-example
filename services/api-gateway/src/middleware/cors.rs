@@ -7,14 +7,24 @@ use tracing::{info, warn};
 #[derive(Debug, Clone)]
 pub struct CorsConfig {
     pub allowed_origins: Vec<String>,
+    pub allowed_headers: Vec<String>,
     pub dev_mode: bool,
 }
 
 impl CorsConfig {
     /// Create a new CORS configuration
     pub fn new(allowed_origins: Vec<String>, dev_mode: bool) -> Self {
+        Self::with_headers(allowed_origins, Vec::new(), dev_mode)
+    }
+
+    pub fn with_headers(
+        allowed_origins: Vec<String>,
+        allowed_headers: Vec<String>,
+        dev_mode: bool,
+    ) -> Self {
         Self {
             allowed_origins,
+            allowed_headers,
             dev_mode,
         }
     }
@@ -79,26 +89,35 @@ impl CorsConfig {
             Method::OPTIONS,
         ]);
 
-        // Configure allowed headers
-        // These are the headers that clients can send in requests
-        let allowed_headers: Vec<HeaderName> = vec![
-            "content-type",
-            "authorization",
-            "x-request-id",
-            "x-trace-id",
-        ]
-        .into_iter()
-        .filter_map(|h| h.parse().ok())
-        .collect();
+        // Configure allowed headers. Start from a minimum safe set (content-type,
+        // authorization, trace-propagation) and merge anything extra the yaml
+        // wants — X-Tenant-ID is critical so UI requests actually pass preflight.
+        let mut header_names: Vec<String> = vec![
+            "content-type".into(),
+            "authorization".into(),
+            "x-request-id".into(),
+            "x-trace-id".into(),
+            "traceparent".into(),
+            "tracestate".into(),
+        ];
+        for h in &self.allowed_headers {
+            let lower = h.to_ascii_lowercase();
+            if !header_names.iter().any(|n| n == &lower) {
+                header_names.push(lower);
+            }
+        }
+        let allowed_headers: Vec<HeaderName> = header_names
+            .into_iter()
+            .filter_map(|h| h.parse().ok())
+            .collect();
 
         if !allowed_headers.is_empty() {
             cors = cors.allow_headers(allowed_headers);
         }
 
-        // Configure exposed headers
-        // These are the headers that clients can read from responses
-        // x-trace-id is exposed for error correlation and debugging
-        let exposed_headers: Vec<HeaderName> = vec!["x-trace-id"]
+        // Configure exposed headers — clients read x-request-id / traceparent
+        // to correlate with Grafana Tempo traces.
+        let exposed_headers: Vec<HeaderName> = vec!["x-trace-id", "x-request-id", "traceparent"]
             .into_iter()
             .filter_map(|h| h.parse().ok())
             .collect();

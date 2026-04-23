@@ -170,7 +170,13 @@ fn apply_middleware(
 ) -> Result<Router, Box<dyn std::error::Error + Send + Sync>> {
     info!("Applying middleware layers");
 
-    let mut app = router.layer(TraceLayer::new_for_http());
+    // X-Request-ID + W3C traceparent: must run first so every downstream layer
+    // (including the TraceLayer span and gRPC clients) sees the canonical values.
+    let mut app = router
+        .layer(axum::middleware::from_fn(
+            crate::middleware::request_id_middleware,
+        ))
+        .layer(TraceLayer::new_for_http());
 
     // Add CORS middleware if enabled
     if let Some(cors_config) = &app_state.config.cors {
@@ -201,8 +207,11 @@ fn apply_cors_middleware(
     let dev_mode = determine_dev_mode();
     let allowed_origins = get_allowed_origins(cors_config);
 
-    // Create CORS configuration
-    let cors_middleware_config = CorsConfig::new(allowed_origins.clone(), dev_mode);
+    // Create CORS configuration — pass through allowed_headers from yaml so
+    // app-specific headers like X-Tenant-ID don't get blocked at preflight.
+    let allowed_headers = cors_config.allowed_headers.clone();
+    let cors_middleware_config =
+        CorsConfig::with_headers(allowed_origins.clone(), allowed_headers, dev_mode);
 
     // Log configuration
     log_cors_configuration(dev_mode, &allowed_origins);
