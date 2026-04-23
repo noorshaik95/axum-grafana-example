@@ -117,16 +117,15 @@ proto: proto/onboarding.proto
 2. The **actual W13 onboarding-service** is Restate/Rust Virtual Objects (`OnboardingWorkflow` + `CanvasMigration`) with HTTP endpoints on :9080, not gRPC. Restate's programming model is HTTP-native; a gRPC shim would fight the framework.
 3. The yaml referenced a **third** set (`StartOnboarding`, `GetOnboardingStatus`, `CanvasImport`) that existed in neither world — removed in `2ebfa8c`.
 
-**Resolution (§1b, CLOSED `22b4d70`):** 14 Restate routes added to gateway-config.yaml using `http_proxy_target: http://restate-server:9080` (Restate ingress) + `http_proxy_path_template` for `:key` substitution. Target is the Restate ingress port, NOT `onboarding-service:9080` (SDK endpoint is not publicly routable).
+**Resolution (§1b, CLOSED `22b4d70` + cleanup `2ebfa8c`):** 14 Restate routes added to gateway-config.yaml using `http_proxy_target: http://restate-server:9080` (Restate ingress) + `http_proxy_path_template` for `:id` substitution (matcher key is `:id`, matching the rest of the yaml's convention; CanvasMigration nested under `/api/onboarding/:id/canvas/*`). Target is the Restate ingress port, NOT `onboarding-service:9080` (SDK endpoint is not publicly routable). Stale `onboarding.OnboardingService/{StartOnboarding,GetOnboardingStatus,CanvasImport,Health}` gRPC passthroughs + the `/api/health/onboarding` public-route entry removed in `2ebfa8c`.
 
-| yaml route                                      | method                                                                  | status               |
-| ----------------------------------------------- | ----------------------------------------------------------------------- | -------------------- |
-| `POST /api/onboarding/:key/start`               | HTTP proxy → `http://restate-server:9080/OnboardingWorkflow/:key/start` | **DONE**             |
-| `GET /api/onboarding/:key/status`               | HTTP proxy → `/OnboardingWorkflow/:key/status`                          | **DONE**             |
-| `POST /api/onboarding/:key/approve`             | HTTP proxy → `/OnboardingWorkflow/:key/approve`                         | **DONE**             |
-| `POST /api/onboarding/:key/reject`              | HTTP proxy → `/OnboardingWorkflow/:key/reject`                          | **DONE**             |
-| _(+ 10 more CanvasMigration + workflow routes)_ | see gateway-config.yaml §Onboarding                                     | **DONE**             |
-| `GET /api/health/onboarding`                    | `onboarding.OnboardingService/Health`                                   | **FIX-YAML applied** |
+| yaml route                                      | method                                                                 | status   |
+| ----------------------------------------------- | ---------------------------------------------------------------------- | -------- |
+| `POST /api/onboarding/:id/start`                | HTTP proxy → `http://restate-server:9080/OnboardingWorkflow/:id/start` | **DONE** |
+| `GET /api/onboarding/:id/status`                | HTTP proxy → `/OnboardingWorkflow/:id/status`                          | **DONE** |
+| `POST /api/onboarding/:id/approve`              | HTTP proxy → `/OnboardingWorkflow/:id/approve`                         | **DONE** |
+| `POST /api/onboarding/:id/reject`               | HTTP proxy → `/OnboardingWorkflow/:id/reject`                          | **DONE** |
+| _(+ 10 more CanvasMigration + workflow routes)_ | see gateway-config.yaml §Onboarding                                    | **DONE** |
 
 ---
 
